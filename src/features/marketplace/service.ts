@@ -343,6 +343,52 @@ export async function listMarketplaceListings(
   });
 }
 
+export async function getMarketplaceListing(
+  actorUserId: string | null,
+  circleId: string,
+  listingId: string
+): Promise<MarketplaceListingItem | null> {
+  return withRlsTransaction(actorUserId, async (tx) => {
+    const { circle, membership } = await assertCommerceCapability(tx, circleId, actorUserId);
+    if (
+      !canReadCircleContent(circle.visibility, {
+        userId: actorUserId,
+        circleRole: membership?.role ?? null,
+        membershipStatus: membership?.status ?? null,
+      })
+    ) {
+      throw new ForbiddenError('You do not have permission to view listings in this Circle.');
+    }
+
+    const res = await tx.query<
+      MarketplaceListingItem & {
+        seller_username: string;
+        seller_display_name: string;
+        seller_avatar_url: string | null;
+        viewer_has_saved: boolean;
+      }
+    >(
+      `SELECT l.*,
+         COALESCE(u.username, 'member') AS seller_username,
+         COALESCE(u.display_name, 'Member') AS seller_display_name,
+         u.avatar_url AS seller_avatar_url,
+         EXISTS (
+           SELECT 1 FROM public.marketplace_saved_listings s
+           WHERE s.listing_id = l.id AND s.user_id = $3
+         ) AS viewer_has_saved
+       FROM public.marketplace_listings l
+       LEFT JOIN public.profiles u ON u.id = l.seller_id
+       WHERE l.circle_id = $1 AND l.id = $2
+       LIMIT 1;`,
+      [circleId, listingId, actorUserId]
+    );
+
+    const row = res.rows[0];
+    if (!row) return null;
+    return normalizeListingRow(row);
+  });
+}
+
 export async function updateMarketplaceListing(
   actorUserId: string,
   circleId: string,

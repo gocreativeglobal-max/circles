@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
+import Link from 'next/link';
 import {
   ArrowUpDown,
   Bookmark,
@@ -10,6 +11,8 @@ import {
   Clock,
   Download,
   Edit3,
+  ExternalLink,
+  Eye,
   Inbox,
   MapPin,
   MessageSquare,
@@ -29,6 +32,7 @@ import {
   ServiceBookingItem,
 } from '@/types/domain';
 import { Button } from '@/components/ui/button';
+import { ImageUploader } from '@/components/ui/image-uploader';
 import { DirectMessageDrawer } from '@/components/messages/direct-message-drawer';
 import {
   generateAvailableSlots,
@@ -98,7 +102,7 @@ export function MarketplaceBoard({
   >('good');
   const [location, setLocation] = useState('');
   const [description, setDescription] = useState('');
-  const [imageUrlsText, setImageUrlsText] = useState('');
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [status, setStatus] = useState<'published' | 'draft' | 'reserved' | 'sold'>('published');
 
   // Detail Modal
@@ -170,7 +174,7 @@ export function MarketplaceBoard({
     setPricingUnit('fixed');
     setCondition('good');
     setLocation('');
-    setImageUrlsText('');
+    setImageUrls([]);
     setStatus('published');
     setSchedDays([1, 2, 3, 4, 5]);
     setSchedStartTime('09:00');
@@ -193,7 +197,7 @@ export function MarketplaceBoard({
     setPricingUnit(item.pricing_unit);
     setCondition((item.condition as typeof condition) || 'not_applicable');
     setLocation(item.location || '');
-    setImageUrlsText((item.image_urls || []).join('\n'));
+    setImageUrls(item.image_urls || []);
     setStatus(
       item.status === 'draft' || item.status === 'reserved' || item.status === 'sold'
         ? item.status
@@ -224,10 +228,9 @@ export function MarketplaceBoard({
       const url = `/api/circles/${circleId}/marketplace`;
       const method = isEdit ? 'PATCH' : 'POST';
 
-      const parsedImages = imageUrlsText
-        .split('\n')
+      const parsedImages = imageUrls
         .map((u) => u.trim())
-        .filter((u) => u.startsWith('http://') || u.startsWith('https://'));
+        .filter((u) => u.startsWith('http://') || u.startsWith('https://') || u.startsWith('/'));
 
       const payload = {
         ...(isEdit ? { listingId: editingListingId } : {}),
@@ -900,13 +903,21 @@ export function MarketplaceBoard({
                     <div className="space-y-3">
                       {/* Image Thumbnail Preview (if present) */}
                       {hasImage && (
-                        <div className="relative h-40 w-full overflow-hidden rounded-xl bg-stone-100 border border-stone-200/80">
+                        <div
+                          onClick={() => setSelectedListing(item)}
+                          className="relative h-44 w-full cursor-pointer overflow-hidden rounded-xl bg-stone-100 border border-stone-200/80 group/img"
+                        >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={item.image_urls[0]}
                             alt={item.title}
-                            className="h-full w-full object-cover group-hover:scale-102 transition-transform duration-300"
+                            className="h-full w-full object-cover group-hover/img:scale-103 transition-transform duration-300"
                           />
+                          <div className="absolute inset-0 bg-stone-900/0 hover:bg-stone-900/20 transition-colors flex items-center justify-center opacity-0 group-hover/img:opacity-100">
+                            <span className="rounded-lg bg-stone-900/80 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-xs flex items-center gap-1 shadow-xs">
+                              <Eye className="h-3.5 w-3.5" /> View Details
+                            </span>
+                          </div>
                           {item.image_urls.length > 1 && (
                             <span className="absolute bottom-2 right-2 rounded-md bg-black/70 px-1.5 py-0.5 text-[10px] font-mono font-medium text-white backdrop-blur-xs">
                               +{item.image_urls.length - 1} photos
@@ -936,13 +947,13 @@ export function MarketplaceBoard({
                       {/* Title & Price */}
                       <div className="space-y-1">
                         <div className="flex items-baseline justify-between gap-2">
-                          <h3
-                            onClick={() => setSelectedListing(item)}
-                            className="text-base font-bold text-stone-900 group-hover:text-emerald-950 transition-colors cursor-pointer truncate"
+                          <Link
+                            href={`/circles/${circleSlug}/marketplace/${item.id}`}
+                            className="text-base font-bold text-stone-900 hover:text-emerald-900 hover:underline transition-colors truncate"
                             title={item.title}
                           >
                             {item.title}
-                          </h3>
+                          </Link>
                           <span className="text-sm font-black text-stone-900 font-mono shrink-0">
                             {item.pricing_unit === 'free'
                               ? 'FREE'
@@ -994,8 +1005,8 @@ export function MarketplaceBoard({
                       </div>
 
                       <div className="flex items-center justify-between gap-2 pt-1">
-                        {/* Status badge if not active */}
-                        <div>
+                        {/* Status badge and View Details Link */}
+                        <div className="flex items-center gap-1.5">
                           {item.status === 'reserved' && (
                             <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-mono font-bold text-amber-800 border border-amber-200">
                               RESERVED
@@ -1006,16 +1017,14 @@ export function MarketplaceBoard({
                               SOLD
                             </span>
                           )}
-                          {item.status === 'published' && (
-                            <Button
-                              size="xs"
-                              variant="ghost"
-                              onClick={() => setSelectedListing(item)}
-                              className="text-stone-500 hover:text-stone-900 px-1"
-                            >
-                              Details
-                            </Button>
-                          )}
+                          <Link
+                            href={`/circles/${circleSlug}/marketplace/${item.id}`}
+                            className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-xs font-semibold text-stone-700 shadow-2xs hover:bg-stone-50 hover:text-stone-900 transition-colors"
+                            title="View full listing details"
+                          >
+                            <Eye className="h-3 w-3 text-stone-500" />
+                            <span>Details</span>
+                          </Link>
                         </div>
 
                         {/* Action buttons */}
@@ -1537,15 +1546,14 @@ export function MarketplaceBoard({
                 </div>
 
                 <div className="sm:col-span-3">
-                  <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-600">
-                    Photo URLs (One per line)
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={imageUrlsText}
-                    onChange={(e) => setImageUrlsText(e.target.value)}
-                    placeholder="https://images.unsplash.com/photo-xyz&#10;https://example.com/item.jpg"
-                    className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/60 px-3 py-2 text-xs font-mono text-stone-800 focus:outline-none focus:ring-1 focus:ring-stone-900"
+                  <ImageUploader
+                    circleId={circleId}
+                    value={imageUrls}
+                    onChange={setImageUrls}
+                    multiple
+                    maxFiles={8}
+                    label="Listing Photos"
+                    helperText="Upload photos from your device or paste links"
                   />
                 </div>
 
@@ -1849,6 +1857,14 @@ export function MarketplaceBoard({
               )}
 
               <div className="flex items-center gap-2">
+                <Link
+                  href={`/circles/${circleSlug}/marketplace/${selectedListing.id}`}
+                  className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 shadow-2xs hover:bg-stone-50 hover:text-stone-900 transition-colors"
+                >
+                  <span>Open Full Page</span>
+                  <ExternalLink className="h-3.5 w-3.5 text-stone-500" />
+                </Link>
+
                 {currentUserId !== selectedListing.seller_id && isMember && (
                   <>
                     <Button

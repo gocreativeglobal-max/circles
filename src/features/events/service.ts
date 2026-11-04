@@ -39,6 +39,14 @@ export const createEventSchema = z.object({
   timezone: z.string().trim().min(1).max(80).default('UTC'),
   capacity: z.number().int().min(1).max(100000).nullable().optional(),
   registrationClosesAt: z.string().datetime().nullable().optional(),
+  coverImageUrl: z
+    .string()
+    .trim()
+    .max(2048)
+    .nullable()
+    .optional()
+    .or(z.literal(''))
+    .transform((v) => (v === '' ? null : v)),
 });
 
 export const updateEventSchema = z.object({
@@ -60,6 +68,14 @@ export const updateEventSchema = z.object({
   endsAt: z.string().datetime().optional(),
   capacity: z.number().int().min(1).max(100000).nullable().optional(),
   registrationClosesAt: z.string().datetime().nullable().optional(),
+  coverImageUrl: z
+    .string()
+    .trim()
+    .max(2048)
+    .nullable()
+    .optional()
+    .or(z.literal(''))
+    .transform((v) => (v === '' ? null : v)),
   status: z.enum(['draft', 'published', 'cancelled', 'completed']).optional(),
 });
 
@@ -152,8 +168,8 @@ export async function createCircleEvent(
       `INSERT INTO public.circle_events (
          id, circle_id, space_id, organizer_id, title, description, event_type,
          location_type, venue_text, meeting_url, starts_at, ends_at, timezone,
-         capacity, registration_closes_at, status
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 'published')
+         capacity, registration_closes_at, cover_image_url, status
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'published')
        RETURNING *;`,
       [
         eventId,
@@ -171,6 +187,7 @@ export async function createCircleEvent(
         parsed.timezone,
         parsed.capacity ?? null,
         parsed.registrationClosesAt ?? null,
+        parsed.coverImageUrl ?? null,
       ]
     );
 
@@ -357,8 +374,9 @@ export async function updateCircleEvent(
            status = $10,
            event_type = $11,
            space_id = $12,
+           cover_image_url = $13,
            updated_at = NOW()
-       WHERE id = $13 AND circle_id = $14;`,
+       WHERE id = $14 AND circle_id = $15;`,
       [
         parsed.title ?? existing.title,
         parsed.description ?? existing.description,
@@ -374,6 +392,7 @@ export async function updateCircleEvent(
         parsed.status ?? existing.status,
         parsed.eventType ?? existing.event_type,
         parsed.spaceId !== undefined ? parsed.spaceId : existing.space_id,
+        parsed.coverImageUrl !== undefined ? parsed.coverImageUrl : existing.cover_image_url,
         eventId,
         circleId,
       ]

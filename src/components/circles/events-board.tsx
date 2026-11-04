@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { CircleEventItem, CircleRole, CircleSpace, EventRsvpItem } from '@/types/domain';
 import { Button } from '@/components/ui/button';
+import { ImageUploader } from '@/components/ui/image-uploader';
 
 export interface EventsBoardProps {
   circleId: string;
@@ -70,6 +71,7 @@ export function EventsBoard({
   const [capacity, setCapacity] = useState('');
   const [startsAt, setStartsAt] = useState('');
   const [endsAt, setEndsAt] = useState('');
+  const [coverImageUrl, setCoverImageUrl] = useState('');
 
   // Roster / Check-in Drawer state
   const [rosterEvent, setRosterEvent] = useState<CircleEventItem | null>(null);
@@ -94,6 +96,7 @@ export function EventsBoard({
     setMeetingUrl('');
     setSpaceId('');
     setCapacity('');
+    setCoverImageUrl('');
     const now = Date.now();
     const start = new Date(now + 86400_000);
     const end = new Date(now + 93600_000);
@@ -113,6 +116,7 @@ export function EventsBoard({
     setMeetingUrl(ev.meeting_url || '');
     setSpaceId(ev.space_id || '');
     setCapacity(ev.capacity ? String(ev.capacity) : '');
+    setCoverImageUrl(ev.cover_image_url || '');
     setStartsAt(new Date(ev.starts_at).toISOString().slice(0, 16));
     setEndsAt(new Date(ev.ends_at).toISOString().slice(0, 16));
     setModalOpen(true);
@@ -143,6 +147,7 @@ export function EventsBoard({
         meetingUrl: meetingUrl.trim() ? meetingUrl.trim() : null,
         spaceId: spaceId ? spaceId : null,
         capacity: capacity ? Number(capacity) : null,
+        coverImageUrl: coverImageUrl.trim() ? coverImageUrl.trim() : null,
         startsAt: new Date(startsAt).toISOString(),
         endsAt: new Date(endsAt).toISOString(),
       };
@@ -739,8 +744,19 @@ export function EventsBoard({
             return (
               <div
                 key={ev.id}
-                className="group relative rounded-2xl border border-stone-200/80 bg-white p-5 shadow-xs hover:border-stone-400 hover:shadow-premium-hover transition-all duration-200"
+                className="group relative rounded-2xl border border-stone-200/80 bg-white p-5 shadow-xs hover:border-stone-400 hover:shadow-premium-hover transition-all duration-200 overflow-hidden"
               >
+                {ev.cover_image_url && (
+                  <div className="relative -mx-5 -mt-5 mb-5 h-44 sm:h-52 overflow-hidden border-b border-stone-200">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={ev.cover_image_url}
+                      alt={ev.title}
+                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-stone-900/40 via-transparent to-transparent" />
+                  </div>
+                )}
                 <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
                   {/* Date Ribbon Badge */}
                   <div className="flex flex-row items-center gap-3 sm:flex-col sm:items-center sm:justify-center rounded-xl bg-stone-50 px-3.5 py-2.5 border border-stone-200/80 shrink-0 sm:w-20 sm:text-center">
@@ -1158,6 +1174,17 @@ export function EventsBoard({
                     </span>
                   </div>
                 )}
+
+                <div className="sm:col-span-2">
+                  <ImageUploader
+                    circleId={circleId}
+                    value={coverImageUrl}
+                    onChange={setCoverImageUrl}
+                    aspectRatio="banner"
+                    label="Cover Banner Image"
+                    helperText="Upload a banner photo from your computer or enter a URL"
+                  />
+                </div>
 
                 <div className="sm:col-span-2">
                   <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-600">

@@ -283,6 +283,7 @@ export interface CircleEventItem {
   timezone: string;
   capacity: number | null;
   registration_closes_at: string | null;
+  cover_image_url?: string | null;
   status: 'draft' | 'published' | 'cancelled' | 'completed';
   created_at: string;
   updated_at: string;

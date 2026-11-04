@@ -77,6 +77,7 @@ export async function POST(
     const event = await createCircleEvent(user.id, {
       ...body,
       circleId: params.circleId,
+      coverImageUrl: body.coverImageUrl ?? body.cover_image_url,
     });
     return NextResponse.json({ event }, { status: 201 });
   } catch (error) {
@@ -113,7 +114,10 @@ export async function PATCH(
       user.id,
       params.circleId,
       String(body.eventId),
-      body
+      {
+        ...body,
+        coverImageUrl: body.coverImageUrl ?? body.cover_image_url,
+      }
     );
     return NextResponse.json({ event });
   } catch (error) {
