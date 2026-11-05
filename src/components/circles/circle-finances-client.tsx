@@ -21,6 +21,7 @@ import {
 } from '@/types/domain';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { formatBachsAmount } from '@/lib/payments/currencies';
 
 interface CircleFinancesClientProps {
   circle: Circle;
@@ -86,7 +87,7 @@ export function CircleFinancesClient({
             title: plan.name,
             totalCents: amountCents,
             currency: plan.currency,
-            paymentMethod: 'bank_transfer',
+            paymentMethod: 'bachs',
             status: 'open',
           },
         }),
@@ -241,7 +242,7 @@ export function CircleFinancesClient({
                       {plan.billing_type === 'sliding_scale' ? (
                         <div>
                           <span className="text-2xl font-extrabold text-stone-900">
-                            From ${(plan.min_amount_cents ? plan.min_amount_cents / 100 : 0).toFixed(2)}
+                            From {formatBachsAmount(plan.min_amount_cents || 0, plan.currency)}
                           </span>
                           <span className="text-xs text-stone-500 block mt-0.5">
                             Pay what you wish
@@ -250,7 +251,7 @@ export function CircleFinancesClient({
                       ) : (
                         <>
                           <span className="text-3xl font-extrabold text-stone-900">
-                            ${(plan.amount_cents / 100).toFixed(2)}
+                            {formatBachsAmount(plan.amount_cents, plan.currency)}
                           </span>
                           <span className="text-xs text-stone-500 font-medium">
                             {plan.billing_type === 'recurring' && plan.interval_unit
@@ -347,7 +348,7 @@ export function CircleFinancesClient({
                       </td>
                       <td className="px-6 py-4 font-medium text-stone-800">{inv.title}</td>
                       <td className="px-6 py-4 font-bold text-stone-900">
-                        ${(inv.total_cents / 100).toFixed(2)}
+                        {formatBachsAmount(inv.total_cents, inv.currency)}
                       </td>
                       <td className="px-6 py-4 text-xs text-stone-500">
                         {inv.due_date ? new Date(inv.due_date).toLocaleDateString() : 'Upon receipt'}

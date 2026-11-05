@@ -20,6 +20,7 @@ import {
   NotFoundError,
 } from '@/lib/errors';
 import { createNotification } from '@/features/notifications/service';
+import { isBachsSupportedCurrency } from '@/lib/payments/currencies';
 
 // ============================================================================
 // Input Validation Schemas
@@ -37,7 +38,17 @@ export const createPricingPlanSchema = z.object({
   description: z.string().trim().max(2000).default(''),
   billingType: z.enum(['one_time', 'recurring', 'installments', 'sliding_scale', 'metered_pack']),
   amountCents: z.number().int().min(0).default(0),
-  currency: z.string().trim().length(3).default('USD'),
+  currency: z
+    .string()
+    .trim()
+    .min(3)
+    .max(4)
+    .toUpperCase()
+    .refine(
+      (c) => isBachsSupportedCurrency(c),
+      'Currency must be an accepted Bachs currency (e.g. USD, NGN, GHS, KES, ZAR, EUR, GBP, CAD, USDT, USDC).'
+    )
+    .default('USD'),
   intervalUnit: z.enum(['day', 'week', 'month', 'quarter', 'year']).nullable().optional(),
   intervalCount: z.number().int().min(1).default(1),
   installmentCount: z.number().int().min(1).nullable().optional(),
@@ -83,7 +94,17 @@ export const createInvoiceSchema = z.object({
   title: z.string().trim().min(2).max(200),
   description: z.string().trim().max(2000).default(''),
   totalCents: z.number().int().min(0),
-  currency: z.string().trim().length(3).default('USD'),
+  currency: z
+    .string()
+    .trim()
+    .min(3)
+    .max(4)
+    .toUpperCase()
+    .refine(
+      (c) => isBachsSupportedCurrency(c),
+      'Currency must be an accepted Bachs currency (e.g. USD, NGN, GHS, KES, ZAR, EUR, GBP, CAD, USDT, USDC).'
+    )
+    .default('USD'),
   paymentMethod: z
     .enum(['bachs', 'stripe', 'bank_transfer', 'cash', 'manual_credit', 'external_erp', 'free_grant'])
     .default('bachs'),

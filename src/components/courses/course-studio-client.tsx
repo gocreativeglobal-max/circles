@@ -34,6 +34,11 @@ import {
 } from '@/types/domain';
 import { Button } from '@/components/ui/button';
 import { LessonBlockBuilder } from './lesson-block-builder';
+import {
+  BACHS_ACCEPTED_CURRENCIES,
+  formatBachsAmount,
+  getBachsCurrency,
+} from '@/lib/payments/currencies';
 
 interface CourseStudioClientProps {
   circleId: string;
@@ -1625,7 +1630,7 @@ export function CourseStudioClient({
                             <div className="flex items-center gap-3">
                               <div className="text-right">
                                 <span className="text-sm font-bold text-stone-900">
-                                  {plan.currency} {(plan.amount_cents / 100).toFixed(2)}
+                                  {formatBachsAmount(plan.amount_cents, plan.currency)}
                                 </span>
                               </div>
                               <button
@@ -1659,7 +1664,7 @@ export function CourseStudioClient({
                               .filter((p) => !paywallPlans.some((linked) => linked.id === p.id))
                               .map((p) => (
                                 <option key={p.id} value={p.id}>
-                                  {p.name} — {p.currency} {(p.amount_cents / 100).toFixed(2)} ({p.billing_type})
+                                  {p.name} — {formatBachsAmount(p.amount_cents, p.currency)} ({p.billing_type})
                                 </option>
                               ))}
                           </select>
@@ -1752,17 +1757,45 @@ export function CourseStudioClient({
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-stone-800">Currency</label>
+                    <label className="block text-xs font-bold text-stone-800">
+                      Bachs Accepted Currency
+                    </label>
                     <select
                       value={newPlanCurrency}
                       onChange={(e) => setNewPlanCurrency(e.target.value)}
                       className="mt-1 w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs text-stone-900 focus:border-black focus:outline-none"
                     >
-                      <option value="USD">USD ($)</option>
-                      <option value="EUR">EUR (€)</option>
-                      <option value="GBP">GBP (£)</option>
-                      <option value="CAD">CAD ($)</option>
+                      <optgroup label="Global Currencies">
+                        {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'fiat_global').map(
+                          (c) => (
+                            <option key={c.code} value={c.code}>
+                              {c.code} ({c.symbol}) — {c.name}
+                            </option>
+                          )
+                        )}
+                      </optgroup>
+                      <optgroup label="African Rails (Bank & Mobile Money)">
+                        {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'fiat_african').map(
+                          (c) => (
+                            <option key={c.code} value={c.code}>
+                              {c.code} ({c.symbol}) — {c.name}
+                            </option>
+                          )
+                        )}
+                      </optgroup>
+                      <optgroup label="Crypto Stablecoins">
+                        {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'stablecoin').map(
+                          (c) => (
+                            <option key={c.code} value={c.code}>
+                              {c.code} ({c.symbol}) — {c.name}
+                            </option>
+                          )
+                        )}
+                      </optgroup>
                     </select>
+                    <p className="mt-1 text-[10px] text-stone-500">
+                      {getBachsCurrency(newPlanCurrency).paymentMethodsDescription}
+                    </p>
                   </div>
                 </div>
 

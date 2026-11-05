@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { z } from 'zod';
 import { withRlsTransaction, withServiceRoleTransaction, DbTransaction } from '@/lib/db/postgres';
 import { getPaymentProcessor } from '@/lib/payments/adapter';
+import { isBachsSupportedCurrency } from '@/lib/payments/currencies';
 import {
   CourseItem,
   CourseModuleItem,
@@ -2777,7 +2778,17 @@ export const createCoursePaywallSchema = z.object({
   name: z.string().trim().min(3).max(180),
   description: z.string().trim().max(1000).default(''),
   amountCents: z.number().int().min(0).max(100000000),
-  currency: z.string().trim().length(3).default('USD'),
+  currency: z
+    .string()
+    .trim()
+    .min(3)
+    .max(4)
+    .toUpperCase()
+    .refine(
+      (c) => isBachsSupportedCurrency(c),
+      'Currency must be an accepted Bachs currency (e.g. USD, NGN, GHS, KES, ZAR, EUR, GBP, CAD, USDT, USDC).'
+    )
+    .default('USD'),
   billingType: z.enum(['one_time', 'recurring']).default('one_time'),
   intervalUnit: z.enum(['day', 'week', 'month', 'quarter', 'year']).nullable().optional(),
 });

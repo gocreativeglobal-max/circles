@@ -32,6 +32,11 @@ import {
 } from '@/types/domain';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import {
+  BACHS_ACCEPTED_CURRENCIES,
+  formatBachsAmount,
+  getBachsCurrency,
+} from '@/lib/payments/currencies';
 
 interface StudioFinancesTabProps {
   circle: Circle;
@@ -66,7 +71,7 @@ export function StudioFinancesTab({
   const [planDescription, setPlanDescription] = useState('');
   const [planBillingType, setPlanBillingType] = useState<BillingType>('recurring');
   const [planAmount, setPlanAmount] = useState('75');
-  const [planCurrency] = useState('USD');
+  const [planCurrency, setPlanCurrency] = useState('USD');
   const [planIntervalUnit, setPlanIntervalUnit] = useState<'month' | 'quarter' | 'year'>('month');
   const [planInstallmentCount, setPlanInstallmentCount] = useState('3');
   const [planMinAmount, setPlanMinAmount] = useState('10');
@@ -80,6 +85,7 @@ export function StudioFinancesTab({
   const [invPlanId, setInvPlanId] = useState('');
   const [invTitle, setInvTitle] = useState('');
   const [invAmount, setInvAmount] = useState('');
+  const [invCurrency, setInvCurrency] = useState('USD');
   const [invDueDate, setInvDueDate] = useState('');
   const [invNotes, setInvNotes] = useState('');
 
@@ -240,7 +246,7 @@ export function StudioFinancesTab({
             planId: invPlanId || undefined,
             title: invTitle,
             totalCents,
-            currency: 'USD',
+            currency: invCurrency,
             dueDate: invDueDate ? new Date(invDueDate).toISOString() : undefined,
             notes: invNotes,
             status: 'open',
@@ -566,12 +572,12 @@ export function StudioFinancesTab({
                     <div className="mt-4 flex items-baseline gap-1">
                       {plan.billing_type === 'sliding_scale' ? (
                         <span className="text-xl font-bold text-stone-900">
-                          From ${(plan.min_amount_cents ? plan.min_amount_cents / 100 : 0).toFixed(2)}
+                          From {formatBachsAmount(plan.min_amount_cents || 0, plan.currency)}
                         </span>
                       ) : (
                         <>
                           <span className="text-2xl font-bold text-stone-900">
-                            ${(plan.amount_cents / 100).toFixed(2)}
+                            {formatBachsAmount(plan.amount_cents, plan.currency)}
                           </span>
                           <span className="text-xs text-stone-500">
                             {plan.billing_type === 'recurring' && plan.interval_unit
@@ -664,7 +670,7 @@ export function StudioFinancesTab({
                       </td>
                       <td className="px-5 py-4 font-medium text-stone-800">{inv.title}</td>
                       <td className="px-5 py-4 font-bold text-stone-900">
-                        ${(inv.total_cents / 100).toFixed(2)}
+                        {formatBachsAmount(inv.total_cents, inv.currency)}
                       </td>
                       <td className="px-5 py-4">
                         <span
@@ -866,7 +872,7 @@ export function StudioFinancesTab({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-stone-700">
-                    Amount ($ USD)
+                    Amount ({getBachsCurrency(planCurrency).symbol})
                   </label>
                   <input
                     type="number"
@@ -878,6 +884,49 @@ export function StudioFinancesTab({
                     className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm focus:border-forest-600 focus:outline-none"
                   />
                 </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-stone-700">
+                    Bachs Currency
+                  </label>
+                  <select
+                    value={planCurrency}
+                    onChange={(e) => setPlanCurrency(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm focus:border-forest-600 focus:outline-none"
+                  >
+                    <optgroup label="Global Currencies">
+                      {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'fiat_global').map(
+                        (c) => (
+                          <option key={c.code} value={c.code}>
+                            {c.code} ({c.symbol}) — {c.name}
+                          </option>
+                        )
+                      )}
+                    </optgroup>
+                    <optgroup label="African Rails (Bank & Mobile Money)">
+                      {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'fiat_african').map(
+                        (c) => (
+                          <option key={c.code} value={c.code}>
+                            {c.code} ({c.symbol}) — {c.name}
+                          </option>
+                        )
+                      )}
+                    </optgroup>
+                    <optgroup label="Crypto Stablecoins">
+                      {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'stablecoin').map(
+                        (c) => (
+                          <option key={c.code} value={c.code}>
+                            {c.code} ({c.symbol}) — {c.name}
+                          </option>
+                        )
+                      )}
+                    </optgroup>
+                  </select>
+                </div>
+              </div>
+              <p className="text-[11px] text-stone-500 -mt-2">
+                Supported via Bachs: {getBachsCurrency(planCurrency).paymentMethodsDescription}
+              </p>
 
                 {planBillingType === 'recurring' && (
                   <div>
@@ -917,7 +966,7 @@ export function StudioFinancesTab({
                 {planBillingType === 'sliding_scale' && (
                   <div>
                     <label className="block text-xs font-semibold uppercase tracking-wider text-stone-700">
-                      Minimum Amount ($)
+                      Minimum Amount ({getBachsCurrency(planCurrency).symbol})
                     </label>
                     <input
                       type="number"
@@ -928,7 +977,6 @@ export function StudioFinancesTab({
                     />
                   </div>
                 )}
-              </div>
 
               <div>
                 <label className="block text-xs font-semibold uppercase tracking-wider text-stone-700">
@@ -1085,6 +1133,7 @@ export function StudioFinancesTab({
                     if (selected) {
                       setInvTitle(selected.name);
                       setInvAmount((selected.amount_cents / 100).toFixed(2));
+                      setInvCurrency(selected.currency || 'USD');
                     }
                   }}
                   className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm focus:border-forest-600 focus:outline-none"
@@ -1092,7 +1141,7 @@ export function StudioFinancesTab({
                   <option value="">Custom one-off invoice</option>
                   {plans.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name} (${(p.amount_cents / 100).toFixed(2)})
+                      {p.name} ({formatBachsAmount(p.amount_cents, p.currency)})
                     </option>
                   ))}
                 </select>
@@ -1115,7 +1164,7 @@ export function StudioFinancesTab({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-stone-700">
-                    Total Amount ($)
+                    Total Amount ({getBachsCurrency(invCurrency).symbol})
                   </label>
                   <input
                     type="number"
@@ -1129,15 +1178,32 @@ export function StudioFinancesTab({
                 </div>
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-stone-700">
-                    Due Date
+                    Bachs Currency
                   </label>
-                  <input
-                    type="date"
-                    value={invDueDate}
-                    onChange={(e) => setInvDueDate(e.target.value)}
+                  <select
+                    value={invCurrency}
+                    onChange={(e) => setInvCurrency(e.target.value)}
                     className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm focus:border-forest-600 focus:outline-none"
-                  />
+                  >
+                    {BACHS_ACCEPTED_CURRENCIES.map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {c.code} ({c.symbol}) — {c.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-stone-700">
+                  Due Date
+                </label>
+                <input
+                  type="date"
+                  value={invDueDate}
+                  onChange={(e) => setInvDueDate(e.target.value)}
+                  className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm focus:border-forest-600 focus:outline-none"
+                />
               </div>
 
               <div>

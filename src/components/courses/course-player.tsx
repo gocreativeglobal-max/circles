@@ -42,6 +42,7 @@ import { ContentBlockRenderer } from './content-block-renderer';
 import { QuizRunner } from './quiz-runner';
 import { LessonBlockBuilder } from './lesson-block-builder';
 import { CourseSettingsModal } from './course-settings-modal';
+import { formatBachsAmount, getBachsCurrency } from '@/lib/payments/currencies';
 
 export function CoursePlayer({
   circleId,
@@ -1155,7 +1156,7 @@ export function CoursePlayer({
                       </div>
                       <div className="flex items-center gap-3">
                         <span className="text-sm font-extrabold text-stone-900">
-                          {plan.currency} {(plan.amount_cents / 100).toFixed(2)}
+                          {formatBachsAmount(plan.amount_cents, plan.currency)}
                         </span>
                         <Button
                           onClick={() => {
@@ -2050,12 +2051,12 @@ export function CoursePlayer({
                 <div className="flex items-center justify-between text-xs text-stone-600">
                   <span>Course Access Pass</span>
                   <span className="font-bold text-stone-900">
-                    {selectedPaywallPlan.currency} {(selectedPaywallPlan.amount_cents / 100).toFixed(2)}
+                    {formatBachsAmount(selectedPaywallPlan.amount_cents, selectedPaywallPlan.currency)}
                   </span>
                 </div>
                 <div className="border-t border-stone-200/80 pt-2 flex items-center justify-between text-sm font-extrabold text-stone-900">
                   <span>Total Due Today</span>
-                  <span>{selectedPaywallPlan.currency} {(selectedPaywallPlan.amount_cents / 100).toFixed(2)}</span>
+                  <span>{formatBachsAmount(selectedPaywallPlan.amount_cents, selectedPaywallPlan.currency)}</span>
                 </div>
               </div>
 
@@ -2065,7 +2066,9 @@ export function CoursePlayer({
                   <CreditCard className="h-4 w-4 text-stone-700" />
                   <div className="flex-1">
                     <p className="text-xs font-bold text-stone-900">Bachs Secure Checkout</p>
-                    <p className="text-[11px] text-stone-500">Global cards, bank transfer & mobile money via Bachs.io</p>
+                    <p className="text-[11px] text-stone-500">
+                      {getBachsCurrency(selectedPaywallPlan.currency).paymentMethodsDescription} via Bachs.io
+                    </p>
                   </div>
                   <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">Bachs Pay</span>
                 </div>
@@ -2085,7 +2088,9 @@ export function CoursePlayer({
                   disabled={isPurchasing}
                   className="bg-black text-white hover:bg-stone-800 text-xs px-4 py-2 rounded-lg font-semibold shadow-2xs"
                 >
-                  {isPurchasing ? 'Processing...' : `Pay ${selectedPaywallPlan.currency} ${(selectedPaywallPlan.amount_cents / 100).toFixed(2)} & Start Learning`}
+                  {isPurchasing
+                    ? 'Processing...'
+                    : `Pay ${formatBachsAmount(selectedPaywallPlan.amount_cents, selectedPaywallPlan.currency)} & Start Learning`}
                 </Button>
               </div>
             </div>
