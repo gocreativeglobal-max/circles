@@ -96,8 +96,11 @@ function parseEnvLocal(): Record<string, string> | null {
 }
 
 const envLocalVars = parseEnvLocal();
+const shouldRunHostedStaging = Boolean(
+  envLocalVars && process.env.RUN_HOSTED_SUPABASE_TESTS === 'true'
+);
 
-describe.skipIf(!envLocalVars)(
+describe.skipIf(!shouldRunHostedStaging)(
   'Live Hosted Supabase PostgreSQL Staging End-to-End Verification',
   () => {
     const createdUserIds: string[] = [];

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   GraduationCap,
   Plus,
@@ -15,6 +16,10 @@ import {
   X,
   Compass,
   Settings,
+  Layers,
+  Calendar,
+  CheckCircle2,
+  ArrowRight,
 } from 'lucide-react';
 import { CourseItem, LeaderboardEntry, MemberXpSummary } from '@/types/domain';
 import { Button } from '@/components/ui/button';
@@ -34,6 +39,7 @@ export function CoursesCatalog({
   isMember: boolean;
   isStaff: boolean;
 }) {
+  const router = useRouter();
   const [courses, setCourses] = useState<CourseItem[]>(initialCourses);
   const [mainTab, setMainTab] = useState<'courses' | 'paths'>('courses');
   const [search, setSearch] = useState('');
@@ -48,6 +54,10 @@ export function CoursesCatalog({
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(false);
 
   // Form states
+  const [pacingFormat, setPacingFormat] = useState<'self_paced' | 'structured' | 'scheduled'>('self_paced');
+  const [scheduleType, setScheduleType] = useState<'relative_drip' | 'calendar_date'>('relative_drip');
+  const [cohortStartDate, setCohortStartDate] = useState('');
+  const [cohortEndDate, setCohortEndDate] = useState('');
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
   const [isSlugManual, setIsSlugManual] = useState(false);
@@ -120,7 +130,17 @@ export function CoursesCatalog({
           description,
           difficultyLevel: difficulty,
           estimatedDurationHours: parseFloat(durationHours) || 0,
-          pacingFormat: 'self_paced',
+          pacingFormat,
+          scheduleType: pacingFormat === 'scheduled' ? scheduleType : 'relative_drip',
+          cohortStartDate:
+            pacingFormat === 'scheduled' && scheduleType === 'calendar_date' && cohortStartDate
+              ? new Date(cohortStartDate).toISOString()
+              : null,
+          cohortEndDate:
+            pacingFormat === 'scheduled' && scheduleType === 'calendar_date' && cohortEndDate
+              ? new Date(cohortEndDate).toISOString()
+              : null,
+          requireSequentialCompletion: pacingFormat === 'structured',
           accessRule,
           minLevelRequired: accessRule === 'min_level' ? Number(minLevelRequired) : 1,
         }),
@@ -133,9 +153,16 @@ export function CoursesCatalog({
       setSlug('');
       setIsSlugManual(false);
       setDescription('');
+      setPacingFormat('self_paced');
+      setScheduleType('relative_drip');
+      setCohortStartDate('');
+      setCohortEndDate('');
       setAccessRule('open');
       setMinLevelRequired(2);
       setShowCreate(false);
+
+      // Immediately navigate instructor into the Circle Course Studio
+      router.push(`/circles/${circleSlug}/courses/${data.course.id}/studio`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to create course.');
     } finally {
@@ -339,6 +366,9 @@ export function CoursesCatalog({
                           <span className="rounded-md bg-stone-100 px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-wider text-stone-700 border border-stone-200/60">
                             {course.difficulty_level?.replace('_', ' ') || 'All Levels'}
                           </span>
+                          <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-mono font-semibold text-emerald-800 border border-emerald-200/80 capitalize">
+                            {course.pacing_format ? course.pacing_format.replace('_', ' ') : 'Self-paced'}
+                          </span>
                           <span className="rounded-md bg-stone-100 px-2 py-0.5 text-[10px] font-mono text-stone-600 border border-stone-200/60">
                             v{course.published_version || 1}
                           </span>
@@ -452,162 +482,389 @@ export function CoursesCatalog({
 
       {/* Create Course Modal */}
       {showCreate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
-          <div className="w-full max-w-lg rounded-2xl border border-stone-200 bg-white p-6 shadow-xl">
-            <h3 className="text-base font-bold text-stone-900">Create New Course</h3>
-            <p className="mt-1 text-xs text-stone-500">
-              Set up the course title, slug, and overview. You can add video lessons and modules right after.
-            </p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl">
+            <button
+              type="button"
+              onClick={() => setShowCreate(false)}
+              className="absolute top-5 right-5 rounded-lg p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors"
+              aria-label="Close modal"
+            >
+              <X className="h-5 w-5" />
+            </button>
+
+            <div className="pr-8">
+              <h3 className="text-lg font-bold text-stone-900">Create New Course</h3>
+              <p className="mt-1 text-xs text-stone-500">
+                First, select your course pacing format, then configure its details. You can build out lessons, quizzes, and paywalls inside the Studio.
+              </p>
+            </div>
 
             {error && (
-              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-2.5 text-xs text-red-600">
+              <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-600">
                 {error}
               </div>
             )}
 
-            <form onSubmit={handleCreateCourse} className="mt-4 space-y-3.5">
-              <div>
-                <label className="block text-xs font-semibold text-stone-700">Course Title</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Full-Stack Web Development Masterclass"
-                  value={title}
-                  onChange={(e) => handleTitleChange(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
-                />
-              </div>
-
-              <div>
+            <form onSubmit={handleCreateCourse} className="mt-5 space-y-5">
+              {/* Step 1: Course Type */}
+              <div className="rounded-xl border border-stone-200/90 bg-stone-50/50 p-4">
                 <div className="flex items-center justify-between">
-                  <label className="block text-xs font-semibold text-stone-700">URL Slug</label>
-                  <span className="text-[10px] text-stone-500 font-mono">lowercase & dashes</span>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-900">
+                    Step 1: Choose Course Type <span className="text-red-500">*</span>
+                  </label>
+                  <span className="text-[11px] font-medium text-stone-500">How students progress</span>
                 </div>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. web-dev-masterclass"
-                  value={slug}
-                  onChange={(e) => {
-                    const sanitized = e.target.value
-                      .toLowerCase()
-                      .replace(/[^a-z0-9-]/g, '-')
-                      .replace(/-+/g, '-');
-                    setSlug(sanitized);
-                    setIsSlugManual(Boolean(sanitized.trim()));
-                    setError(null);
-                  }}
-                  className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-900 font-mono focus:border-stone-900 focus:outline-hidden"
-                />
-                <p className="mt-1 text-[11px] text-stone-500">
-                  Lowercase letters, numbers, and dashes only
+                <p className="mt-0.5 text-xs text-stone-500">
+                  Select the learning experience that fits your community best:
                 </p>
+
+                <div className="mt-3.5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  {/* Self-Paced */}
+                  <button
+                    type="button"
+                    onClick={() => setPacingFormat('self_paced')}
+                    className={`relative flex flex-col items-start rounded-xl border p-3.5 text-left transition-all ${
+                      pacingFormat === 'self_paced'
+                        ? 'border-emerald-600 bg-white shadow-xs ring-2 ring-emerald-600/20'
+                        : 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50/60'
+                    }`}
+                  >
+                    <div className="flex w-full items-center justify-between">
+                      <div
+                        className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+                          pacingFormat === 'self_paced'
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-stone-100 text-stone-600'
+                        }`}
+                      >
+                        <Compass className="h-4 w-4" />
+                      </div>
+                      {pacingFormat === 'self_paced' ? (
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                      ) : (
+                        <span className="h-4 w-4 rounded-full border border-stone-300" />
+                      )}
+                    </div>
+                    <div className="mt-2.5">
+                      <div className="flex items-center gap-1.5">
+                        <h4 className="text-xs font-bold text-stone-900">Self-Paced</h4>
+                        <span className="rounded bg-emerald-100 px-1 py-0.2 text-[9px] font-semibold text-emerald-800">
+                          Popular
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[11px] text-stone-500 leading-relaxed">
+                        On-demand learning. Students move through content at their own speed in any order.
+                      </p>
+                    </div>
+                  </button>
+
+                  {/* Structured */}
+                  <button
+                    type="button"
+                    onClick={() => setPacingFormat('structured')}
+                    className={`relative flex flex-col items-start rounded-xl border p-3.5 text-left transition-all ${
+                      pacingFormat === 'structured'
+                        ? 'border-emerald-600 bg-white shadow-xs ring-2 ring-emerald-600/20'
+                        : 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50/60'
+                    }`}
+                  >
+                    <div className="flex w-full items-center justify-between">
+                      <div
+                        className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+                          pacingFormat === 'structured'
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-stone-100 text-stone-600'
+                        }`}
+                      >
+                        <Layers className="h-4 w-4" />
+                      </div>
+                      {pacingFormat === 'structured' ? (
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                      ) : (
+                        <span className="h-4 w-4 rounded-full border border-stone-300" />
+                      )}
+                    </div>
+                    <div className="mt-2.5">
+                      <h4 className="text-xs font-bold text-stone-900">Structured</h4>
+                      <p className="mt-1 text-[11px] text-stone-500 leading-relaxed">
+                        Sequential path. Students must complete each lesson in order before unlocking the next.
+                      </p>
+                    </div>
+                  </button>
+
+                  {/* Scheduled */}
+                  <button
+                    type="button"
+                    onClick={() => setPacingFormat('scheduled')}
+                    className={`relative flex flex-col items-start rounded-xl border p-3.5 text-left transition-all ${
+                      pacingFormat === 'scheduled'
+                        ? 'border-emerald-600 bg-white shadow-xs ring-2 ring-emerald-600/20'
+                        : 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50/60'
+                    }`}
+                  >
+                    <div className="flex w-full items-center justify-between">
+                      <div
+                        className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+                          pacingFormat === 'scheduled'
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-stone-100 text-stone-600'
+                        }`}
+                      >
+                        <Calendar className="h-4 w-4" />
+                      </div>
+                      {pacingFormat === 'scheduled' ? (
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                      ) : (
+                        <span className="h-4 w-4 rounded-full border border-stone-300" />
+                      )}
+                    </div>
+                    <div className="mt-2.5">
+                      <h4 className="text-xs font-bold text-stone-900">Scheduled</h4>
+                      <p className="mt-1 text-[11px] text-stone-500 leading-relaxed">
+                        Cohort drip. Content unlocks relative to days enrolled or on specific calendar dates.
+                      </p>
+                    </div>
+                  </button>
+                </div>
+
+                {/* Scheduled Sub-options */}
+                {pacingFormat === 'scheduled' && (
+                  <div className="mt-3.5 rounded-xl border border-stone-200 bg-white p-3.5 shadow-2xs">
+                    <div className="text-xs font-semibold text-stone-800">
+                      Scheduled Delivery Mechanism
+                    </div>
+                    <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2 text-xs">
+                      <label
+                        className={`flex items-start gap-2 rounded-lg border p-2.5 cursor-pointer transition-colors ${
+                          scheduleType === 'relative_drip'
+                            ? 'border-emerald-600 bg-emerald-50/40 ring-1 ring-emerald-600'
+                            : 'border-stone-200 bg-white hover:bg-stone-50'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="schedule_type"
+                          checked={scheduleType === 'relative_drip'}
+                          onChange={() => setScheduleType('relative_drip')}
+                          className="mt-0.5 text-emerald-600 focus:ring-emerald-600"
+                        />
+                        <div>
+                          <div className="font-semibold text-stone-900">Relative Drip</div>
+                          <div className="text-[11px] text-stone-500">
+                            Unlocks relative to student enrollment (e.g. Day 1, Day 7)
+                          </div>
+                        </div>
+                      </label>
+                      <label
+                        className={`flex items-start gap-2 rounded-lg border p-2.5 cursor-pointer transition-colors ${
+                          scheduleType === 'calendar_date'
+                            ? 'border-emerald-600 bg-emerald-50/40 ring-1 ring-emerald-600'
+                            : 'border-stone-200 bg-white hover:bg-stone-50'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="schedule_type"
+                          checked={scheduleType === 'calendar_date'}
+                          onChange={() => setScheduleType('calendar_date')}
+                          className="mt-0.5 text-emerald-600 focus:ring-emerald-600"
+                        />
+                        <div>
+                          <div className="font-semibold text-stone-900">Fixed Calendar Dates</div>
+                          <div className="text-[11px] text-stone-500">
+                            Unlocks on specific calendar dates for live cohorts
+                          </div>
+                        </div>
+                      </label>
+                    </div>
+
+                    {scheduleType === 'calendar_date' && (
+                      <div className="mt-3 grid grid-cols-1 gap-3 border-t border-stone-100 pt-3 sm:grid-cols-2">
+                        <div>
+                          <label className="block text-[11px] font-semibold text-stone-700">
+                            Cohort Start Date
+                          </label>
+                          <input
+                            type="datetime-local"
+                            value={cohortStartDate}
+                            onChange={(e) => setCohortStartDate(e.target.value)}
+                            className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[11px] font-semibold text-stone-700">
+                            Cohort End Date
+                          </label>
+                          <input
+                            type="datetime-local"
+                            value={cohortEndDate}
+                            onChange={(e) => setCohortEndDate(e.target.value)}
+                            className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {/* Step 2: Course Details */}
+              <div className="space-y-3.5">
+                <label className="block text-xs font-bold uppercase tracking-wider text-stone-900">
+                  Step 2: Course Details
+                </label>
+
                 <div>
-                  <label className="block text-xs font-semibold text-stone-700">Difficulty</label>
-                  <select
-                    value={difficulty}
-                    onChange={(e) =>
-                      setDifficulty(
-                        e.target.value as
-                          | 'all_levels'
-                          | 'beginner'
-                          | 'intermediate'
-                          | 'advanced'
-                      )
-                    }
-                    className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-2.5 py-2 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
-                  >
-                    <option value="all_levels">All Levels</option>
-                    <option value="beginner">Beginner</option>
-                    <option value="intermediate">Intermediate</option>
-                    <option value="advanced">Advanced</option>
-                  </select>
+                  <label className="block text-xs font-semibold text-stone-700">Course Title *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Full-Stack Web Development Masterclass"
+                    value={title}
+                    onChange={(e) => handleTitleChange(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
+                  />
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-stone-700">
-                    Est. Duration (Hours)
-                  </label>
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-semibold text-stone-700">URL Slug *</label>
+                    <span className="text-[10px] text-stone-500 font-mono">lowercase & dashes</span>
+                  </div>
                   <input
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    value={durationHours}
-                    onChange={(e) => setDurationHours(e.target.value)}
+                    type="text"
+                    required
+                    placeholder="e.g. web-dev-masterclass"
+                    value={slug}
+                    onChange={(e) => {
+                      const sanitized = e.target.value
+                        .toLowerCase()
+                        .replace(/[^a-z0-9-]/g, '-')
+                        .replace(/-+/g, '-');
+                      setSlug(sanitized);
+                      setIsSlugManual(Boolean(sanitized.trim()));
+                      setError(null);
+                    }}
+                    className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-900 font-mono focus:border-stone-900 focus:outline-hidden"
+                  />
+                  <p className="mt-1 text-[11px] text-stone-500">
+                    Accessible at /circles/{circleSlug}/courses/{slug || '...'}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700">Difficulty</label>
+                    <select
+                      value={difficulty}
+                      onChange={(e) =>
+                        setDifficulty(
+                          e.target.value as
+                            | 'all_levels'
+                            | 'beginner'
+                            | 'intermediate'
+                            | 'advanced'
+                        )
+                      }
+                      className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-2.5 py-2 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
+                    >
+                      <option value="all_levels">All Levels</option>
+                      <option value="beginner">Beginner</option>
+                      <option value="intermediate">Intermediate</option>
+                      <option value="advanced">Advanced</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700">
+                      Est. Duration (Hours)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      value={durationHours}
+                      onChange={(e) => setDurationHours(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-700">Access Gating</label>
+                    <select
+                      value={accessRule}
+                      onChange={(e) =>
+                        setAccessRule(
+                          e.target.value as 'open' | 'members_only' | 'min_level' | 'staff_only'
+                        )
+                      }
+                      className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-2.5 py-2 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
+                    >
+                      <option value="open">Open (All Visitors)</option>
+                      <option value="members_only">Members Only</option>
+                      <option value="min_level">Minimum Community Level</option>
+                      <option value="staff_only">Staff Only</option>
+                    </select>
+                  </div>
+
+                  {accessRule === 'min_level' ? (
+                    <div>
+                      <label className="block text-xs font-semibold text-stone-700">
+                        Required Level
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="10"
+                        value={minLevelRequired}
+                        onChange={(e) => setMinLevelRequired(parseInt(e.target.value, 10) || 1)}
+                        className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex items-center text-[11px] text-stone-400 pt-5">
+                      No level requirement
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-stone-700">Overview / Description</label>
+                  <textarea
+                    rows={3}
+                    placeholder="Describe what students will learn in this course..."
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
                     className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
                   />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-stone-700">Access Gating</label>
-                  <select
-                    value={accessRule}
-                    onChange={(e) =>
-                      setAccessRule(
-                        e.target.value as 'open' | 'members_only' | 'min_level' | 'staff_only'
-                      )
-                    }
-                    className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-2.5 py-2 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
-                  >
-                    <option value="open">Open (All Visitors)</option>
-                    <option value="members_only">Members Only</option>
-                    <option value="min_level">Minimum Community Level</option>
-                    <option value="staff_only">Staff Only</option>
-                  </select>
-                </div>
-
-                {accessRule === 'min_level' ? (
-                  <div>
-                    <label className="block text-xs font-semibold text-stone-700">
-                      Required Level
-                    </label>
-                    <input
-                      type="number"
-                      min="1"
-                      max="10"
-                      value={minLevelRequired}
-                      onChange={(e) => setMinLevelRequired(parseInt(e.target.value, 10) || 1)}
-                      className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
-                    />
-                  </div>
-                ) : (
-                  <div className="flex items-center text-[11px] text-stone-400 pt-5">
-                    No level requirement
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-stone-700">Overview / Description</label>
-                <textarea
-                  rows={3}
-                  placeholder="Describe what students will learn in this course..."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
-                />
-              </div>
-
-              <div className="mt-5 flex items-center justify-end gap-2 border-t border-stone-100 pt-3">
+              <div className="mt-6 flex items-center justify-end gap-2 border-t border-stone-100 pt-4">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setShowCreate(false)}
-                  className="rounded-lg text-xs"
+                  className="rounded-xl text-xs"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
                   disabled={loading}
-                  className="rounded-lg bg-black text-white text-xs px-4"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-black px-4 py-2 text-xs font-semibold text-white hover:bg-stone-800 disabled:opacity-50"
                 >
-                  {loading ? 'Creating...' : 'Create Course'}
+                  {loading ? (
+                    'Creating Course...'
+                  ) : (
+                    <>
+                      <span>Create Course & Open Studio</span>
+                      <ArrowRight className="h-3.5 w-3.5" />
+                    </>
+                  )}
                 </Button>
               </div>
             </form>
