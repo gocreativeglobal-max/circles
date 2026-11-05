@@ -85,10 +85,14 @@ export async function requireEnabledCapability(
 export async function updateCircleCapability(
   actorUserId: string,
   circleId: string,
-  capabilityKey: string,
+  rawCapabilityKey: string,
   enabled: boolean,
   settingsUpdate?: Record<string, unknown>
 ): Promise<CircleCapabilityState> {
+  const capabilityKey =
+    rawCapabilityKey === 'finances' || rawCapabilityKey === 'payments'
+      ? 'payments_finances'
+      : rawCapabilityKey;
   const def = getCapabilityDefinition(capabilityKey);
 
   return withRlsTransaction(actorUserId, async (tx) => {
@@ -124,6 +128,19 @@ export async function updateCircleCapability(
     const enabledSet = new Set(
       currentRows.rows.filter((r) => r.enabled).map((r) => r.capability_key)
     );
+
+    // Auto-enable member_directory dependency when enabling payments_finances
+    if (capabilityKey === 'payments_finances' && enabled && !enabledSet.has('member_directory')) {
+      await tx.query(
+        `INSERT INTO public.circle_capabilities (
+           id, circle_id, capability_key, enabled, settings, enabled_by, enabled_at, updated_at
+         ) VALUES ($1, $2, 'member_directory', true, '{}'::jsonb, $3, NOW(), NOW())
+         ON CONFLICT (circle_id, capability_key)
+         DO UPDATE SET enabled = true, updated_at = NOW();`,
+        [crypto.randomUUID(), circleId, actorUserId]
+      );
+      enabledSet.add('member_directory');
+    }
 
     const transition = validateCapabilityTransition(capabilityKey, enabled, enabledSet);
     if (!transition.valid) {

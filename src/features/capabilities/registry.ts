@@ -431,7 +431,8 @@ export function getAllCapabilityDefinitions(): CapabilityDefinition[] {
 }
 
 export function getCapabilityDefinition(key: string): CapabilityDefinition {
-  const def = CAPABILITY_REGISTRY[key];
+  const normalizedKey = key === 'finances' || key === 'payments' ? 'payments_finances' : key;
+  const def = CAPABILITY_REGISTRY[normalizedKey];
   if (!def) {
     throw new ValidationError(`Unknown capability key: "${key}"`);
   }

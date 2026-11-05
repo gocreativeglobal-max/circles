@@ -47,7 +47,7 @@ export default async function CircleCourseStudioPage({
 
   const capabilities = await getCircleCapabilities(user.id, circle.id);
   const isFinancesEnabled = capabilities.some(
-    (c) => c.capability_key === 'finances' && c.enabled
+    (c) => (c.capability_key === 'payments_finances' || c.capability_key === 'finances') && c.enabled
   );
 
   return (

@@ -640,17 +640,20 @@ export function CourseStudioClient({
     setIsEnablingFinances(true);
     try {
       const res = await fetch(`/api/circles/${circleId}/capabilities`, {
-        method: 'POST',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ capabilityKey: 'finances', isEnabled: true }),
+        body: JSON.stringify({
+          capabilityKey: 'payments_finances',
+          enabled: true,
+        }),
       });
-      if (res.ok) {
-        setFinancesEnabled(true);
-        showFeedback('success', 'Finances module enabled! You can now configure course paywalls.');
-        loadCirclePlans();
-      } else {
-        throw new Error('Failed to enable finances capability.');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to enable Payments & Finances module.');
       }
+      setFinancesEnabled(true);
+      showFeedback('success', 'Payments & Finances module enabled! You can now configure course paywalls.');
+      void loadCirclePlans();
     } catch (err) {
       showFeedback('error', err instanceof Error ? err.message : 'Unable to enable finances.');
     } finally {
