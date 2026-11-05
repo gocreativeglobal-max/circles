@@ -857,11 +857,19 @@ export function CoursePlayer({
                               }}
                               className="flex items-center gap-2.5 text-left flex-1 truncate mr-2"
                             >
-                              <Play
-                                className={`h-3 w-3 shrink-0 ${
-                                  isActive ? 'text-white fill-current' : 'text-stone-400'
-                                }`}
-                              />
+                              {lesson.thumbnail_url ? (
+                                <img
+                                  src={lesson.thumbnail_url}
+                                  alt=""
+                                  className="h-6 w-9 shrink-0 rounded object-cover border border-stone-200/80"
+                                />
+                              ) : (
+                                <Play
+                                  className={`h-3 w-3 shrink-0 ${
+                                    isActive ? 'text-white fill-current' : 'text-stone-400'
+                                  }`}
+                                />
+                              )}
                               <span className="truncate">{lesson.title}</span>
                               {lesson.is_optional && (
                                 <span
@@ -1127,6 +1135,17 @@ export function CoursePlayer({
                   <p className="text-xs text-amber-900 whitespace-pre-wrap leading-relaxed">
                     {activeLesson.instructor_notes}
                   </p>
+                </div>
+              )}
+
+              {/* Lesson Featured Cover Image */}
+              {activeLesson.thumbnail_url && !activeLesson.video_url && (
+                <div className="relative aspect-video max-h-[360px] w-full overflow-hidden rounded-2xl border border-stone-200/90 bg-stone-100 shadow-xs">
+                  <img
+                    src={activeLesson.thumbnail_url}
+                    alt={activeLesson.title}
+                    className="h-full w-full object-cover"
+                  />
                 </div>
               )}
 

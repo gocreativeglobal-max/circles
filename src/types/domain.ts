@@ -688,6 +688,7 @@ export interface CourseLessonItem {
   slug: string;
   description: string;
   content_body: string;
+  thumbnail_url?: string | null;
   video_url: string | null;
   duration_minutes: number;
   attachment_url: string | null;
@@ -721,6 +722,14 @@ export type LessonContentBlock =
       provider?: 'youtube' | 'vimeo' | 'loom' | 'custom';
       title?: string;
       durationSec?: number;
+    }
+  | {
+      id: string;
+      type: 'image';
+      url: string;
+      title?: string;
+      caption?: string;
+      altText?: string;
     }
   | {
       id: string;

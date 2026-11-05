@@ -27,6 +27,8 @@ import {
   ChevronRight,
   Maximize2,
   Minimize2,
+  ImageIcon,
+  Upload,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CourseLessonItem, LessonContentBlock } from '@/types/domain';
@@ -139,6 +141,16 @@ export function LessonBlockBuilder({
     switch (type) {
       case 'video':
         newBlock = { id, type: 'video', url: '', title: 'Video Presentation', provider: 'youtube' };
+        break;
+      case 'image':
+        newBlock = {
+          id,
+          type: 'image',
+          url: '',
+          title: 'Lesson Graphic',
+          caption: '',
+          altText: 'Diagram or illustration',
+        };
         break;
       case 'rich_text':
         newBlock = {
@@ -302,6 +314,8 @@ export function LessonBlockBuilder({
     switch (block.type) {
       case 'video':
         return block.title || block.url || 'Video presentation';
+      case 'image':
+        return block.title || block.caption || block.url || 'Lesson Graphic / Image';
       case 'rich_text': {
         const firstLine = block.markdown.split('\n').find((l) => l.trim().length > 0) || '';
         return firstLine.replace(/^#+\s*/, '') || 'Rich markdown text';
@@ -325,6 +339,7 @@ export function LessonBlockBuilder({
 
   const blockColors: Record<LessonContentBlock['type'], { bg: string; text: string; border: string }> = {
     video: { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' },
+    image: { bg: 'bg-pink-50', text: 'text-pink-700', border: 'border-pink-200' },
     rich_text: { bg: 'bg-stone-100', text: 'text-stone-700', border: 'border-stone-200' },
     code_sandbox: { bg: 'bg-emerald-50', text: 'text-emerald-800', border: 'border-emerald-200' },
     file_asset: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
@@ -381,6 +396,20 @@ export function LessonBlockBuilder({
                 <div>
                   <p className="text-xs font-bold text-stone-900">Video</p>
                   <p className="text-[10px] text-stone-500">YouTube, Loom, MP4</p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleAddBlock('image', insertIdx)}
+                className="flex items-center gap-2 rounded-xl border border-pink-200 bg-white p-2 text-left hover:bg-pink-50 transition-colors"
+              >
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-pink-100 text-pink-700">
+                  <ImageIcon className="h-3.5 w-3.5" />
+                </span>
+                <div>
+                  <p className="text-xs font-bold text-stone-900">Image</p>
+                  <p className="text-[10px] text-stone-500">Diagram, Graphic, Photo</p>
                 </div>
               </button>
 
@@ -852,6 +881,112 @@ export function LessonBlockBuilder({
                                       className="w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-1.5 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
                                     />
                                   </div>
+                                </div>
+                              )}
+
+                              {block.type === 'image' && (
+                                <div className="space-y-3">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <div>
+                                      <label className="text-[11px] font-semibold text-stone-700">Image Title / Headline</label>
+                                      <input
+                                        type="text"
+                                        placeholder="e.g. System Architecture Diagram"
+                                        value={block.title || ''}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          setBlocks((prev) =>
+                                            prev.map((b, i) => (i === idx && b.type === 'image' ? { ...b, title: val } : b))
+                                          );
+                                        }}
+                                        className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-1.5 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="text-[11px] font-semibold text-stone-700">Caption / Subtitle</label>
+                                      <input
+                                        type="text"
+                                        placeholder="e.g. Figure 1: Client to database request lifecycle"
+                                        value={block.caption || ''}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          setBlocks((prev) =>
+                                            prev.map((b, i) => (i === idx && b.type === 'image' ? { ...b, caption: val } : b))
+                                          );
+                                        }}
+                                        className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-1.5 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  <div>
+                                    <label className="text-[11px] font-semibold text-stone-700">Image Source (URL or File Upload)</label>
+                                    <div className="mt-1 flex items-center gap-2">
+                                      <input
+                                        type="url"
+                                        placeholder="https://images.unsplash.com/... or paste image link"
+                                        value={block.url}
+                                        onChange={(e) => {
+                                          const val = e.target.value;
+                                          setBlocks((prev) =>
+                                            prev.map((b, i) => (i === idx && b.type === 'image' ? { ...b, url: val } : b))
+                                          );
+                                        }}
+                                        className="flex-1 rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-1.5 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
+                                      />
+                                      <label className="cursor-pointer shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 transition-colors shadow-2xs">
+                                        <Upload className="h-3.5 w-3.5" />
+                                        <span>Upload</span>
+                                        <input
+                                          type="file"
+                                          accept="image/*"
+                                          className="hidden"
+                                          onChange={async (e) => {
+                                            const file = e.target.files?.[0];
+                                            if (!file) return;
+                                            const reader = new FileReader();
+                                            reader.onload = async () => {
+                                              const base64 = reader.result;
+                                              if (typeof base64 !== 'string') return;
+                                              try {
+                                                const res = await fetch('/api/uploads', {
+                                                  method: 'POST',
+                                                  headers: { 'Content-Type': 'application/json' },
+                                                  body: JSON.stringify({
+                                                    circleId,
+                                                    originalFilename: file.name,
+                                                    mimeType: file.type || 'image/png',
+                                                    visibility: 'public',
+                                                    contentBase64: base64,
+                                                  }),
+                                                });
+                                                const data = await res.json();
+                                                const url = res.ok && data.upload?.signed_download_url ? data.upload.signed_download_url : base64;
+                                                setBlocks((prev) =>
+                                                  prev.map((b, i) => (i === idx && b.type === 'image' ? { ...b, url } : b))
+                                                );
+                                              } catch {
+                                                setBlocks((prev) =>
+                                                  prev.map((b, i) => (i === idx && b.type === 'image' ? { ...b, url: base64 } : b))
+                                                );
+                                              }
+                                            };
+                                            reader.readAsDataURL(file);
+                                          }}
+                                        />
+                                      </label>
+                                    </div>
+                                  </div>
+
+                                  {block.url && (
+                                    <div className="mt-2 rounded-xl border border-stone-200 bg-stone-50 p-2 overflow-hidden max-w-sm">
+                                      <img
+                                        src={block.url}
+                                        alt={block.altText || block.title || 'Lesson block image'}
+                                        className="w-full max-h-48 object-contain rounded-lg"
+                                      />
+                                    </div>
+                                  )}
                                 </div>
                               )}
 

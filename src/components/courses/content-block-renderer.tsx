@@ -24,7 +24,7 @@ import {
   AlertTriangle,
   Lightbulb,
   X,
-} from 'lucide-react';
+  } from 'lucide-react';
 import { LessonContentBlock } from '@/types/domain';
 import { Button } from '@/components/ui/button';
 
@@ -237,6 +237,36 @@ export function ContentBlockRenderer({
                   </div>
                 )}
               </div>
+            );
+          }
+
+          case 'image': {
+            return (
+              <figure
+                key={block.id || idx}
+                className="my-5 overflow-hidden rounded-2xl border border-stone-200/90 bg-stone-50/50 shadow-xs"
+              >
+                <div className="relative flex w-full items-center justify-center bg-stone-900/5 p-2">
+                  <img
+                    src={block.url}
+                    alt={block.altText || block.title || 'Lesson illustration'}
+                    className="max-h-[520px] w-auto max-w-full rounded-xl object-contain shadow-2xs"
+                    loading="lazy"
+                  />
+                </div>
+                {(block.title || block.caption) && (
+                  <figcaption className="border-t border-stone-200/70 bg-white px-5 py-3 text-center">
+                    {block.title && (
+                      <p className="text-xs font-bold text-stone-900">{block.title}</p>
+                    )}
+                    {block.caption && (
+                      <p className="mt-0.5 text-[11px] text-stone-500 leading-relaxed">
+                        {block.caption}
+                      </p>
+                    )}
+                  </figcaption>
+                )}
+              </figure>
             );
           }
 

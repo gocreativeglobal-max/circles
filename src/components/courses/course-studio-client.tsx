@@ -24,6 +24,7 @@ import {
   MoveUp,
   MoveDown,
   Compass,
+  Upload,
 } from 'lucide-react';
 import {
   CourseItem,
@@ -82,6 +83,8 @@ export function CourseStudioClient({
   const [isLessonSlugManual, setIsLessonSlugManual] = useState(false);
   const [lessonDescription, setLessonDescription] = useState('');
   const [lessonDuration, setLessonDuration] = useState('15');
+  const [lessonThumbnailUrl, setLessonThumbnailUrl] = useState('');
+  const [isUploadingLessonImage, setIsUploadingLessonImage] = useState(false);
   const [lessonIsFreePreview, setLessonIsFreePreview] = useState(false);
   const [lessonStatus, setLessonStatus] = useState<'draft' | 'published'>('published');
 
@@ -253,6 +256,7 @@ export function CourseStudioClient({
     setLessonSlug('');
     setIsLessonSlugManual(false);
     setLessonDescription('');
+    setLessonThumbnailUrl('');
     setLessonDuration('15');
     setLessonIsFreePreview(false);
     setLessonStatus('published');
@@ -266,10 +270,49 @@ export function CourseStudioClient({
     setLessonSlug(lesson.slug);
     setIsLessonSlugManual(true);
     setLessonDescription(lesson.description || '');
+    setLessonThumbnailUrl(lesson.thumbnail_url || '');
     setLessonDuration(String(lesson.duration_minutes || 15));
     setLessonIsFreePreview(Boolean(lesson.is_free_preview));
     setLessonStatus(lesson.status === 'draft' ? 'draft' : 'published');
     setShowLessonModal(true);
+  }
+
+  async function handleLessonImageFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploadingLessonImage(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        const base64 = reader.result as string;
+        try {
+          const res = await fetch('/api/uploads', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              circleId,
+              originalFilename: file.name,
+              mimeType: file.type || 'image/png',
+              visibility: 'public',
+              contentBase64: base64,
+            }),
+          });
+          const data = await res.json();
+          if (res.ok && data.upload?.signed_download_url) {
+            setLessonThumbnailUrl(data.upload.signed_download_url);
+          } else {
+            setLessonThumbnailUrl(base64);
+          }
+        } catch {
+          setLessonThumbnailUrl(base64);
+        } finally {
+          setIsUploadingLessonImage(false);
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch {
+      setIsUploadingLessonImage(false);
+    }
   }
 
   function handleLessonTitleChange(val: string) {
@@ -300,6 +343,7 @@ export function CourseStudioClient({
             title: lessonTitle.trim(),
             slug: lessonSlug.trim() || undefined,
             description: lessonDescription.trim(),
+            thumbnailUrl: lessonThumbnailUrl.trim() || null,
             durationMinutes: parseInt(lessonDuration, 10) || 0,
             isFreePreview: lessonIsFreePreview,
             status: lessonStatus,
@@ -328,6 +372,7 @@ export function CourseStudioClient({
                 .replace(/[^a-z0-9]+/g, '-')
                 .replace(/^-+|-+$/g, ''),
             description: lessonDescription.trim(),
+            thumbnailUrl: lessonThumbnailUrl.trim() || null,
             durationMinutes: parseInt(lessonDuration, 10) || 0,
             isFreePreview: lessonIsFreePreview,
             status: lessonStatus,
@@ -1008,9 +1053,17 @@ export function CourseStudioClient({
                                 className="flex items-center justify-between px-6 py-3 hover:bg-stone-50/50 transition-colors"
                               >
                                 <div className="flex items-center gap-3">
-                                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-stone-100 text-stone-600">
-                                    <Play className="h-3 w-3" />
-                                  </div>
+                                  {lesson.thumbnail_url ? (
+                                    <img
+                                      src={lesson.thumbnail_url}
+                                      alt={lesson.title}
+                                      className="h-9 w-14 shrink-0 rounded-lg object-cover border border-stone-200/90 shadow-2xs"
+                                    />
+                                  ) : (
+                                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-stone-100 text-stone-600">
+                                      <Play className="h-3 w-3" />
+                                    </div>
+                                  )}
                                   <div>
                                     <div className="flex items-center gap-2">
                                       <p className="text-xs font-bold text-stone-900">
@@ -1638,6 +1691,70 @@ export function CourseStudioClient({
                     <option value="draft">Draft</option>
                   </select>
                 </div>
+              </div>
+
+              {/* Lesson Image / Thumbnail */}
+              <div>
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-stone-800">
+                    Lesson Image / Thumbnail
+                  </label>
+                  <span className="text-[11px] text-stone-400">Optional · 16:9 recommended</span>
+                </div>
+
+                {lessonThumbnailUrl ? (
+                  <div className="mt-1.5 relative rounded-xl border border-stone-200 overflow-hidden bg-stone-50 group">
+                    <img
+                      src={lessonThumbnailUrl}
+                      alt="Lesson preview"
+                      className="w-full h-32 object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      <label className="cursor-pointer inline-flex items-center gap-1.5 rounded-lg bg-white px-2.5 py-1.5 text-xs font-semibold text-stone-900 shadow-sm hover:bg-stone-50">
+                        <Upload className="h-3.5 w-3.5" />
+                        <span>Replace</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={handleLessonImageFileChange}
+                          disabled={isUploadingLessonImage}
+                        />
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setLessonThumbnailUrl('')}
+                        className="inline-flex items-center gap-1 rounded-lg bg-rose-600 px-2.5 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-rose-700"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        <span>Remove</span>
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <input
+                        type="url"
+                        placeholder="https://images.unsplash.com/... or paste image URL"
+                        value={lessonThumbnailUrl}
+                        onChange={(e) => setLessonThumbnailUrl(e.target.value)}
+                        className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs text-stone-900 focus:border-black focus:outline-none"
+                      />
+                    </div>
+                    <label className="cursor-pointer shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-stone-300 bg-stone-50 px-3 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-100 transition-colors shadow-2xs">
+                      <Upload className="h-3.5 w-3.5" />
+                      <span>{isUploadingLessonImage ? 'Uploading...' : 'Upload'}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={handleLessonImageFileChange}
+                        disabled={isUploadingLessonImage}
+                      />
+                    </label>
+                  </div>
+                )}
               </div>
 
               <div>

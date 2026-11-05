@@ -118,6 +118,7 @@ export const createLessonSchema = z.object({
     .regex(/^[a-z0-9-]+$/, 'Slug must consist of lowercase letters, numbers, and dashes.'),
   description: z.string().trim().max(2000).default(''),
   contentBody: z.string().trim().max(50000).default(''),
+  thumbnailUrl: z.string().trim().max(2048).nullable().optional(),
   videoUrl: z.string().trim().max(1000).nullable().optional(),
   durationMinutes: z.number().int().min(0).max(1440).default(0),
   attachmentUrl: z.string().trim().max(1000).nullable().optional(),
@@ -140,6 +141,7 @@ export const updateLessonSchema = z.object({
     .optional(),
   description: z.string().trim().max(2000).optional(),
   contentBody: z.string().trim().max(50000).optional(),
+  thumbnailUrl: z.string().trim().max(2048).nullable().optional(),
   videoUrl: z.string().trim().max(1000).nullable().optional(),
   durationMinutes: z.number().int().min(0).max(1440).optional(),
   attachmentUrl: z.string().trim().max(1000).nullable().optional(),
@@ -854,9 +856,9 @@ export async function createLesson(
     const res = await tx.query<CourseLessonItem>(
       `INSERT INTO public.course_lessons (
          id, module_id, course_id, circle_id, title, slug, description,
-         content_body, video_url, duration_minutes, attachment_url,
+         content_body, thumbnail_url, video_url, duration_minutes, attachment_url,
          attachment_name, is_free_preview, live_event_id, is_live_session, status, sort_order
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
        RETURNING *;`,
       [
         lessonId,
@@ -867,6 +869,7 @@ export async function createLesson(
         parsed.slug,
         parsed.description,
         parsed.contentBody,
+        parsed.thumbnailUrl || null,
         parsed.videoUrl || null,
         parsed.durationMinutes,
         parsed.attachmentUrl || null,
@@ -1036,13 +1039,14 @@ export async function updateLesson(
          slug = COALESCE($4, slug),
          description = COALESCE($5, description),
          content_body = COALESCE($6, content_body),
-         video_url = CASE WHEN $7::boolean THEN $8 ELSE video_url END,
-         duration_minutes = COALESCE($9, duration_minutes),
-         attachment_url = CASE WHEN $10::boolean THEN $11 ELSE attachment_url END,
-         attachment_name = CASE WHEN $12::boolean THEN $13 ELSE attachment_name END,
-         is_free_preview = COALESCE($14, is_free_preview),
-         status = COALESCE($15, status),
-         sort_order = COALESCE($16, sort_order),
+         thumbnail_url = CASE WHEN $7::boolean THEN $8 ELSE thumbnail_url END,
+         video_url = CASE WHEN $9::boolean THEN $10 ELSE video_url END,
+         duration_minutes = COALESCE($11, duration_minutes),
+         attachment_url = CASE WHEN $12::boolean THEN $13 ELSE attachment_url END,
+         attachment_name = CASE WHEN $14::boolean THEN $15 ELSE attachment_name END,
+         is_free_preview = COALESCE($16, is_free_preview),
+         status = COALESCE($17, status),
+         sort_order = COALESCE($18, sort_order),
          updated_at = NOW()
        WHERE id = $1 AND circle_id = $2
        RETURNING *;`,
@@ -1053,6 +1057,8 @@ export async function updateLesson(
         parsed.slug ?? null,
         parsed.description ?? null,
         parsed.contentBody ?? null,
+        parsed.thumbnailUrl !== undefined,
+        parsed.thumbnailUrl ?? null,
         parsed.videoUrl !== undefined,
         parsed.videoUrl ?? null,
         parsed.durationMinutes ?? null,
@@ -1858,10 +1864,10 @@ export async function duplicateLesson(
     const res = await tx.query<CourseLessonItem>(
       `INSERT INTO public.course_lessons (
          id, module_id, course_id, circle_id, title, slug, description,
-         content_body, video_url, duration_minutes, attachment_url, attachment_name,
+         content_body, thumbnail_url, video_url, duration_minutes, attachment_url, attachment_name,
          is_free_preview, status, sort_order, content_blocks, learning_objectives,
          instructor_notes, is_optional, last_edited_by
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
        RETURNING *;`,
       [
         newId,
@@ -1872,6 +1878,7 @@ export async function duplicateLesson(
         newSlug,
         source.description,
         source.content_body,
+        source.thumbnail_url || null,
         source.video_url,
         source.duration_minutes,
         source.attachment_url,
