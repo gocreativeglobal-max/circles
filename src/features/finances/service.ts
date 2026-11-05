@@ -529,6 +529,20 @@ export async function fulfillInvoiceEntitlements(
         [crypto.randomUUID(), invoice.circle_id, invoice.user_id]
       );
     }
+
+    // If entitlement is course_access, automatically enroll the student in the course
+    const isTargetUuid =
+      ent.target_id &&
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(ent.target_id);
+    if (ent.target_type === 'course_access' && isTargetUuid) {
+      await tx.query(
+        `INSERT INTO public.course_enrollments (id, course_id, circle_id, student_id)
+         SELECT $1, $2, $3, $4
+         WHERE EXISTS (SELECT 1 FROM public.courses WHERE id = $2 AND circle_id = $3)
+         ON CONFLICT (course_id, student_id) DO NOTHING;`,
+        [crypto.randomUUID(), ent.target_id, invoice.circle_id, invoice.user_id]
+      );
+    }
   }
 
   return granted;

@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { withRlsTransaction, withServiceRoleTransaction, DbTransaction } from '@/lib/db/postgres';
+import { getPaymentProcessor } from '@/lib/payments/adapter';
 import {
   CourseItem,
   CourseModuleItem,
@@ -562,11 +563,30 @@ export async function getCourseWithCurriculum(
         }
       }
 
+      // Security Hardening: Redact lesson contents, videos, blocks, and attachments
+      // on the server if viewer does not hold access rights and lesson is not a free preview.
+      const rawLessons = isLocked ? [] : lessonsByModule[mod.id] || [];
+      const sanitizedLessons = rawLessons.map((lesson) => {
+        if (!viewerCanAccess && !lesson.is_free_preview) {
+          return {
+            ...lesson,
+            content_body: '',
+            video_url: null,
+            attachment_url: null,
+            attachment_name: null,
+            content_blocks: [],
+            is_locked: true,
+            lock_reason: 'paywall',
+          };
+        }
+        return lesson;
+      });
+
       return {
         ...mod,
         is_locked: isLocked,
         unlocks_at: unlocksAt,
-        lessons: isLocked ? [] : lessonsByModule[mod.id] || [],
+        lessons: sanitizedLessons,
       };
     });
 
@@ -2808,22 +2828,30 @@ export async function createCoursePaywall(
 }
 
 /**
- * Purchases a paywall plan for a course, creating an invoice, fulfilling the entitlement, and auto-enrolling the student.
+ * Purchases a paywall plan for a course. Free plans are granted immediately;
+ * paid plans create an open invoice and generate a Bachs checkout session URL.
  */
 export async function purchaseCoursePaywall(
   actorUserId: string,
   circleId: string,
   courseId: string,
   planId: string,
-  paymentMethod: string = 'bachs'
-): Promise<{ success: boolean; invoiceId: string; entitlementId: string }> {
+  _paymentMethod: string = 'bachs'
+): Promise<{
+  success: boolean;
+  invoiceId: string;
+  entitlementId?: string;
+  checkoutUrl?: string;
+  isFree: boolean;
+}> {
   return withServiceRoleTransaction(async (tx) => {
     // 1. Ensure user has a profile
-    const profileRes = await tx.query<{ id: string; display_name: string }>(
-      `SELECT id, display_name FROM public.profiles WHERE id = $1 LIMIT 1;`,
+    const profileRes = await tx.query<{ id: string; display_name: string; email: string }>(
+      `SELECT id, display_name, email FROM public.profiles WHERE id = $1 LIMIT 1;`,
       [actorUserId]
     );
     if (!profileRes.rows[0]) throw new NotFoundError('User profile not found.');
+    const profile = profileRes.rows[0];
 
     // 2. Fetch the plan & entitlement target
     const planRes = await tx.query<{
@@ -2857,14 +2885,59 @@ export async function purchaseCoursePaywall(
       );
     }
 
-    // 4. Create paid Invoice
+    const isFree = plan.amount_cents === 0;
     const invoiceId = crypto.randomUUID();
     const invoiceNumber = `INV-COURSE-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+
+    if (isFree) {
+      // Free Course Plan: Directly grant entitlement and enroll student
+      await tx.query(
+        `INSERT INTO public.invoices (
+          id, circle_id, user_id, plan_id, invoice_number, title, description,
+          status, total_cents, currency, payment_method, paid_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'paid', 0, $8, 'free_grant', NOW());`,
+        [
+          invoiceId,
+          circleId,
+          actorUserId,
+          plan.id,
+          invoiceNumber,
+          `Course Access (Free): ${plan.name}`,
+          plan.description,
+          plan.currency,
+        ]
+      );
+
+      const entitlementId = crypto.randomUUID();
+      await tx.query(
+        `INSERT INTO public.member_entitlements (
+          id, circle_id, user_id, plan_id, invoice_id, target_type, target_id, status
+        ) VALUES ($1, $2, $3, $4, $5, 'course_access', $6, 'active');`,
+        [entitlementId, circleId, actorUserId, plan.id, invoiceId, courseId]
+      );
+
+      const enrollId = crypto.randomUUID();
+      await tx.query(
+        `INSERT INTO public.course_enrollments (id, course_id, circle_id, student_id)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (course_id, student_id) DO NOTHING;`,
+        [enrollId, courseId, circleId, actorUserId]
+      );
+
+      return {
+        success: true,
+        invoiceId,
+        entitlementId,
+        isFree: true,
+      };
+    }
+
+    // Paid Course Plan: Create pending/open invoice and initialize Bachs hosted checkout session
     await tx.query(
       `INSERT INTO public.invoices (
         id, circle_id, user_id, plan_id, invoice_number, title, description,
         status, total_cents, currency, payment_method, paid_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'paid', $8, $9, $10, NOW());`,
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'open', $8, $9, 'bachs', NULL);`,
       [
         invoiceId,
         circleId,
@@ -2875,47 +2948,47 @@ export async function purchaseCoursePaywall(
         plan.description,
         plan.amount_cents,
         plan.currency,
-        paymentMethod,
       ]
     );
 
-    // 5. Grant Member Entitlement
-    const entitlementId = crypto.randomUUID();
-    await tx.query(
-      `INSERT INTO public.member_entitlements (
-        id, circle_id, user_id, plan_id, invoice_id, target_type, target_id, status
-      ) VALUES ($1, $2, $3, $4, $5, 'course_access', $6, 'active');`,
-      [entitlementId, circleId, actorUserId, plan.id, invoiceId, courseId]
+    // Fetch circle & course slug for canonical redirect URLs
+    const slugRes = await tx.query<{ circle_slug: string; course_slug: string }>(
+      `SELECT c.slug AS circle_slug, cr.slug AS course_slug
+       FROM public.courses cr
+       JOIN public.circles c ON c.id = cr.circle_id
+       WHERE cr.id = $1 AND cr.circle_id = $2
+       LIMIT 1;`,
+      [courseId, circleId]
     );
+    const circleSlug = slugRes.rows[0]?.circle_slug || circleId;
+    const courseSlug = slugRes.rows[0]?.course_slug || courseId;
 
-    // 6. Auto-enroll in the course
-    const enrollId = crypto.randomUUID();
-    await tx.query(
-      `INSERT INTO public.course_enrollments (id, course_id, circle_id, student_id)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (course_id, student_id) DO NOTHING;`,
-      [enrollId, courseId, circleId, actorUserId]
+    const appBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://joincircles.online').replace(
+      /\/+$/,
+      ''
     );
+    const successUrl = `${appBaseUrl}/circles/${circleSlug}/courses/${courseSlug}?checkout=success&invoiceId=${invoiceId}`;
+    const cancelUrl = `${appBaseUrl}/circles/${circleSlug}/courses/${courseSlug}?checkout=cancelled`;
 
-    // 7. Log treasury entry
-    const entryId = crypto.randomUUID();
-    await tx.query(
-      `INSERT INTO public.community_treasury_ledger (
-        id, circle_id, entry_type, category, amount_cents, currency, description, is_public_to_members
-      ) VALUES ($1, $2, 'revenue', 'courses', $3, $4, $5, true);`,
-      [
-        entryId,
-        circleId,
-        plan.amount_cents,
-        plan.currency,
-        `Course Enrollment: ${plan.name} by ${profileRes.rows[0].display_name}`,
-      ]
-    );
+    const processor = getPaymentProcessor();
+    const session = await processor.createCheckoutSession({
+      circleId,
+      invoiceId,
+      planId: plan.id,
+      userId: actorUserId,
+      amountCents: plan.amount_cents,
+      currency: plan.currency,
+      title: `Course Access: ${plan.name}`,
+      customerEmail: profile.email || 'member@joincircles.online',
+      successUrl,
+      cancelUrl,
+    });
 
     return {
       success: true,
       invoiceId,
-      entitlementId,
+      checkoutUrl: session.checkoutUrl,
+      isFree: false,
     };
   });
 }

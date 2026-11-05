@@ -228,6 +228,30 @@ export function CoursePlayer({
   const completedLessons = allLessons.filter((l) => l.is_completed).length;
   const progressPercent = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
 
+  // Handle return from Bachs Checkout
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('checkout') === 'success') {
+      showToast('🎉 Payment successful! Unlocking your full course access...', 'success');
+      // Clean up URL query parameters without reloading
+      const cleanUrl = window.location.pathname;
+      window.history.replaceState({}, document.title, cleanUrl);
+      // Reload course state to fetch unredacted lessons
+      fetch(`/api/circles/${circleId}/courses?courseId=${course.id}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.course) {
+            setCourse(data.course);
+          }
+        })
+        .catch(() => {});
+    } else if (urlParams.get('checkout') === 'cancelled') {
+      showToast('Checkout was cancelled. You can complete it whenever you are ready.', 'error');
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [circleId, course.id]);
+
   // Fetch comments when active lesson changes
   useEffect(() => {
     if (!activeLesson?.id) return;
@@ -266,6 +290,13 @@ export function CoursePlayer({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to complete checkout.');
+
+      // If Bachs hosted checkout URL is returned, redirect student securely to Bachs
+      if (data.checkoutUrl) {
+        showToast('Redirecting to Bachs secure checkout...', 'success');
+        window.location.href = data.checkoutUrl;
+        return;
+      }
 
       setCourse((prev) => ({
         ...prev,

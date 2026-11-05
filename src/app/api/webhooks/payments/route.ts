@@ -22,10 +22,18 @@ export async function POST(req: NextRequest) {
       req.headers.get('x-timestamp') ||
       '';
 
-    const secret =
-      process.env.BACHS_WEBHOOK_SECRET ||
-      process.env.STRIPE_WEBHOOK_SECRET ||
-      'whsec_local_dev';
+    const isProduction = process.env.NODE_ENV === 'production';
+    const configuredSecret = process.env.BACHS_WEBHOOK_SECRET || process.env.STRIPE_WEBHOOK_SECRET;
+
+    if (!configuredSecret && isProduction) {
+      logger.error('Payment webhook rejected: BACHS_WEBHOOK_SECRET is not configured in production environment.');
+      return NextResponse.json(
+        { error: 'Webhook configuration error in production environment' },
+        { status: 500 }
+      );
+    }
+
+    const secret = configuredSecret || 'whsec_local_dev';
     const processor = getPaymentProcessor();
 
     const verification = await processor.verifyWebhookSignature(rawBody, signature, secret, timestamp);
@@ -57,6 +65,32 @@ export async function POST(req: NextRequest) {
         );
         const invoice = invRes.rows[0];
         if (!invoice || invoice.status === 'paid') {
+          return;
+        }
+
+        // Security check: Validate against underpayment price-tampering
+        if (
+          verification.amountCents !== undefined &&
+          verification.amountCents < invoice.total_cents
+        ) {
+          logger.warn('Bachs payment rejected due to underpayment mismatch', {
+            invoiceId,
+            expectedCents: invoice.total_cents,
+            receivedCents: verification.amountCents,
+          });
+          return;
+        }
+
+        // Security check: Validate currency match
+        if (
+          verification.currency &&
+          verification.currency.toUpperCase() !== invoice.currency.toUpperCase()
+        ) {
+          logger.warn('Bachs payment rejected due to currency mismatch', {
+            invoiceId,
+            expectedCurrency: invoice.currency,
+            receivedCurrency: verification.currency,
+          });
           return;
         }
 

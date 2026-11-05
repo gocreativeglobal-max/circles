@@ -117,6 +117,22 @@ export class BachsPaymentProcessorAdapter implements PaymentProcessorAdapter {
 
     // Bachs signs timestamp + "." + rawBody
     const timestamp = timestampHeader || '';
+    if (timestamp) {
+      const tsSec = Number(timestamp);
+      // If timestamp is numeric, verify within 300s (5-minute) tolerance window
+      if (!Number.isNaN(tsSec) && tsSec > 0) {
+        const nowSec = Math.floor(Date.now() / 1000);
+        if (Math.abs(nowSec - tsSec) > 300) {
+          logger.warn('Bachs webhook timestamp expired or out of tolerance window', {
+            webhookTimestamp: tsSec,
+            serverTimestamp: nowSec,
+            driftSeconds: Math.abs(nowSec - tsSec),
+          });
+          return { isValid: false, eventType: 'timestamp_expired' };
+        }
+      }
+    }
+
     const signedPayload = timestamp ? `${timestamp}.${rawBody}` : rawBody;
 
     const expectedSignature = crypto
@@ -124,15 +140,10 @@ export class BachsPaymentProcessorAdapter implements PaymentProcessorAdapter {
       .update(signedPayload)
       .digest('hex');
 
-    let isValid = false;
-    try {
-      isValid = crypto.timingSafeEqual(
-        Buffer.from(signatureHeader, 'utf8'),
-        Buffer.from(expectedSignature, 'utf8')
-      );
-    } catch {
-      isValid = signatureHeader === expectedSignature;
-    }
+    const sigBuf = Buffer.from(signatureHeader, 'utf8');
+    const expBuf = Buffer.from(expectedSignature, 'utf8');
+    const isValid =
+      sigBuf.length === expBuf.length && crypto.timingSafeEqual(sigBuf, expBuf);
 
     if (!isValid) {
       return { isValid: false, eventType: 'invalid_signature' };
