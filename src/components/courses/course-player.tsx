@@ -26,6 +26,7 @@ import {
   FileText,
   FileCode,
   Check,
+  BookOpen,
   Settings,
 } from 'lucide-react';
 import {
@@ -712,6 +713,15 @@ export function CoursePlayer({
 
               {!previewAsStudent && (
                 <>
+                  <Link
+                    href={`/circles/${circleSlug}/courses/${course.id}/studio`}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 hover:border-black transition-colors shadow-2xs"
+                    title="Open Circle Course Studio"
+                  >
+                    <BookOpen className="h-3.5 w-3.5 text-stone-500" />
+                    <span>Studio</span>
+                  </Link>
+
                   <Button
                     onClick={() => setShowCourseSettings(true)}
                     variant="outline"

@@ -3,8 +3,12 @@ import {
   createCourse,
   createCourseAssignment,
   createLesson,
+  updateLesson,
+  deleteLesson,
   createLessonComment,
   createModule,
+  updateModule,
+  deleteModule,
   enrollInCourse,
   getCircleLeaderboard,
   getMemberXpSummary,
@@ -181,6 +185,18 @@ export async function POST(
       return NextResponse.json({ module: createdModule }, { status: 201 });
     }
 
+    if (body.action === 'update_module') {
+      if (!body.moduleId) throw new ValidationError('moduleId is required.');
+      const updatedModule = await updateModule(user.id, params.circleId, body.moduleId, body);
+      return NextResponse.json({ module: updatedModule });
+    }
+
+    if (body.action === 'delete_module') {
+      if (!body.moduleId) throw new ValidationError('moduleId is required.');
+      const res = await deleteModule(user.id, params.circleId, body.moduleId);
+      return NextResponse.json(res);
+    }
+
     if (body.action === 'create_lesson') {
       if (!body.courseId || !body.moduleId) {
         throw new ValidationError('courseId and moduleId are required.');
@@ -190,6 +206,18 @@ export async function POST(
         circleId: params.circleId,
       });
       return NextResponse.json({ lesson }, { status: 201 });
+    }
+
+    if (body.action === 'update_lesson') {
+      if (!body.lessonId) throw new ValidationError('lessonId is required.');
+      const lesson = await updateLesson(user.id, params.circleId, body.lessonId, body);
+      return NextResponse.json({ lesson });
+    }
+
+    if (body.action === 'delete_lesson') {
+      if (!body.lessonId) throw new ValidationError('lessonId is required.');
+      const res = await deleteLesson(user.id, params.circleId, body.lessonId);
+      return NextResponse.json(res);
     }
 
     if (body.action === 'update_lesson_blocks') {

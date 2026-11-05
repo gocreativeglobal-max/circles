@@ -49,6 +49,11 @@ export const createCourseSchema = z.object({
     .nullable()
     .optional(),
   estimatedDurationHours: z.number().min(0).max(1000).default(0),
+  pacingFormat: z.enum(['self_paced', 'structured', 'scheduled']).default('self_paced'),
+  scheduleType: z.enum(['relative_drip', 'calendar_date']).default('relative_drip'),
+  cohortStartDate: z.string().datetime().nullable().optional(),
+  cohortEndDate: z.string().datetime().nullable().optional(),
+  requireSequentialCompletion: z.boolean().default(false),
   accessRule: z.enum(['open', 'members_only', 'min_level', 'staff_only']).default('open'),
   minLevelRequired: z.number().int().min(1).default(1),
   status: z.enum(['draft', 'published', 'archived']).default('published'),
@@ -70,6 +75,11 @@ export const updateCourseSchema = z.object({
     .nullable()
     .optional(),
   estimatedDurationHours: z.number().min(0).max(1000).optional(),
+  pacingFormat: z.enum(['self_paced', 'structured', 'scheduled']).optional(),
+  scheduleType: z.enum(['relative_drip', 'calendar_date']).optional(),
+  cohortStartDate: z.string().datetime().nullable().optional(),
+  cohortEndDate: z.string().datetime().nullable().optional(),
+  requireSequentialCompletion: z.boolean().optional(),
   accessRule: z.enum(['open', 'members_only', 'min_level', 'staff_only']).optional(),
   minLevelRequired: z.number().int().min(1).optional(),
   status: z.enum(['draft', 'published', 'archived']).optional(),
@@ -83,6 +93,15 @@ export const createModuleSchema = z.object({
   sortOrder: z.number().int().min(0).default(0),
   dripType: z.enum(['instant', 'relative_days', 'calendar_date']).default('instant'),
   dripDaysAfterEnrollment: z.number().int().min(0).default(0),
+  dripUnlockDate: z.string().datetime().nullable().optional(),
+});
+
+export const updateModuleSchema = z.object({
+  title: z.string().trim().min(2).max(180).optional(),
+  description: z.string().trim().max(2000).optional(),
+  sortOrder: z.number().int().min(0).optional(),
+  dripType: z.enum(['instant', 'relative_days', 'calendar_date']).optional(),
+  dripDaysAfterEnrollment: z.number().int().min(0).optional(),
   dripUnlockDate: z.string().datetime().nullable().optional(),
 });
 
@@ -251,6 +270,11 @@ export async function listCourses(
         estimated_duration_hours: Number(row.estimated_duration_hours),
         status: row.status,
         sort_order: row.sort_order,
+        pacing_format: row.pacing_format ?? 'self_paced',
+        schedule_type: row.schedule_type ?? 'relative_drip',
+        cohort_start_date: row.cohort_start_date ?? null,
+        cohort_end_date: row.cohort_end_date ?? null,
+        require_sequential_completion: Boolean(row.require_sequential_completion),
         access_rule: row.access_rule ?? 'open',
         min_level_required: Number(row.min_level_required ?? 1),
         created_at: row.created_at,
@@ -391,15 +415,30 @@ export async function getCourseWithCurriculum(
     }
 
     const lessonsByModule: Record<string, CourseLessonItem[]> = {};
+    const requireSequential = Boolean(course.require_sequential_completion || course.pacing_format === 'structured');
+    let previousLessonCompleted = true;
+
     for (const lesson of lessonsRes.rows) {
       if (!lessonsByModule[lesson.module_id]) {
         lessonsByModule[lesson.module_id] = [];
       }
 
       const isCompleted = completedLessonIds.has(lesson.id);
-      const isPrereqLocked = Boolean(
-        lesson.prerequisite_lesson_id && !completedLessonIds.has(lesson.prerequisite_lesson_id)
-      );
+      let isLocked = false;
+      let lockReason: string | null = null;
+
+      if (!isStaff) {
+        if (lesson.prerequisite_lesson_id && !completedLessonIds.has(lesson.prerequisite_lesson_id)) {
+          isLocked = true;
+          lockReason = 'Requires completion of prerequisite lesson.';
+        } else if (requireSequential && !previousLessonCompleted) {
+          isLocked = true;
+          lockReason = 'Requires completion of previous lesson in sequence.';
+        }
+      }
+
+      // Track sequential completion for subsequent lessons in structured mode
+      previousLessonCompleted = isCompleted;
 
       // Synthesize fallback blocks if legacy columns used
       let blocks = Array.isArray(lesson.content_blocks) ? lesson.content_blocks : [];
@@ -427,8 +466,8 @@ export async function getCourseWithCurriculum(
         content_blocks: blocks,
         instructor_notes: isStaff ? lesson.instructor_notes : null,
         is_completed: isCompleted,
-        is_locked: isPrereqLocked,
-        lock_reason: isPrereqLocked ? 'Requires completion of prerequisite lesson.' : null,
+        is_locked: isLocked,
+        lock_reason: lockReason,
         assignment: assignmentsByLesson[lesson.id] || null,
         quiz: quizzesByLesson[lesson.id] || null,
       });
@@ -505,6 +544,39 @@ export async function getCourseWithCurriculum(
     const progressPercentage =
       totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
 
+    let enrolledStudentsCount = 0;
+    let inProgressStudentsCount = 0;
+    let completedStudentsCount = 0;
+    let completionRatePercentage = 0;
+
+    if (isStaff) {
+      const enrollStatsRes = await tx.query<{ student_id: string }>(
+        `SELECT student_id FROM public.course_enrollments WHERE course_id = $1 AND circle_id = $2;`,
+        [course.id, circleId]
+      );
+      enrolledStudentsCount = enrollStatsRes.rows.length;
+
+      if (enrolledStudentsCount > 0 && totalLessons > 0) {
+        const compGroupRes = await tx.query<{ user_id: string; comp_count: string }>(
+          `SELECT user_id, COUNT(DISTINCT lesson_id)::text AS comp_count
+           FROM public.course_lesson_completions
+           WHERE course_id = $1 AND circle_id = $2
+           GROUP BY user_id;`,
+          [course.id, circleId]
+        );
+        const compByUser = new Map(compGroupRes.rows.map((r) => [r.user_id, parseInt(r.comp_count, 10)]));
+        for (const row of enrollStatsRes.rows) {
+          const count = compByUser.get(row.student_id) || 0;
+          if (count >= totalLessons) {
+            completedStudentsCount++;
+          } else if (count > 0) {
+            inProgressStudentsCount++;
+          }
+        }
+        completionRatePercentage = Math.round((completedStudentsCount / enrolledStudentsCount) * 100);
+      }
+    }
+
     return {
       ...course,
       estimated_duration_hours: Number(course.estimated_duration_hours),
@@ -521,6 +593,15 @@ export async function getCourseWithCurriculum(
       total_lessons_count: totalLessons,
       completed_lessons_count: completedLessons,
       progress_percentage: progressPercentage,
+      pacing_format: course.pacing_format ?? 'self_paced',
+      schedule_type: course.schedule_type ?? 'relative_drip',
+      cohort_start_date: course.cohort_start_date ?? null,
+      cohort_end_date: course.cohort_end_date ?? null,
+      require_sequential_completion: Boolean(course.require_sequential_completion),
+      enrolled_students_count: enrolledStudentsCount,
+      in_progress_students_count: inProgressStudentsCount,
+      completed_students_count: completedStudentsCount,
+      completion_rate_percentage: completionRatePercentage,
     };
   });
 }
@@ -560,8 +641,9 @@ export async function createCourse(
       `INSERT INTO public.courses (
          id, circle_id, instructor_id, title, slug, description,
          thumbnail_url, difficulty_level, estimated_duration_hours,
-         access_rule, min_level_required, status
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+         pacing_format, schedule_type, cohort_start_date, cohort_end_date,
+         require_sequential_completion, access_rule, min_level_required, status
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
        RETURNING *;`,
       [
         courseId,
@@ -573,6 +655,11 @@ export async function createCourse(
         parsed.thumbnailUrl || null,
         parsed.difficultyLevel || null,
         parsed.estimatedDurationHours,
+        parsed.pacingFormat,
+        parsed.scheduleType,
+        parsed.cohortStartDate ? new Date(parsed.cohortStartDate).toISOString() : null,
+        parsed.cohortEndDate ? new Date(parsed.cohortEndDate).toISOString() : null,
+        parsed.requireSequentialCompletion,
         parsed.accessRule,
         parsed.minLevelRequired,
         parsed.status,
@@ -629,9 +716,14 @@ export async function updateCourse(
          thumbnail_url = CASE WHEN $6::boolean THEN $7 ELSE thumbnail_url END,
          difficulty_level = CASE WHEN $8::boolean THEN $9 ELSE difficulty_level END,
          estimated_duration_hours = COALESCE($10, estimated_duration_hours),
-         status = COALESCE($11, status),
-         access_rule = COALESCE($12, access_rule),
-         min_level_required = COALESCE($13, min_level_required),
+         pacing_format = COALESCE($11, pacing_format),
+         schedule_type = COALESCE($12, schedule_type),
+         cohort_start_date = CASE WHEN $13::boolean THEN $14::timestamptz ELSE cohort_start_date END,
+         cohort_end_date = CASE WHEN $15::boolean THEN $16::timestamptz ELSE cohort_end_date END,
+         require_sequential_completion = COALESCE($17, require_sequential_completion),
+         status = COALESCE($18, status),
+         access_rule = COALESCE($19, access_rule),
+         min_level_required = COALESCE($20, min_level_required),
          updated_at = NOW()
        WHERE id = $1 AND circle_id = $2
        RETURNING *;`,
@@ -646,6 +738,13 @@ export async function updateCourse(
         parsed.difficultyLevel !== undefined,
         parsed.difficultyLevel ?? null,
         parsed.estimatedDurationHours ?? null,
+        parsed.pacingFormat ?? null,
+        parsed.scheduleType ?? null,
+        parsed.cohortStartDate !== undefined,
+        parsed.cohortStartDate ?? null,
+        parsed.cohortEndDate !== undefined,
+        parsed.cohortEndDate ?? null,
+        parsed.requireSequentialCompletion !== undefined ? parsed.requireSequentialCompletion : null,
         parsed.status ?? null,
         parsed.accessRule ?? null,
         parsed.minLevelRequired ?? null,
@@ -784,6 +883,231 @@ export async function createLesson(
       ...res.rows[0],
       is_completed: false,
     };
+  });
+}
+
+/**
+ * Updates a module's settings or syllabus metadata.
+ */
+export async function updateModule(
+  actorUserId: string,
+  circleId: string,
+  moduleId: string,
+  input: z.input<typeof updateModuleSchema>
+): Promise<CourseModuleItem> {
+  const parsed = updateModuleSchema.parse(input);
+
+  return withRlsTransaction(actorUserId, async (tx) => {
+    const modRes = await tx.query<{ course_id: string }>(
+      `SELECT course_id FROM public.course_modules WHERE id = $1 AND circle_id = $2 LIMIT 1;`,
+      [moduleId, circleId]
+    );
+    if (!modRes.rows[0]) throw new NotFoundError('Module not found.');
+
+    const courseRes = await tx.query<{ instructor_id: string }>(
+      `SELECT instructor_id FROM public.courses WHERE id = $1 AND circle_id = $2 LIMIT 1;`,
+      [modRes.rows[0].course_id, circleId]
+    );
+    if (!courseRes.rows[0]) throw new NotFoundError('Course not found.');
+
+    const memRes = await tx.query<{ role: CircleRole }>(
+      `SELECT role FROM public.circle_memberships WHERE circle_id = $1 AND user_id = $2 LIMIT 1;`,
+      [circleId, actorUserId]
+    );
+    const role = memRes.rows[0]?.role;
+    const isStaff = role === 'owner' || role === 'admin' || role === 'moderator';
+
+    if (!isStaff && courseRes.rows[0].instructor_id !== actorUserId) {
+      throw new ForbiddenError('Only the instructor or staff can update modules.');
+    }
+
+    const res = await tx.query<CourseModuleItem>(
+      `UPDATE public.course_modules
+       SET
+         title = COALESCE($3, title),
+         description = COALESCE($4, description),
+         sort_order = COALESCE($5, sort_order),
+         drip_type = COALESCE($6, drip_type),
+         drip_days_after_enrollment = COALESCE($7, drip_days_after_enrollment),
+         drip_unlock_date = CASE WHEN $8::boolean THEN $9::timestamptz ELSE drip_unlock_date END,
+         updated_at = NOW()
+       WHERE id = $1 AND circle_id = $2
+       RETURNING *;`,
+      [
+        moduleId,
+        circleId,
+        parsed.title ?? null,
+        parsed.description ?? null,
+        parsed.sortOrder ?? null,
+        parsed.dripType ?? null,
+        parsed.dripDaysAfterEnrollment ?? null,
+        parsed.dripUnlockDate !== undefined,
+        parsed.dripUnlockDate ?? null,
+      ]
+    );
+
+    return {
+      ...res.rows[0],
+      lessons: [],
+    };
+  });
+}
+
+/**
+ * Deletes a module and cascades to all its lessons.
+ */
+export async function deleteModule(
+  actorUserId: string,
+  circleId: string,
+  moduleId: string
+): Promise<{ success: boolean }> {
+  return withRlsTransaction(actorUserId, async (tx) => {
+    const modRes = await tx.query<{ course_id: string }>(
+      `SELECT course_id FROM public.course_modules WHERE id = $1 AND circle_id = $2 LIMIT 1;`,
+      [moduleId, circleId]
+    );
+    if (!modRes.rows[0]) throw new NotFoundError('Module not found.');
+
+    const courseRes = await tx.query<{ instructor_id: string }>(
+      `SELECT instructor_id FROM public.courses WHERE id = $1 AND circle_id = $2 LIMIT 1;`,
+      [modRes.rows[0].course_id, circleId]
+    );
+    if (!courseRes.rows[0]) throw new NotFoundError('Course not found.');
+
+    const memRes = await tx.query<{ role: CircleRole }>(
+      `SELECT role FROM public.circle_memberships WHERE circle_id = $1 AND user_id = $2 LIMIT 1;`,
+      [circleId, actorUserId]
+    );
+    const role = memRes.rows[0]?.role;
+    const isStaff = role === 'owner' || role === 'admin' || role === 'moderator';
+
+    if (!isStaff && courseRes.rows[0].instructor_id !== actorUserId) {
+      throw new ForbiddenError('Only the instructor or staff can delete modules.');
+    }
+
+    await tx.query(
+      `DELETE FROM public.course_modules WHERE id = $1 AND circle_id = $2;`,
+      [moduleId, circleId]
+    );
+
+    return { success: true };
+  });
+}
+
+/**
+ * Updates a lesson's metadata (title, slug, status, video URL, etc.).
+ */
+export async function updateLesson(
+  actorUserId: string,
+  circleId: string,
+  lessonId: string,
+  input: z.input<typeof updateLessonSchema>
+): Promise<CourseLessonItem> {
+  const parsed = updateLessonSchema.parse(input);
+
+  return withRlsTransaction(actorUserId, async (tx) => {
+    const lessonRes = await tx.query<{ course_id: string }>(
+      `SELECT course_id FROM public.course_lessons WHERE id = $1 AND circle_id = $2 LIMIT 1;`,
+      [lessonId, circleId]
+    );
+    if (!lessonRes.rows[0]) throw new NotFoundError('Lesson not found.');
+
+    const courseRes = await tx.query<{ instructor_id: string }>(
+      `SELECT instructor_id FROM public.courses WHERE id = $1 AND circle_id = $2 LIMIT 1;`,
+      [lessonRes.rows[0].course_id, circleId]
+    );
+    if (!courseRes.rows[0]) throw new NotFoundError('Course not found.');
+
+    const memRes = await tx.query<{ role: CircleRole }>(
+      `SELECT role FROM public.circle_memberships WHERE circle_id = $1 AND user_id = $2 LIMIT 1;`,
+      [circleId, actorUserId]
+    );
+    const role = memRes.rows[0]?.role;
+    const isStaff = role === 'owner' || role === 'admin' || role === 'moderator';
+
+    if (!isStaff && courseRes.rows[0].instructor_id !== actorUserId) {
+      throw new ForbiddenError('Only the instructor or staff can update lessons.');
+    }
+
+    const res = await tx.query<CourseLessonItem>(
+      `UPDATE public.course_lessons
+       SET
+         title = COALESCE($3, title),
+         slug = COALESCE($4, slug),
+         description = COALESCE($5, description),
+         content_body = COALESCE($6, content_body),
+         video_url = CASE WHEN $7::boolean THEN $8 ELSE video_url END,
+         duration_minutes = COALESCE($9, duration_minutes),
+         attachment_url = CASE WHEN $10::boolean THEN $11 ELSE attachment_url END,
+         attachment_name = CASE WHEN $12::boolean THEN $13 ELSE attachment_name END,
+         is_free_preview = COALESCE($14, is_free_preview),
+         status = COALESCE($15, status),
+         sort_order = COALESCE($16, sort_order),
+         updated_at = NOW()
+       WHERE id = $1 AND circle_id = $2
+       RETURNING *;`,
+      [
+        lessonId,
+        circleId,
+        parsed.title ?? null,
+        parsed.slug ?? null,
+        parsed.description ?? null,
+        parsed.contentBody ?? null,
+        parsed.videoUrl !== undefined,
+        parsed.videoUrl ?? null,
+        parsed.durationMinutes ?? null,
+        parsed.attachmentUrl !== undefined,
+        parsed.attachmentUrl ?? null,
+        parsed.attachmentName !== undefined,
+        parsed.attachmentName ?? null,
+        parsed.isFreePreview !== undefined ? parsed.isFreePreview : null,
+        parsed.status ?? null,
+        parsed.sortOrder ?? null,
+      ]
+    );
+
+    return res.rows[0];
+  });
+}
+
+/**
+ * Deletes a lesson.
+ */
+export async function deleteLesson(
+  actorUserId: string,
+  circleId: string,
+  lessonId: string
+): Promise<{ success: boolean }> {
+  return withRlsTransaction(actorUserId, async (tx) => {
+    const lessonRes = await tx.query<{ course_id: string }>(
+      `SELECT course_id FROM public.course_lessons WHERE id = $1 AND circle_id = $2 LIMIT 1;`,
+      [lessonId, circleId]
+    );
+    if (!lessonRes.rows[0]) throw new NotFoundError('Lesson not found.');
+
+    const courseRes = await tx.query<{ instructor_id: string }>(
+      `SELECT instructor_id FROM public.courses WHERE id = $1 AND circle_id = $2 LIMIT 1;`,
+      [lessonRes.rows[0].course_id, circleId]
+    );
+    if (!courseRes.rows[0]) throw new NotFoundError('Course not found.');
+
+    const memRes = await tx.query<{ role: CircleRole }>(
+      `SELECT role FROM public.circle_memberships WHERE circle_id = $1 AND user_id = $2 LIMIT 1;`,
+      [circleId, actorUserId]
+    );
+    const role = memRes.rows[0]?.role;
+    const isStaff = role === 'owner' || role === 'admin' || role === 'moderator';
+
+    if (!isStaff && courseRes.rows[0].instructor_id !== actorUserId) {
+      throw new ForbiddenError('Only the instructor or staff can delete lessons.');
+    }
+
+    await tx.query(
+      `DELETE FROM public.course_lessons WHERE id = $1 AND circle_id = $2;`,
+      [lessonId, circleId]
+    );
+
+    return { success: true };
   });
 }
 

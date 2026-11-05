@@ -120,6 +120,7 @@ export function CoursesCatalog({
           description,
           difficultyLevel: difficulty,
           estimatedDurationHours: parseFloat(durationHours) || 0,
+          pacingFormat: 'self_paced',
           accessRule,
           minLevelRequired: accessRule === 'min_level' ? Number(minLevelRequired) : 1,
         }),
@@ -421,13 +422,24 @@ export function CoursesCatalog({
                           <span>Locked (Requires Level {course.min_level_required})</span>
                         </Link>
                       ) : (
-                        <Link
-                          href={`/circles/${circleSlug}/courses/${course.id}`}
-                          className="flex w-full items-center justify-center gap-1.5 rounded-xl bg-stone-900 px-3 py-2 text-xs font-medium text-white hover:bg-black transition-colors"
-                        >
-                          <Play className="h-3.5 w-3.5 fill-current" />
-                          {hasStarted ? 'Continue Learning' : 'Start Course'}
-                        </Link>
+                        <div className="flex items-center gap-2">
+                          <Link
+                            href={`/circles/${circleSlug}/courses/${course.id}`}
+                            className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-stone-900 px-3 py-2 text-xs font-medium text-white hover:bg-black transition-colors"
+                          >
+                            <Play className="h-3.5 w-3.5 fill-current" />
+                            {hasStarted ? 'Continue Learning' : 'Start Course'}
+                          </Link>
+                          {isStaff && (
+                            <Link
+                              href={`/circles/${circleSlug}/courses/${course.id}/studio`}
+                              className="inline-flex items-center justify-center gap-1 rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-50 hover:border-black transition-colors shadow-2xs"
+                              title="Open Circle Course Studio"
+                            >
+                              Studio
+                            </Link>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>

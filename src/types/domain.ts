@@ -953,6 +953,11 @@ export interface CourseItem {
   estimated_duration_hours: number;
   status: 'draft' | 'published' | 'archived';
   sort_order: number;
+  pacing_format?: 'self_paced' | 'structured' | 'scheduled';
+  schedule_type?: 'relative_drip' | 'calendar_date';
+  cohort_start_date?: string | null;
+  cohort_end_date?: string | null;
+  require_sequential_completion?: boolean;
   access_rule?: 'open' | 'members_only' | 'min_level' | 'staff_only';
   min_level_required?: number;
   viewer_can_access?: boolean;
@@ -965,6 +970,10 @@ export interface CourseItem {
   completed_lessons_count?: number;
   progress_percentage?: number;
   is_enrolled?: boolean;
+  enrolled_students_count?: number;
+  in_progress_students_count?: number;
+  completed_students_count?: number;
+  completion_rate_percentage?: number;
   learning_objectives?: string[];
   published_version?: number;
   validation_issues?: string[];
