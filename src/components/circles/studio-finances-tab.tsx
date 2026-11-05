@@ -16,6 +16,11 @@ import {
   ShieldCheck,
   Eye,
   EyeOff,
+  Percent,
+  Sparkles,
+  Zap,
+  Crown,
+  Check,
 } from 'lucide-react';
 import {
   BillingType,
@@ -37,6 +42,10 @@ import {
   formatBachsAmount,
   getBachsCurrency,
 } from '@/lib/payments/currencies';
+import {
+  PLATFORM_TIERS,
+  PlatformPlanTier,
+} from '@/features/finances/platform-fee-constants';
 
 interface StudioFinancesTabProps {
   circle: Circle;
@@ -49,7 +58,7 @@ export function StudioFinancesTab({
   spaces,
   members,
 }: StudioFinancesTabProps) {
-  const [subTab, setSubTab] = useState<'plans' | 'invoices' | 'treasury'>('plans');
+  const [subTab, setSubTab] = useState<'plans' | 'invoices' | 'treasury' | 'tier'>('plans');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [banner, setBanner] = useState<string | null>(null);
@@ -58,6 +67,27 @@ export function StudioFinancesTab({
   const [invoices, setInvoices] = useState<InvoiceItem[]>([]);
   const [treasuryLedger, setTreasuryLedger] = useState<CommunityTreasuryLedgerItem[]>([]);
   const [treasurySummary, setTreasurySummary] = useState<TreasurySummary | null>(null);
+
+  // Platform Tier State
+  const [currentTier, setCurrentTier] = useState<PlatformPlanTier>(circle.plan_tier || 'free');
+  const [customFeePct, setCustomFeePct] = useState<number | null>(
+    circle.custom_platform_fee_percentage ?? null
+  );
+  const [platformLedger, setPlatformLedger] = useState<
+    Array<{
+      id: string;
+      invoice_id: string;
+      plan_tier: PlatformPlanTier;
+      gross_amount_cents: number;
+      platform_fee_percentage: number;
+      platform_fee_cents: number;
+      creator_net_cents: number;
+      currency: string;
+      payment_reference: string | null;
+      created_at: string;
+    }>
+  >([]);
+  const [tierSaving, setTierSaving] = useState(false);
 
   // Modals state
   const [showCreatePlanModal, setShowCreatePlanModal] = useState(false);
@@ -114,14 +144,17 @@ export function StudioFinancesTab({
     setLoading(true);
     setError(null);
     try {
-      const [plansRes, invsRes, ledgerRes, summaryRes] = await Promise.all([
-        fetch(`/api/circles/${circle.id}/finances?mode=plans&includeInactive=true`).then((r) =>
-          r.json()
-        ),
-        fetch(`/api/circles/${circle.id}/finances?mode=invoices`).then((r) => r.json()),
-        fetch(`/api/circles/${circle.id}/finances?mode=treasury_ledger`).then((r) => r.json()),
-        fetch(`/api/circles/${circle.id}/finances?mode=treasury_summary`).then((r) => r.json()),
-      ]);
+      const [plansRes, invsRes, ledgerRes, summaryRes, tierRes, platformLedgerRes] =
+        await Promise.all([
+          fetch(`/api/circles/${circle.id}/finances?mode=plans&includeInactive=true`).then((r) =>
+            r.json()
+          ),
+          fetch(`/api/circles/${circle.id}/finances?mode=invoices`).then((r) => r.json()),
+          fetch(`/api/circles/${circle.id}/finances?mode=treasury_ledger`).then((r) => r.json()),
+          fetch(`/api/circles/${circle.id}/finances?mode=treasury_summary`).then((r) => r.json()),
+          fetch(`/api/circles/${circle.id}/finances?mode=platform_tier`).then((r) => r.json()),
+          fetch(`/api/circles/${circle.id}/finances?mode=platform_ledger`).then((r) => r.json()),
+        ]);
 
       if (plansRes.error) throw new Error(plansRes.error);
       if (invsRes.error) throw new Error(invsRes.error);
@@ -130,6 +163,13 @@ export function StudioFinancesTab({
       setInvoices(invsRes.invoices || []);
       setTreasuryLedger(ledgerRes.ledger || []);
       setTreasurySummary(summaryRes.summary || null);
+      if (tierRes?.planTier) {
+        setCurrentTier(tierRes.planTier);
+        setCustomFeePct(tierRes.customPlatformFeePercentage ?? null);
+      }
+      if (platformLedgerRes?.ledger) {
+        setPlatformLedger(platformLedgerRes.ledger);
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Failed to load finances';
       setError(msg);
@@ -141,6 +181,31 @@ export function StudioFinancesTab({
   useEffect(() => {
     loadAllFinancialData();
   }, [loadAllFinancialData]);
+
+  async function handleSwitchTier(targetTier: PlatformPlanTier) {
+    setTierSaving(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/circles/${circle.id}/finances`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update_tier',
+          tier: targetTier,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update plan tier');
+
+      setCurrentTier(targetTier);
+      showSuccess(`Successfully changed circle tier to ${PLATFORM_TIERS[targetTier].name}!`);
+      loadAllFinancialData();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error switching tier');
+    } finally {
+      setTierSaving(false);
+    }
+  }
 
   async function handleCreatePlan(e: React.FormEvent) {
     e.preventDefault();
@@ -362,7 +427,7 @@ export function StudioFinancesTab({
       )}
 
       {/* KPI Financial Overview Cards */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <div className="rounded-2xl border border-stone-200/80 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold uppercase tracking-wider text-stone-500">
@@ -435,11 +500,41 @@ export function StudioFinancesTab({
             <span className="text-xs text-stone-500">{circle.name} fund</span>
           </div>
         </div>
+
+        <div className="rounded-2xl border border-stone-200/80 bg-white p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold uppercase tracking-wider text-stone-500">
+              Platform Fee Tier
+            </span>
+            <div className="rounded-xl bg-forest-50 p-2 text-forest-700">
+              <Percent className="h-4 w-4" />
+            </div>
+          </div>
+          <div className="mt-3 flex items-baseline justify-between">
+            <div>
+              <span className="text-lg font-bold text-stone-900">
+                {PLATFORM_TIERS[currentTier]?.name.split(' ')[0] || 'Free'}
+              </span>
+              <p className="text-xs font-semibold text-emerald-700">
+                {currentTier === 'enterprise' && customFeePct != null
+                  ? `${customFeePct}% Custom Fee`
+                  : PLATFORM_TIERS[currentTier]?.badge}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSubTab('tier')}
+              className="text-xs font-semibold text-forest-700 hover:text-forest-900 underline"
+            >
+              Plans →
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Sub-Navigation Tabs & Actions Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-stone-200 pb-4">
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             onClick={() => setSubTab('plans')}
             className={`rounded-xl px-4 py-2 text-sm font-semibold transition-all ${
@@ -469,6 +564,17 @@ export function StudioFinancesTab({
             }`}
           >
             Community Treasury Ledger ({treasuryLedger.length})
+          </button>
+          <button
+            onClick={() => setSubTab('tier')}
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition-all flex items-center gap-1.5 ${
+              subTab === 'tier'
+                ? 'bg-forest-900 text-white shadow-sm'
+                : 'text-stone-600 hover:bg-stone-100'
+            }`}
+          >
+            <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+            Platform Plan & Fees ({PLATFORM_TIERS[currentTier]?.badge})
           </button>
         </div>
 
@@ -817,6 +923,223 @@ export function StudioFinancesTab({
                         >
                           {entry.entry_type === 'revenue' ? '+' : '-'}$
                           {(entry.amount_cents / 100).toFixed(2)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* SUB-TAB 4: PLATFORM PLAN & FEES */}
+      {subTab === 'tier' && (
+        <div className="space-y-8 animate-in fade-in duration-200">
+          {/* Header & Architecture Card */}
+          <div className="rounded-2xl border border-stone-200 bg-gradient-to-br from-forest-950 via-forest-900 to-forest-800 p-6 text-white shadow-sm">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <div className="inline-flex items-center gap-2 rounded-full bg-forest-800/80 px-3 py-1 text-xs font-semibold text-forest-200 ring-1 ring-inset ring-white/10">
+                  <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+                  Circles Fee Engine • Bachs Settlement
+                </div>
+                <h3 className="mt-3 text-2xl font-bold tracking-tight text-white">
+                  Platform Fee & Subscription Tiers
+                </h3>
+                <p className="mt-1 text-sm text-forest-200 max-w-2xl leading-relaxed">
+                  Circles takes a transparent platform fee on paid transactions (courses, pricing plans, and invoices).
+                  All checkouts process securely through Bachs, platform fees are automatically computed and deducted,
+                  and 100% of your net earnings are immediately credited to your Community Treasury.
+                </p>
+              </div>
+
+              <div className="flex flex-col items-start md:items-end justify-center rounded-xl bg-forest-800/60 p-4 border border-forest-700/50 backdrop-blur-sm shrink-0">
+                <span className="text-xs uppercase font-semibold tracking-wider text-forest-300">
+                  Current Active Tier
+                </span>
+                <span className="text-xl font-extrabold text-white">
+                  {PLATFORM_TIERS[currentTier]?.name || 'Free / Starter'}
+                </span>
+                <span className="text-xs font-bold text-amber-400 mt-0.5">
+                  {currentTier === 'enterprise' && customFeePct != null
+                    ? `${customFeePct}% Custom Fee`
+                    : PLATFORM_TIERS[currentTier]?.badge}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Pricing Tier Grid */}
+          <div>
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <h4 className="text-lg font-bold text-stone-900">Choose Your Platform Tier</h4>
+                <p className="text-xs text-stone-500">
+                  Select the tier that fits your circle scale. Upgrade anytime to unlock lower transaction fees.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-4">
+              {(
+                ['free', 'pro', 'platinum', 'enterprise'] as PlatformPlanTier[]
+              ).map((tierKey) => {
+                const tierDef = PLATFORM_TIERS[tierKey];
+                const isCurrent = currentTier === tierKey;
+
+                return (
+                  <div
+                    key={tierKey}
+                    className={`relative flex flex-col justify-between rounded-2xl border p-6 transition-all ${
+                      isCurrent
+                        ? 'border-forest-600 bg-forest-50/20 shadow-md ring-2 ring-forest-600/30'
+                        : 'border-stone-200 bg-white hover:border-stone-300 shadow-sm'
+                    }`}
+                  >
+                    {isCurrent && (
+                      <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-forest-700 px-3 py-0.5 text-[11px] font-bold text-white shadow-sm">
+                        Current Plan
+                      </span>
+                    )}
+
+                    <div>
+                      <div className="flex items-center justify-between">
+                        <h5 className="text-base font-bold text-stone-900">{tierDef.name}</h5>
+                        {tierKey === 'platinum' && <Crown className="h-4 w-4 text-amber-500" />}
+                        {tierKey === 'pro' && <Zap className="h-4 w-4 text-emerald-600" />}
+                      </div>
+
+                      <div className="mt-4 flex items-baseline gap-1">
+                        {tierKey === 'enterprise' ? (
+                          <span className="text-2xl font-extrabold text-stone-900">Custom</span>
+                        ) : (
+                          <>
+                            <span className="text-3xl font-extrabold text-stone-900">
+                              ${tierDef.monthlyPriceUsd}
+                            </span>
+                            <span className="text-xs font-semibold text-stone-500">/month</span>
+                          </>
+                        )}
+                      </div>
+
+                      <div className="mt-2 inline-flex items-center rounded-lg bg-emerald-100/70 px-2.5 py-1 text-xs font-bold text-emerald-800">
+                        {tierKey === 'enterprise' && customFeePct != null
+                          ? `${customFeePct}% Platform Fee`
+                          : tierDef.badge}
+                      </div>
+
+                      <p className="mt-3 text-xs text-stone-600 leading-relaxed">
+                        {tierDef.description}
+                      </p>
+
+                      <div className="mt-5 border-t border-stone-200/80 pt-4">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400">
+                          Included
+                        </span>
+                        <ul className="mt-2.5 space-y-2 text-xs text-stone-700">
+                          {tierDef.features.map((feat, idx) => (
+                            <li key={idx} className="flex items-start gap-2">
+                              <Check className="h-3.5 w-3.5 text-forest-700 shrink-0 mt-0.5" />
+                              <span>{feat}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </div>
+
+                    <div className="mt-6 pt-2">
+                      {isCurrent ? (
+                        <Button
+                          disabled
+                          className="w-full bg-forest-900/10 text-forest-900 border border-forest-900/20 cursor-default"
+                          size="sm"
+                        >
+                          <Check className="h-3.5 w-3.5 mr-1 text-forest-800" />
+                          Active Plan
+                        </Button>
+                      ) : (
+                        <Button
+                          onClick={() => handleSwitchTier(tierKey)}
+                          disabled={tierSaving}
+                          variant={tierKey === 'pro' || tierKey === 'platinum' ? 'primary' : 'outline'}
+                          className="w-full"
+                          size="sm"
+                        >
+                          {tierSaving ? 'Switching...' : `Select ${tierDef.name.split(' ')[0]}`}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Platform Revenue Deductions Ledger Table */}
+          <div className="rounded-2xl border border-stone-200 bg-white overflow-hidden shadow-sm">
+            <div className="border-b border-stone-200 bg-stone-50/70 px-6 py-4">
+              <h4 className="text-sm font-bold text-stone-900">Platform Fee Deduction Ledger</h4>
+              <p className="text-xs text-stone-500">
+                Transparent log of platform fees deducted on Bachs settlements and net treasury payouts.
+              </p>
+            </div>
+
+            {platformLedger.length === 0 ? (
+              <div className="p-10 text-center">
+                <Percent className="mx-auto h-8 w-8 text-stone-400" />
+                <h5 className="mt-2 text-sm font-semibold text-stone-900">
+                  No platform fee deductions recorded yet
+                </h5>
+                <p className="mt-1 text-xs text-stone-500 max-w-md mx-auto">
+                  When members purchase paid courses, memberships, or pay invoices through Bachs,
+                  the platform fee and net creator treasury deposit will appear here with reference details.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs text-stone-600">
+                  <thead className="bg-stone-50 text-[11px] font-semibold uppercase tracking-wider text-stone-500 border-b border-stone-200">
+                    <tr>
+                      <th className="px-5 py-3">Date</th>
+                      <th className="px-5 py-3">Plan Tier</th>
+                      <th className="px-5 py-3">Bachs Reference</th>
+                      <th className="px-5 py-3 text-right">Gross Amount</th>
+                      <th className="px-5 py-3 text-right">Platform Fee %</th>
+                      <th className="px-5 py-3 text-right">Fee Retained</th>
+                      <th className="px-5 py-3 text-right text-emerald-800">Net Creator Deposit</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stone-100">
+                    {platformLedger.map((row) => (
+                      <tr key={row.id} className="hover:bg-stone-50/80 transition-colors">
+                        <td className="px-5 py-3.5 font-medium text-stone-900 whitespace-nowrap">
+                          {new Date(row.created_at).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric',
+                          })}
+                        </td>
+                        <td className="px-5 py-3.5 capitalize font-semibold text-stone-700">
+                          <span className="rounded-md bg-stone-100 px-2 py-0.5 text-[11px]">
+                            {row.plan_tier}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5 font-mono text-[11px] text-stone-500 truncate max-w-xs">
+                          {row.payment_reference || 'N/A'}
+                        </td>
+                        <td className="px-5 py-3.5 text-right font-mono font-medium text-stone-900">
+                          {formatBachsAmount(row.gross_amount_cents, row.currency)}
+                        </td>
+                        <td className="px-5 py-3.5 text-right font-bold text-amber-700">
+                          {row.platform_fee_percentage}%
+                        </td>
+                        <td className="px-5 py-3.5 text-right font-mono font-semibold text-red-700">
+                          -{formatBachsAmount(row.platform_fee_cents, row.currency)}
+                        </td>
+                        <td className="px-5 py-3.5 text-right font-mono font-bold text-emerald-700">
+                          +{formatBachsAmount(row.creator_net_cents, row.currency)}
                         </td>
                       </tr>
                     ))}

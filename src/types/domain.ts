@@ -63,6 +63,8 @@ export interface Circle {
   created_at: string;
   updated_at: string;
   member_count?: number;
+  plan_tier?: 'free' | 'pro' | 'platinum' | 'enterprise';
+  custom_platform_fee_percentage?: number | null;
   current_user_role?: CircleRole | null;
   current_user_membership_status?: MembershipStatus | null;
   current_user_join_request_status?: JoinRequestStatus | null;
@@ -1150,6 +1152,9 @@ export interface InvoiceItem {
   description: string;
   status: InvoiceStatus;
   total_cents: number;
+  platform_fee_cents?: number;
+  platform_fee_percentage?: number;
+  creator_net_cents?: number;
   currency: string;
   payment_method: PaymentMethod;
   payment_reference: string | null;

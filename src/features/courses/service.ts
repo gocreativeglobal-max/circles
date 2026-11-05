@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { withRlsTransaction, withServiceRoleTransaction, DbTransaction } from '@/lib/db/postgres';
 import { getPaymentProcessor } from '@/lib/payments/adapter';
 import { isBachsSupportedCurrency } from '@/lib/payments/currencies';
+import { calculatePlatformFee, getCircleTierInfo } from '@/features/finances/platform-fees';
 import {
   CourseItem,
   CourseModuleItem,
@@ -2943,12 +2944,21 @@ export async function purchaseCoursePaywall(
       };
     }
 
-    // Paid Course Plan: Create pending/open invoice and initialize Bachs hosted checkout session
+    // Paid Course Plan: Calculate platform fee based on circle's subscription tier
+    const tierInfo = await getCircleTierInfo(tx, circleId);
+    const feeCalc = calculatePlatformFee(
+      tierInfo.planTier,
+      plan.amount_cents,
+      tierInfo.customPlatformFeePercentage
+    );
+
+    // Create pending/open invoice and initialize Bachs hosted checkout session
     await tx.query(
       `INSERT INTO public.invoices (
         id, circle_id, user_id, plan_id, invoice_number, title, description,
-        status, total_cents, currency, payment_method, paid_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'open', $8, $9, 'bachs', NULL);`,
+        status, total_cents, platform_fee_cents, platform_fee_percentage,
+        creator_net_cents, currency, payment_method, paid_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'open', $8, $9, $10, $11, $12, 'bachs', NULL);`,
       [
         invoiceId,
         circleId,
@@ -2958,6 +2968,9 @@ export async function purchaseCoursePaywall(
         `Course Access: ${plan.name}`,
         plan.description,
         plan.amount_cents,
+        feeCalc.feeCents,
+        feeCalc.feePercentage,
+        feeCalc.creatorNetCents,
         plan.currency,
       ]
     );

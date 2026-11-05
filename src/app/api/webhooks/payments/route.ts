@@ -3,6 +3,11 @@ import { getPaymentProcessor } from '@/lib/payments/adapter';
 import { withServiceRoleTransaction } from '@/lib/db/postgres';
 import { fulfillInvoiceEntitlements } from '@/features/finances/service';
 import { dispatchFinancialWebhookEvent } from '@/features/finances/integrations';
+import {
+  recordPlatformRevenue,
+  getCircleTierInfo,
+  calculatePlatformFee,
+} from '@/features/finances/platform-fees';
 import { InvoiceItem } from '@/types/domain';
 import { logger } from '@/lib/logging';
 
@@ -111,8 +116,29 @@ export async function POST(req: NextRequest) {
         // Automatically fulfill and activate plan entitlements
         const granted = await fulfillInvoiceEntitlements(tx, paidInvoice);
 
-        // Record revenue entry in community treasury ledger
+        // Record platform revenue and creator net revenue in community treasury ledger
         if (paidInvoice.total_cents > 0) {
+          const tierInfo = await getCircleTierInfo(tx, paidInvoice.circle_id);
+          const feeCalc = calculatePlatformFee(
+            tierInfo.planTier,
+            paidInvoice.total_cents,
+            tierInfo.customPlatformFeePercentage
+          );
+
+          // Record Circles platform revenue cut
+          await recordPlatformRevenue(tx, {
+            circleId: paidInvoice.circle_id,
+            invoiceId: paidInvoice.id,
+            planTier: feeCalc.planTier,
+            grossAmountCents: paidInvoice.total_cents,
+            platformFeePercentage: feeCalc.feePercentage,
+            platformFeeCents: feeCalc.feeCents,
+            creatorNetCents: feeCalc.creatorNetCents,
+            currency: paidInvoice.currency,
+            paymentReference,
+          });
+
+          // Record net creator revenue in community treasury ledger
           await tx.query(
             `INSERT INTO public.community_treasury_ledger (
                id, circle_id, entry_type, category, amount_cents, currency,
@@ -121,9 +147,9 @@ export async function POST(req: NextRequest) {
             [
               crypto.randomUUID(),
               paidInvoice.circle_id,
-              paidInvoice.total_cents,
+              feeCalc.creatorNetCents,
               paidInvoice.currency,
-              `Bachs checkout payment for ${paidInvoice.title} (Ref: ${paymentReference})`,
+              `Bachs payment for ${paidInvoice.title} (Net payout after ${feeCalc.feePercentage}% platform fee; Ref: ${paymentReference})`,
               paidInvoice.id,
               paidInvoice.user_id,
             ]

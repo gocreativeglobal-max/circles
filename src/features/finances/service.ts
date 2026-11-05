@@ -21,6 +21,7 @@ import {
 } from '@/lib/errors';
 import { createNotification } from '@/features/notifications/service';
 import { isBachsSupportedCurrency } from '@/lib/payments/currencies';
+import { calculatePlatformFee, getCircleTierInfo } from './platform-fees';
 
 // ============================================================================
 // Input Validation Schemas
@@ -471,12 +472,21 @@ export async function createInvoice(
     const invoiceId = crypto.randomUUID();
     const invoiceNumber = generateInvoiceNumber();
 
+    // Calculate platform fee based on Circle's subscription tier
+    const tierInfo = await getCircleTierInfo(tx, input.circleId);
+    const feeCalc = calculatePlatformFee(
+      tierInfo.planTier,
+      input.totalCents,
+      tierInfo.customPlatformFeePercentage
+    );
+
     const invRes = await tx.query<InvoiceItem>(
       `INSERT INTO public.invoices (
          id, circle_id, user_id, plan_id, invoice_number, title, description,
-         status, total_cents, currency, payment_method, payment_reference,
+         status, total_cents, platform_fee_cents, platform_fee_percentage,
+         creator_net_cents, currency, payment_method, payment_reference,
          due_date, paid_at, notes, metadata
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
        RETURNING *;`,
       [
         invoiceId,
@@ -488,6 +498,9 @@ export async function createInvoice(
         input.description,
         input.status,
         input.totalCents,
+        feeCalc.feeCents,
+        feeCalc.feePercentage,
+        feeCalc.creatorNetCents,
         input.currency.toUpperCase(),
         input.paymentMethod,
         input.paymentReference ?? null,

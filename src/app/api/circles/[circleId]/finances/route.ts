@@ -12,6 +12,13 @@ import {
   recordTreasuryEntry,
   updatePricingPlan,
 } from '@/features/finances/service';
+import {
+  PLATFORM_TIERS,
+  updateCircleTier,
+  getCirclePlatformLedger,
+  getCircleTierInfo,
+} from '@/features/finances/platform-fees';
+import { withRlsTransaction } from '@/lib/db/postgres';
 import { handleApiError, resolveApiUser } from '@/lib/auth/api-helpers';
 import { UnauthorizedError, ValidationError } from '@/lib/errors';
 import { InvoiceStatus } from '@/types/domain';
@@ -63,6 +70,25 @@ export async function GET(
       if (!user) throw new UnauthorizedError();
       const summary = await getTreasurySummary(user.id, params.circleId);
       return NextResponse.json({ summary });
+    }
+
+    if (mode === 'platform_tier') {
+      if (!user) throw new UnauthorizedError();
+      const info = await withRlsTransaction(user.id, (tx) =>
+        getCircleTierInfo(tx, params.circleId)
+      );
+      return NextResponse.json({
+        ...info,
+        tiers: PLATFORM_TIERS,
+      });
+    }
+
+    if (mode === 'platform_ledger') {
+      if (!user) throw new UnauthorizedError();
+      const limit = parseInt(searchParams.get('limit') || '50', 10);
+      const offset = parseInt(searchParams.get('offset') || '0', 10);
+      const ledger = await getCirclePlatformLedger(user.id, params.circleId, limit, offset);
+      return NextResponse.json({ ledger });
     }
 
     throw new ValidationError(`Unknown mode: "${mode}"`);
@@ -150,6 +176,19 @@ export async function PATCH(
         body.updates || {}
       );
       return NextResponse.json({ plan });
+    }
+
+    if (action === 'update_tier') {
+      if (!body.tier || !['free', 'pro', 'platinum', 'enterprise'].includes(body.tier)) {
+        throw new ValidationError('Valid tier (free, pro, platinum, enterprise) is required.');
+      }
+      const updated = await updateCircleTier(
+        user.id,
+        params.circleId,
+        body.tier,
+        body.customFeePercentage != null ? Number(body.customFeePercentage) : null
+      );
+      return NextResponse.json({ updated });
     }
 
     throw new ValidationError(`Unknown action: "${action}"`);
