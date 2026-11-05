@@ -46,13 +46,22 @@ export function getRemoteDatabaseUrl(): string | null {
     return null;
   }
 
-  if (!raw.startsWith('postgres://') && !raw.startsWith('postgresql://')) {
+  // Strip wrapping quotes if entered in dashboard e.g. "postgres://..."
+  const cleaned = raw.replace(/^["']|["']$/g, '').trim();
+
+  if (cleaned === '[SENSITIVE]') {
+    throw new ConfigurationError(
+      'Database configuration error: DATABASE_URL in Vercel Environment Variables is currently set to the placeholder "[SENSITIVE]". Please replace it in the Vercel Dashboard with your actual PostgreSQL connection string.'
+    );
+  }
+
+  if (!cleaned.startsWith('postgres://') && !cleaned.startsWith('postgresql://')) {
     throw new ConfigurationError(
       'Database configuration error: DATABASE_URL / SUPABASE_DB_URL must be a valid PostgreSQL connection string starting with postgres:// or postgresql://.'
     );
   }
 
-  return raw;
+  return cleaned;
 }
 
 export function isSupabaseConfigured(): boolean {
