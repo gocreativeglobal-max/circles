@@ -8,8 +8,6 @@ import {
   Plus,
   Settings,
   Eye,
-  CheckCircle2,
-  Lock,
   ChevronDown,
   ChevronRight,
   Trash2,
@@ -18,7 +16,6 @@ import {
   Layers,
   Users,
   CreditCard,
-  Smartphone,
   Workflow,
   Clock,
   FolderPlus,
@@ -48,7 +45,6 @@ type StudioTab =
   | 'lessons'
   | 'customize'
   | 'paywalls'
-  | 'mobile_lock'
   | 'members'
   | 'options'
   | 'workflows';
@@ -655,7 +651,6 @@ export function CourseStudioClient({
               { id: 'lessons', label: 'Lessons', icon: BookOpen },
               { id: 'customize', label: 'Customize', icon: Settings },
               { id: 'paywalls', label: 'Paywalls', icon: CreditCard },
-              { id: 'mobile_lock', label: 'Mobile lock screen', icon: Smartphone },
               { id: 'members', label: 'Members', icon: Users },
               { id: 'options', label: 'Options', icon: Layers },
               { id: 'workflows', label: 'Workflows', icon: Workflow },
@@ -1337,73 +1332,6 @@ export function CourseStudioClient({
           </div>
         )}
 
-        {/* ==================================================================== */}
-        {/* TAB 5: MOBILE LOCK SCREEN */}
-        {/* ==================================================================== */}
-        {activeTab === 'mobile_lock' && (
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-2xs">
-              <h2 className="text-base font-bold text-stone-900">Mobile Lock Screen Preview</h2>
-              <p className="text-xs text-stone-500 mt-0.5">
-                Here is how locked courses appear to iOS and Android mobile app users before enrollment.
-              </p>
-
-              <div className="mt-6 space-y-4 text-xs text-stone-600">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                  <span>Displays clear preview lesson badges</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                  <span>Native in-app enrollment prompt</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                  <span>Customizable call-to-action button</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Mobile device frame mockup */}
-            <div className="flex justify-center">
-              <div className="w-[300px] rounded-[36px] border-[6px] border-stone-800 bg-stone-900 p-3 shadow-xl">
-                <div className="h-full rounded-[26px] bg-white p-4 text-stone-900 flex flex-col justify-between min-h-[480px]">
-                  <div>
-                    <div className="mx-auto h-4 w-24 rounded-full bg-stone-200 mb-4" />
-                    <div className="rounded-xl bg-stone-100 p-4 text-center">
-                      <Lock className="mx-auto h-8 w-8 text-stone-600 mb-2" />
-                      <h4 className="text-xs font-bold text-stone-900">{course.title}</h4>
-                      <p className="text-[10px] text-stone-500 mt-1 line-clamp-2">
-                        {course.description || 'Unlock this course to start learning.'}
-                      </p>
-                    </div>
-
-                    <div className="mt-4 space-y-2">
-                      <div className="h-8 rounded-lg bg-stone-50 border border-stone-100 px-3 flex items-center justify-between text-[10px] text-stone-600">
-                        <span>Lesson 1: Introduction</span>
-                        <span className="font-semibold text-emerald-600">Free Preview</span>
-                      </div>
-                      <div className="h-8 rounded-lg bg-stone-50 border border-stone-100 px-3 flex items-center justify-between text-[10px] text-stone-400">
-                        <span>Lesson 2: Core Fundamentals</span>
-                        <Lock className="h-3 w-3 text-stone-400" />
-                      </div>
-                      <div className="h-8 rounded-lg bg-stone-50 border border-stone-100 px-3 flex items-center justify-between text-[10px] text-stone-400">
-                        <span>Lesson 3: Advanced Applications</span>
-                        <Lock className="h-3 w-3 text-stone-400" />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="pt-4">
-                    <button className="w-full rounded-xl bg-black py-2.5 text-center text-xs font-bold text-white shadow-xs">
-                      Unlock Full Course
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* ==================================================================== */}
         {/* TAB 6: MEMBERS */}
