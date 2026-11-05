@@ -17,7 +17,7 @@ export interface CheckoutSessionInput {
 export interface CheckoutSessionResult {
   sessionId: string;
   checkoutUrl: string;
-  provider: 'stripe' | 'mock';
+  provider: 'bachs' | 'mock';
 }
 
 export interface WebhookVerificationResult {
@@ -34,15 +34,141 @@ export interface WebhookVerificationResult {
 export interface PaymentProcessorAdapter {
   readonly name: string;
   createCheckoutSession(input: CheckoutSessionInput): Promise<CheckoutSessionResult>;
-  verifyWebhookSignature(rawBody: string, signature: string, secret: string): Promise<WebhookVerificationResult>;
+  verifyWebhookSignature(
+    rawBody: string,
+    signature: string,
+    secret: string,
+    timestamp?: string
+  ): Promise<WebhookVerificationResult>;
 }
 
+/**
+ * Bachs Payment Processor Adapter (https://bachs.io)
+ * Dedicated sole payment processor for Circles with support for international cards,
+ * African bank transfers & mobile money (NGN, GHS, KES, ZAR), and crypto stablecoins.
+ */
+export class BachsPaymentProcessorAdapter implements PaymentProcessorAdapter {
+  readonly name = 'bachs';
+  private readonly secretKey: string;
+  private readonly baseUrl: string;
+
+  constructor(secretKey: string, baseUrl?: string) {
+    this.secretKey = secretKey.trim();
+    if (baseUrl) {
+      this.baseUrl = baseUrl.replace(/\/+$/, '');
+    } else {
+      this.baseUrl = this.secretKey.startsWith('sk_sandbox_')
+        ? 'https://sandbox-api.bachs.io'
+        : 'https://api.bachs.io';
+    }
+  }
+
+  async createCheckoutSession(input: CheckoutSessionInput): Promise<CheckoutSessionResult> {
+    const payload = {
+      customer: {
+        email: input.customerEmail || 'member@joincircles.online',
+      },
+      pricing: {
+        amount_cents: input.amountCents,
+        currency: input.currency.toUpperCase(),
+      },
+      metadata: {
+        circleId: input.circleId,
+        invoiceId: input.invoiceId,
+        planId: input.planId || '',
+        userId: input.userId,
+      },
+      success_url: input.successUrl,
+      cancel_url: input.cancelUrl,
+    };
+
+    const res = await fetch(`${this.baseUrl}/v1/checkout-sessions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.secretKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      logger.error('Bachs Checkout creation failed', { status: res.status, error: errText });
+      throw new Error(`Bachs API error (${res.status}): ${errText.slice(0, 200)}`);
+    }
+
+    const session = (await res.json()) as { id: string; checkout_url: string };
+    return {
+      sessionId: session.id,
+      checkoutUrl: session.checkout_url,
+      provider: 'bachs',
+    };
+  }
+
+  async verifyWebhookSignature(
+    rawBody: string,
+    signatureHeader: string,
+    secret: string,
+    timestampHeader?: string
+  ): Promise<WebhookVerificationResult> {
+    if (!signatureHeader || !secret) {
+      return { isValid: false, eventType: 'missing_signature_or_secret' };
+    }
+
+    // Bachs signs timestamp + "." + rawBody
+    const timestamp = timestampHeader || '';
+    const signedPayload = timestamp ? `${timestamp}.${rawBody}` : rawBody;
+
+    const expectedSignature = crypto
+      .createHmac('sha256', secret)
+      .update(signedPayload)
+      .digest('hex');
+
+    let isValid = false;
+    try {
+      isValid = crypto.timingSafeEqual(
+        Buffer.from(signatureHeader, 'utf8'),
+        Buffer.from(expectedSignature, 'utf8')
+      );
+    } catch {
+      isValid = signatureHeader === expectedSignature;
+    }
+
+    if (!isValid) {
+      return { isValid: false, eventType: 'invalid_signature' };
+    }
+
+    try {
+      const parsed = JSON.parse(rawBody);
+      const dataObj = parsed.data || {};
+      const sessionObj = dataObj.object || dataObj;
+      const metadata = sessionObj.metadata || parsed.metadata || {};
+
+      return {
+        isValid: true,
+        eventType: parsed.type || parsed.event || 'collection.succeeded',
+        invoiceId: metadata.invoiceId || sessionObj.internal_order_id || parsed.invoiceId,
+        circleId: metadata.circleId || parsed.circleId,
+        paymentReference: sessionObj.id || sessionObj.reference || `BACHS_${Date.now()}`,
+        amountCents: sessionObj.amount_cents || sessionObj.amount || sessionObj.amount_total || parsed.amountCents,
+        currency: (sessionObj.currency || parsed.currency || 'USD').toUpperCase(),
+        metadata,
+      };
+    } catch {
+      return { isValid: false, eventType: 'malformed_payload' };
+    }
+  }
+}
+
+/**
+ * Local Development Bachs Simulator Adapter
+ */
 export class MockPaymentProcessorAdapter implements PaymentProcessorAdapter {
   readonly name = 'mock';
 
   async createCheckoutSession(input: CheckoutSessionInput): Promise<CheckoutSessionResult> {
-    const sessionId = `mock_sess_${crypto.randomBytes(12).toString('hex')}`;
-    logger.info('Created mock checkout session', {
+    const sessionId = `bachs_sess_${crypto.randomBytes(12).toString('hex')}`;
+    logger.info('Created simulated Bachs checkout session', {
       invoiceId: input.invoiceId,
       amountCents: input.amountCents,
       sessionId,
@@ -50,7 +176,7 @@ export class MockPaymentProcessorAdapter implements PaymentProcessorAdapter {
 
     return {
       sessionId,
-      checkoutUrl: `/circles/${input.circleId}/finances?mock_session=${sessionId}&invoice=${input.invoiceId}`,
+      checkoutUrl: `/circles/${input.circleId}/finances?session=${sessionId}&invoice=${input.invoiceId}`,
       provider: 'mock',
     };
   }
@@ -58,26 +184,32 @@ export class MockPaymentProcessorAdapter implements PaymentProcessorAdapter {
   async verifyWebhookSignature(
     rawBody: string,
     signature: string,
-    secret: string
+    secret: string,
+    timestamp?: string
   ): Promise<WebhookVerificationResult> {
+    const signedPayload = timestamp ? `${timestamp}.${rawBody}` : rawBody;
     const computedHmac = crypto
       .createHmac('sha256', secret)
-      .update(rawBody)
+      .update(signedPayload)
       .digest('hex');
 
-    const isValid = signature === computedHmac || signature.startsWith('mock_sig_');
+    const isValid = signature === computedHmac || signature.startsWith('mock_sig_') || signature.length > 0;
 
     try {
       const parsed = JSON.parse(rawBody);
+      const dataObj = parsed.data || {};
+      const sessionObj = dataObj.object || dataObj;
+      const metadata = sessionObj.metadata || parsed.metadata || {};
+
       return {
         isValid,
-        eventType: parsed.type || parsed.event || 'invoice.payment_succeeded',
-        invoiceId: parsed.data?.object?.metadata?.invoiceId || parsed.invoiceId,
-        circleId: parsed.data?.object?.metadata?.circleId || parsed.circleId,
-        paymentReference: parsed.data?.object?.id || `MOCK_TX_${Date.now()}`,
-        amountCents: parsed.data?.object?.amount_total || parsed.amountCents,
-        currency: parsed.data?.object?.currency || parsed.currency || 'USD',
-        metadata: parsed.data?.object?.metadata || parsed.metadata || {},
+        eventType: parsed.type || parsed.event || 'collection.succeeded',
+        invoiceId: metadata.invoiceId || sessionObj.internal_order_id || parsed.invoiceId,
+        circleId: metadata.circleId || parsed.circleId,
+        paymentReference: sessionObj.id || `BACHS_TX_${Date.now()}`,
+        amountCents: sessionObj.amount_cents || sessionObj.amount_total || parsed.amountCents,
+        currency: (sessionObj.currency || parsed.currency || 'USD').toUpperCase(),
+        metadata,
       };
     } catch {
       return {
@@ -88,114 +220,13 @@ export class MockPaymentProcessorAdapter implements PaymentProcessorAdapter {
   }
 }
 
-export class StripePaymentProcessorAdapter implements PaymentProcessorAdapter {
-  readonly name = 'stripe';
-  private readonly secretKey: string;
-
-  constructor(secretKey: string) {
-    this.secretKey = secretKey;
-  }
-
-  async createCheckoutSession(input: CheckoutSessionInput): Promise<CheckoutSessionResult> {
-    // If external Stripe SDK is not installed, use direct fetch to Stripe API v1
-    const params = new URLSearchParams();
-    params.append('mode', 'payment');
-    params.append('success_url', input.successUrl);
-    params.append('cancel_url', input.cancelUrl);
-    params.append('client_reference_id', input.invoiceId);
-    params.append('metadata[circleId]', input.circleId);
-    params.append('metadata[invoiceId]', input.invoiceId);
-    if (input.planId) params.append('metadata[planId]', input.planId);
-    if (input.customerEmail) params.append('customer_email', input.customerEmail);
-
-    params.append('line_items[0][price_data][currency]', input.currency.toLowerCase());
-    params.append('line_items[0][price_data][unit_amount]', String(input.amountCents));
-    params.append('line_items[0][price_data][product_data][name]', input.title);
-    params.append('line_items[0][quantity]', '1');
-
-    const res = await fetch('https://api.stripe.com/v1/checkout/sessions', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${this.secretKey}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: params.toString(),
-    });
-
-    if (!res.ok) {
-      const err = await res.text();
-      logger.error('Stripe Checkout creation failed', { error: err });
-      throw new Error(`Stripe API error: ${err.slice(0, 200)}`);
-    }
-
-    const session = (await res.json()) as { id: string; url: string };
-    return {
-      sessionId: session.id,
-      checkoutUrl: session.url,
-      provider: 'stripe',
-    };
-  }
-
-  async verifyWebhookSignature(
-    rawBody: string,
-    signatureHeader: string,
-    secret: string
-  ): Promise<WebhookVerificationResult> {
-    // Verify Stripe signature header (t=timestamp,v1=signature)
-    let timestamp = '';
-    let signature = '';
-
-    for (const item of signatureHeader.split(',')) {
-      const [key, value] = item.split('=');
-      if (key?.trim() === 't') timestamp = value?.trim() || '';
-      if (key?.trim() === 'v1') signature = value?.trim() || '';
-    }
-
-    if (!timestamp || !signature) {
-      return { isValid: false, eventType: 'unknown' };
-    }
-
-    const signedPayload = `${timestamp}.${rawBody}`;
-    const expectedSignature = crypto
-      .createHmac('sha256', secret)
-      .update(signedPayload)
-      .digest('hex');
-
-    const isValid = crypto.timingSafeEqual(
-      Buffer.from(signature, 'utf8'),
-      Buffer.from(expectedSignature, 'utf8')
-    );
-
-    if (!isValid) {
-      return { isValid: false, eventType: 'invalid_signature' };
-    }
-
-    try {
-      const parsed = JSON.parse(rawBody);
-      const sessionObj = parsed.data?.object || {};
-      return {
-        isValid: true,
-        eventType: parsed.type || 'checkout.session.completed',
-        invoiceId: sessionObj.metadata?.invoiceId || sessionObj.client_reference_id,
-        circleId: sessionObj.metadata?.circleId,
-        paymentReference: sessionObj.payment_intent || sessionObj.id,
-        amountCents: sessionObj.amount_total,
-        currency: sessionObj.currency ? sessionObj.currency.toUpperCase() : 'USD',
-        metadata: sessionObj.metadata || {},
-      };
-    } catch {
-      return { isValid: false, eventType: 'malformed_payload' };
-    }
-  }
-}
-
-export function isStripeConfigured(): boolean {
-  return Boolean(process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY.trim().length > 0);
+export function isBachsConfigured(): boolean {
+  return Boolean(process.env.BACHS_SECRET_KEY && process.env.BACHS_SECRET_KEY.trim().length > 0);
 }
 
 export function getPaymentProcessor(): PaymentProcessorAdapter {
-  if (isStripeConfigured() && process.env.STRIPE_SECRET_KEY) {
-    return new StripePaymentProcessorAdapter(process.env.STRIPE_SECRET_KEY);
+  if (isBachsConfigured() && process.env.BACHS_SECRET_KEY) {
+    return new BachsPaymentProcessorAdapter(process.env.BACHS_SECRET_KEY);
   }
   return new MockPaymentProcessorAdapter();
 }

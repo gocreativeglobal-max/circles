@@ -173,6 +173,7 @@ describe.skipIf(!shouldRunHostedStaging)(
           '0019',
           '0020',
           '0021',
+          '0022',
         ]);
 
         const healthRes = await healthGetRoute();

@@ -261,7 +261,7 @@ export function CoursePlayer({
         body: JSON.stringify({
           action: 'purchase_paywall',
           planId: selectedPaywallPlan.id,
-          paymentMethod: 'stripe',
+          paymentMethod: 'bachs',
         }),
       });
       const data = await res.json();
@@ -2033,10 +2033,10 @@ export function CoursePlayer({
                 <div className="rounded-lg border border-stone-200 bg-stone-50/50 p-3 flex items-center gap-3">
                   <CreditCard className="h-4 w-4 text-stone-700" />
                   <div className="flex-1">
-                    <p className="text-xs font-bold text-stone-900">Instant Demo / Stripe Simulation</p>
-                    <p className="text-[11px] text-stone-500">Instant activation & receipt generation</p>
+                    <p className="text-xs font-bold text-stone-900">Bachs Secure Checkout</p>
+                    <p className="text-[11px] text-stone-500">Global cards, bank transfer & mobile money via Bachs.io</p>
                   </div>
-                  <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">Active</span>
+                  <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">Bachs Pay</span>
                 </div>
               </div>
 

@@ -2815,7 +2815,7 @@ export async function purchaseCoursePaywall(
   circleId: string,
   courseId: string,
   planId: string,
-  paymentMethod: string = 'stripe'
+  paymentMethod: string = 'bachs'
 ): Promise<{ success: boolean; invoiceId: string; entitlementId: string }> {
   return withServiceRoleTransaction(async (tx) => {
     // 1. Ensure user has a profile

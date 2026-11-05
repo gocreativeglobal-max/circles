@@ -127,7 +127,7 @@ export function assertCsrfProtection(req: NextRequest): void {
     throw new ForbiddenError('Invalid Origin or Referer header on state-changing request.');
   }
 
-  const allowedHosts = new Set<string>();
+  const allowedHosts = new Set<string>(['joincircles.online', 'www.joincircles.online']);
   const forwardedHost = req.headers.get('x-forwarded-host')?.split(',')[0]?.trim().toLowerCase();
   const hostHeader = req.headers.get('host')?.trim().toLowerCase();
   const nextUrlHost = req.nextUrl?.host?.toLowerCase();

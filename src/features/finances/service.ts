@@ -85,8 +85,8 @@ export const createInvoiceSchema = z.object({
   totalCents: z.number().int().min(0),
   currency: z.string().trim().length(3).default('USD'),
   paymentMethod: z
-    .enum(['stripe', 'bank_transfer', 'cash', 'manual_credit', 'external_erp', 'free_grant'])
-    .default('manual_credit'),
+    .enum(['bachs', 'stripe', 'bank_transfer', 'cash', 'manual_credit', 'external_erp', 'free_grant'])
+    .default('bachs'),
   paymentReference: z.string().trim().max(200).nullable().optional(),
   dueDate: z.string().datetime().nullable().optional(),
   paidAt: z.string().datetime().nullable().optional(),

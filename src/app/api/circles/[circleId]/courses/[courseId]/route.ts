@@ -96,7 +96,7 @@ export async function POST(
         params.circleId,
         params.courseId,
         body.planId,
-        body.paymentMethod || 'stripe'
+        body.paymentMethod || 'bachs'
       );
       return NextResponse.json(result, { status: 200 });
     }

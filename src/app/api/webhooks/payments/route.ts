@@ -12,18 +12,26 @@ export async function POST(req: NextRequest) {
   try {
     const rawBody = await req.text();
     const signature =
-      req.headers.get('stripe-signature') ||
+      req.headers.get('x-bachs-signature') ||
       req.headers.get('x-payment-signature') ||
+      req.headers.get('stripe-signature') ||
       req.headers.get('x-signature') ||
       '';
+    const timestamp =
+      req.headers.get('x-bachs-timestamp') ||
+      req.headers.get('x-timestamp') ||
+      '';
 
-    const secret = process.env.STRIPE_WEBHOOK_SECRET || 'whsec_local_dev';
+    const secret =
+      process.env.BACHS_WEBHOOK_SECRET ||
+      process.env.STRIPE_WEBHOOK_SECRET ||
+      'whsec_local_dev';
     const processor = getPaymentProcessor();
 
-    const verification = await processor.verifyWebhookSignature(rawBody, signature, secret);
+    const verification = await processor.verifyWebhookSignature(rawBody, signature, secret, timestamp);
 
     if (!verification.isValid) {
-      logger.warn('Payment webhook signature verification failed', {
+      logger.warn('Bachs payment webhook signature verification failed', {
         provider: processor.name,
       });
       return NextResponse.json({ error: 'Invalid webhook signature' }, { status: 400 });
@@ -32,6 +40,8 @@ export async function POST(req: NextRequest) {
     const { eventType, invoiceId, paymentReference } = verification;
 
     if (
+      eventType === 'collection.succeeded' ||
+      eventType === 'checkout.completed' ||
       eventType === 'checkout.session.completed' ||
       eventType === 'invoice.payment_succeeded' ||
       eventType === 'payment_intent.succeeded'
@@ -50,17 +60,17 @@ export async function POST(req: NextRequest) {
           return;
         }
 
-        // Update invoice to paid
+        // Update invoice to paid via Bachs
         const updatedInvRes = await tx.query<InvoiceItem>(
           `UPDATE public.invoices
            SET status = 'paid',
-               payment_method = 'stripe',
+               payment_method = 'bachs',
                payment_reference = $1,
                paid_at = NOW(),
                updated_at = NOW()
            WHERE id = $2
            RETURNING *;`,
-          [paymentReference || `STRIPE_${Date.now()}`, invoiceId]
+          [paymentReference || `BACHS_${Date.now()}`, invoiceId]
         );
         const paidInvoice = updatedInvRes.rows[0];
 
@@ -79,14 +89,14 @@ export async function POST(req: NextRequest) {
               paidInvoice.circle_id,
               paidInvoice.total_cents,
               paidInvoice.currency,
-              `Online checkout payment for ${paidInvoice.title} (Ref: ${paymentReference})`,
+              `Bachs checkout payment for ${paidInvoice.title} (Ref: ${paymentReference})`,
               paidInvoice.id,
               paidInvoice.user_id,
             ]
           );
         }
 
-        // Dispatch outbound webhook event to external systems (QuickBooks, Xero, ERP)
+        // Dispatch outbound webhook event to external systems
         dispatchFinancialWebhookEvent(paidInvoice.circle_id, 'invoice.paid', {
           invoice: paidInvoice,
           entitlementsCount: granted.length,
@@ -97,7 +107,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ received: true });
   } catch (err: unknown) {
-    logger.error('Error handling payment webhook', { error: err });
+    logger.error('Error handling Bachs payment webhook', { error: err });
     return NextResponse.json({ error: 'Internal webhook error' }, { status: 500 });
   }
 }

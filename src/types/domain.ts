@@ -1080,6 +1080,7 @@ export type InvoiceStatus =
   | 'refunded';
 
 export type PaymentMethod =
+  | 'bachs'
   | 'stripe'
   | 'bank_transfer'
   | 'cash'
