@@ -24,6 +24,7 @@ import {
   LearningPathItem,
   LearningPathCourseItem,
   CoursePrerequisiteItem,
+  CoursePaywallPlan,
   LearningPathEnrollmentItem,
 } from '@/types/domain';
 import {
@@ -54,7 +55,7 @@ export const createCourseSchema = z.object({
   cohortStartDate: z.string().datetime().nullable().optional(),
   cohortEndDate: z.string().datetime().nullable().optional(),
   requireSequentialCompletion: z.boolean().default(false),
-  accessRule: z.enum(['open', 'members_only', 'min_level', 'staff_only']).default('open'),
+  accessRule: z.enum(['open', 'members_only', 'paywall', 'min_level', 'staff_only']).default('open'),
   minLevelRequired: z.number().int().min(1).default(1),
   status: z.enum(['draft', 'published', 'archived']).default('published'),
 });
@@ -80,7 +81,7 @@ export const updateCourseSchema = z.object({
   cohortStartDate: z.string().datetime().nullable().optional(),
   cohortEndDate: z.string().datetime().nullable().optional(),
   requireSequentialCompletion: z.boolean().optional(),
-  accessRule: z.enum(['open', 'members_only', 'min_level', 'staff_only']).optional(),
+  accessRule: z.enum(['open', 'members_only', 'paywall', 'min_level', 'staff_only']).optional(),
   minLevelRequired: z.number().int().min(1).optional(),
   status: z.enum(['draft', 'published', 'archived']).optional(),
 });
@@ -496,13 +497,41 @@ export async function getCourseWithCurriculum(
     }
 
     let viewerCanAccess = true;
+    let hasPaywallAccess = false;
     if (course.access_rule === 'staff_only') {
       viewerCanAccess = isStaff;
     } else if (course.access_rule === 'members_only') {
       viewerCanAccess = isMember || isStaff;
     } else if (course.access_rule === 'min_level') {
       viewerCanAccess = isStaff || (isMember && viewerLevel >= (course.min_level_required ?? 1));
+    } else if (course.access_rule === 'paywall') {
+      if (isStaff) {
+        viewerCanAccess = true;
+        hasPaywallAccess = true;
+      } else if (actorUserId) {
+        const entRes = await tx.query<{ id: string }>(
+          `SELECT id FROM public.member_entitlements
+           WHERE circle_id = $1 AND user_id = $2 AND target_type = 'course_access' AND target_id = $3
+             AND status = 'active' AND (expires_at IS NULL OR expires_at > NOW())
+           LIMIT 1;`,
+          [circleId, actorUserId, course.id]
+        );
+        hasPaywallAccess = (entRes.rows.length > 0);
+        viewerCanAccess = hasPaywallAccess;
+      } else {
+        viewerCanAccess = false;
+        hasPaywallAccess = false;
+      }
     }
+
+    const paywallPlansRes = await tx.query<CoursePaywallPlan>(
+      `SELECT p.id, p.circle_id, p.slug, p.name, p.description, p.billing_type, p.amount_cents, p.currency, p.interval_unit, p.is_active, pe.id as entitlement_id
+       FROM public.pricing_plans p
+       INNER JOIN public.pricing_plan_entitlements pe ON pe.plan_id = p.id
+       WHERE pe.circle_id = $1 AND pe.target_type = 'course_access' AND pe.target_id = $2 AND p.is_active = true
+       ORDER BY p.amount_cents ASC;`,
+      [circleId, course.id]
+    );
 
     const now = new Date();
     const modules: CourseModuleItem[] = modulesRes.rows.map((mod) => {
@@ -604,6 +633,8 @@ export async function getCourseWithCurriculum(
       in_progress_students_count: inProgressStudentsCount,
       completed_students_count: completedStudentsCount,
       completion_rate_percentage: completionRatePercentage,
+      paywall_plans: paywallPlansRes.rows,
+      has_paywall_access: hasPaywallAccess,
     };
   });
 }
@@ -1679,6 +1710,21 @@ export async function enrollInCourse(
       throw new ForbiddenError('This course is reserved for staff members only.');
     }
 
+    if (course.access_rule === 'paywall' && !isStaff) {
+      const entRes = await tx.query<{ id: string }>(
+        `SELECT id FROM public.member_entitlements
+         WHERE circle_id = $1 AND user_id = $2 AND target_type = 'course_access' AND target_id = $3
+           AND status = 'active' AND (expires_at IS NULL OR expires_at > NOW())
+         LIMIT 1;`,
+        [circleId, actorUserId, courseId]
+      );
+      if (entRes.rows.length === 0) {
+        throw new ForbiddenError(
+          'This course requires purchasing an access plan or active membership pass to enroll.'
+        );
+      }
+    }
+
     if (course.access_rule === 'min_level') {
       const xpRes = await tx.query<{ total: string }>(
         `SELECT COALESCE(SUM(points), 0)::text AS total FROM public.member_xp_points WHERE circle_id = $1 AND user_id = $2;`,
@@ -2622,5 +2668,254 @@ export async function evaluateCoursePrerequisites(
 ): Promise<{ isLocked: boolean; lockReason?: string; unsatisfiedPrerequisites: CoursePrerequisiteItem[] }> {
   return withRlsTransaction(actorUserId, async (tx) => {
     return evaluatePrerequisitesWithTx(tx, actorUserId, circleId, courseId);
+  });
+}
+
+/**
+ * Lists all active and inactive pricing plans linked to a course.
+ */
+export async function getCoursePaywalls(
+  circleId: string,
+  courseId: string
+): Promise<CoursePaywallPlan[]> {
+  return withRlsTransaction(null, async (tx) => {
+    const res = await tx.query<CoursePaywallPlan>(
+      `SELECT p.id, p.circle_id, p.slug, p.name, p.description, p.billing_type, p.amount_cents, p.currency, p.interval_unit, p.is_active, pe.id as entitlement_id
+       FROM public.pricing_plans p
+       INNER JOIN public.pricing_plan_entitlements pe ON pe.plan_id = p.id
+       WHERE pe.circle_id = $1 AND pe.target_type = 'course_access' AND pe.target_id = $2
+       ORDER BY p.amount_cents ASC;`,
+      [circleId, courseId]
+    );
+    return res.rows;
+  });
+}
+
+/**
+ * Links an existing pricing plan to a course.
+ */
+export async function linkCoursePaywall(
+  actorUserId: string,
+  circleId: string,
+  courseId: string,
+  planId: string
+): Promise<void> {
+  return withRlsTransaction(actorUserId, async (tx) => {
+    const memRes = await tx.query<{ role: CircleRole }>(
+      `SELECT role FROM public.circle_memberships WHERE circle_id = $1 AND user_id = $2 AND status = 'active' LIMIT 1;`,
+      [circleId, actorUserId]
+    );
+    const role = memRes.rows[0]?.role;
+    if (role !== 'owner' && role !== 'admin' && role !== 'moderator') {
+      throw new ForbiddenError('Only circle staff can configure course paywalls.');
+    }
+
+    const planRes = await tx.query<{ id: string }>(
+      `SELECT id FROM public.pricing_plans WHERE id = $1 AND circle_id = $2 LIMIT 1;`,
+      [planId, circleId]
+    );
+    if (!planRes.rows[0]) throw new NotFoundError('Pricing plan not found.');
+
+    const entId = crypto.randomUUID();
+    await tx.query(
+      `INSERT INTO public.pricing_plan_entitlements (id, plan_id, circle_id, target_type, target_id)
+       VALUES ($1, $2, $3, 'course_access', $4)
+       ON CONFLICT DO NOTHING;`,
+      [entId, planId, circleId, courseId]
+    );
+  });
+}
+
+/**
+ * Unlinks a pricing plan from a course.
+ */
+export async function unlinkCoursePaywall(
+  actorUserId: string,
+  circleId: string,
+  courseId: string,
+  planId: string
+): Promise<void> {
+  return withRlsTransaction(actorUserId, async (tx) => {
+    const memRes = await tx.query<{ role: CircleRole }>(
+      `SELECT role FROM public.circle_memberships WHERE circle_id = $1 AND user_id = $2 AND status = 'active' LIMIT 1;`,
+      [circleId, actorUserId]
+    );
+    const role = memRes.rows[0]?.role;
+    if (role !== 'owner' && role !== 'admin' && role !== 'moderator') {
+      throw new ForbiddenError('Only circle staff can configure course paywalls.');
+    }
+
+    await tx.query(
+      `DELETE FROM public.pricing_plan_entitlements
+       WHERE plan_id = $1 AND circle_id = $2 AND target_type = 'course_access' AND target_id = $3;`,
+      [planId, circleId, courseId]
+    );
+  });
+}
+
+export const createCoursePaywallSchema = z.object({
+  name: z.string().trim().min(3).max(180),
+  description: z.string().trim().max(1000).default(''),
+  amountCents: z.number().int().min(0).max(100000000),
+  currency: z.string().trim().length(3).default('USD'),
+  billingType: z.enum(['one_time', 'recurring']).default('one_time'),
+  intervalUnit: z.enum(['day', 'week', 'month', 'quarter', 'year']).nullable().optional(),
+});
+
+/**
+ * Creates a new pricing plan and automatically attaches it to a course as a paywall.
+ */
+export async function createCoursePaywall(
+  actorUserId: string,
+  circleId: string,
+  courseId: string,
+  input: z.input<typeof createCoursePaywallSchema>
+): Promise<CoursePaywallPlan> {
+  const parsed = createCoursePaywallSchema.parse(input);
+  return withRlsTransaction(actorUserId, async (tx) => {
+    const memRes = await tx.query<{ role: CircleRole }>(
+      `SELECT role FROM public.circle_memberships WHERE circle_id = $1 AND user_id = $2 AND status = 'active' LIMIT 1;`,
+      [circleId, actorUserId]
+    );
+    const role = memRes.rows[0]?.role;
+    if (role !== 'owner' && role !== 'admin' && role !== 'moderator') {
+      throw new ForbiddenError('Only circle staff can create course paywalls.');
+    }
+
+    const planId = crypto.randomUUID();
+    const intervalUnit = parsed.billingType === 'recurring' ? (parsed.intervalUnit || 'month') : null;
+    const planSlug = parsed.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') + '-' + Date.now().toString(36);
+
+    const planRes = await tx.query<CoursePaywallPlan>(
+      `INSERT INTO public.pricing_plans (id, circle_id, slug, name, description, billing_type, amount_cents, currency, interval_unit, is_active, is_public)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, true)
+       RETURNING id, circle_id, slug, name, description, billing_type, amount_cents, currency, interval_unit, is_active;`,
+      [planId, circleId, planSlug, parsed.name, parsed.description, parsed.billingType, parsed.amountCents, parsed.currency, intervalUnit]
+    );
+
+    const entId = crypto.randomUUID();
+    await tx.query(
+      `INSERT INTO public.pricing_plan_entitlements (id, plan_id, circle_id, target_type, target_id)
+       VALUES ($1, $2, $3, 'course_access', $4);`,
+      [entId, planId, circleId, courseId]
+    );
+
+    return {
+      ...planRes.rows[0],
+      entitlement_id: entId,
+    };
+  });
+}
+
+/**
+ * Purchases a paywall plan for a course, creating an invoice, fulfilling the entitlement, and auto-enrolling the student.
+ */
+export async function purchaseCoursePaywall(
+  actorUserId: string,
+  circleId: string,
+  courseId: string,
+  planId: string,
+  paymentMethod: string = 'stripe'
+): Promise<{ success: boolean; invoiceId: string; entitlementId: string }> {
+  return withServiceRoleTransaction(async (tx) => {
+    // 1. Ensure user has a profile
+    const profileRes = await tx.query<{ id: string; display_name: string }>(
+      `SELECT id, display_name FROM public.profiles WHERE id = $1 LIMIT 1;`,
+      [actorUserId]
+    );
+    if (!profileRes.rows[0]) throw new NotFoundError('User profile not found.');
+
+    // 2. Fetch the plan & entitlement target
+    const planRes = await tx.query<{
+      id: string;
+      name: string;
+      description: string;
+      amount_cents: number;
+      currency: string;
+    }>(
+      `SELECT p.id, p.name, p.description, p.amount_cents, p.currency
+       FROM public.pricing_plans p
+       INNER JOIN public.pricing_plan_entitlements pe ON pe.plan_id = p.id
+       WHERE p.id = $1 AND p.circle_id = $2 AND pe.target_type = 'course_access' AND pe.target_id = $3
+       LIMIT 1;`,
+      [planId, circleId, courseId]
+    );
+    const plan = planRes.rows[0];
+    if (!plan) throw new NotFoundError('Paywall plan not found for this course.');
+
+    // 3. Ensure user is a member of the Circle (create active membership if not already)
+    const memRes = await tx.query<{ id: string }>(
+      `SELECT id FROM public.circle_memberships WHERE circle_id = $1 AND user_id = $2 LIMIT 1;`,
+      [circleId, actorUserId]
+    );
+    if (!memRes.rows[0]) {
+      const memId = crypto.randomUUID();
+      await tx.query(
+        `INSERT INTO public.circle_memberships (id, circle_id, user_id, role, status)
+         VALUES ($1, $2, $3, 'member', 'active');`,
+        [memId, circleId, actorUserId]
+      );
+    }
+
+    // 4. Create paid Invoice
+    const invoiceId = crypto.randomUUID();
+    const invoiceNumber = `INV-COURSE-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    await tx.query(
+      `INSERT INTO public.invoices (
+        id, circle_id, user_id, plan_id, invoice_number, title, description,
+        status, total_cents, currency, payment_method, paid_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, 'paid', $8, $9, $10, NOW());`,
+      [
+        invoiceId,
+        circleId,
+        actorUserId,
+        plan.id,
+        invoiceNumber,
+        `Course Access: ${plan.name}`,
+        plan.description,
+        plan.amount_cents,
+        plan.currency,
+        paymentMethod,
+      ]
+    );
+
+    // 5. Grant Member Entitlement
+    const entitlementId = crypto.randomUUID();
+    await tx.query(
+      `INSERT INTO public.member_entitlements (
+        id, circle_id, user_id, plan_id, invoice_id, target_type, target_id, status
+      ) VALUES ($1, $2, $3, $4, $5, 'course_access', $6, 'active');`,
+      [entitlementId, circleId, actorUserId, plan.id, invoiceId, courseId]
+    );
+
+    // 6. Auto-enroll in the course
+    const enrollId = crypto.randomUUID();
+    await tx.query(
+      `INSERT INTO public.course_enrollments (id, course_id, circle_id, student_id)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (course_id, student_id) DO NOTHING;`,
+      [enrollId, courseId, circleId, actorUserId]
+    );
+
+    // 7. Log treasury entry
+    const entryId = crypto.randomUUID();
+    await tx.query(
+      `INSERT INTO public.community_treasury_ledger (
+        id, circle_id, entry_type, category, amount_cents, currency, description, is_public_to_members
+      ) VALUES ($1, $2, 'revenue', 'courses', $3, $4, $5, true);`,
+      [
+        entryId,
+        circleId,
+        plan.amount_cents,
+        plan.currency,
+        `Course Enrollment: ${plan.name} by ${profileRes.rows[0].display_name}`,
+      ]
+    );
+
+    return {
+      success: true,
+      invoiceId,
+      entitlementId,
+    };
   });
 }

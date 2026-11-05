@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { getAuthenticatedUser } from '@/lib/auth/session';
 import { getCircleBySlugOrId } from '@/features/circles/service';
 import { getCourseWithCurriculum } from '@/features/courses/service';
+import { getCircleCapabilities } from '@/features/capabilities/service';
 import { CourseStudioClient } from '@/components/courses/course-studio-client';
 import { CourseItem } from '@/types/domain';
 
@@ -44,12 +45,18 @@ export default async function CircleCourseStudioPage({
     redirect(`/circles/${circle.slug}/courses/${course.id}`);
   }
 
+  const capabilities = await getCircleCapabilities(user.id, circle.id);
+  const isFinancesEnabled = capabilities.some(
+    (c) => c.capability_key === 'finances' && c.enabled
+  );
+
   return (
     <CourseStudioClient
       circleId={circle.id}
       circleSlug={circle.slug}
       initialCourse={JSON.parse(JSON.stringify(course))}
       isStaff={isStaff}
+      isFinancesEnabled={isFinancesEnabled}
     />
   );
 }

@@ -41,7 +41,7 @@ export function CourseSettingsModal({
     course.estimated_duration_hours ? String(course.estimated_duration_hours) : '2.5'
   );
   const [accessRule, setAccessRule] = useState<
-    'open' | 'members_only' | 'min_level' | 'staff_only'
+    'open' | 'members_only' | 'paywall' | 'min_level' | 'staff_only'
   >(course.access_rule || 'open');
   const [minLevelRequired, setMinLevelRequired] = useState(
     course.min_level_required ?? 2
@@ -329,13 +329,14 @@ export function CourseSettingsModal({
                   value={accessRule}
                   onChange={(e) =>
                     setAccessRule(
-                      e.target.value as 'open' | 'members_only' | 'min_level' | 'staff_only'
+                      e.target.value as 'open' | 'members_only' | 'paywall' | 'min_level' | 'staff_only'
                     )
                   }
                   className="w-full rounded-xl border border-stone-200 bg-white px-3.5 py-2 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
                 >
                   <option value="open">Open (Anyone in circle can view)</option>
                   <option value="members_only">Members Only (Requires circle membership)</option>
+                  <option value="paywall">Behind a Paywall (Paid course access pass)</option>
                   <option value="min_level">Level Gated (Requires minimum community XP level)</option>
                   <option value="staff_only">Staff Only (Private testing & review)</option>
                 </select>

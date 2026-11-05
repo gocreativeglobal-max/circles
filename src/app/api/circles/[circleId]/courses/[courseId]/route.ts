@@ -1,10 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
+  createCoursePaywall,
+  getCoursePaywalls,
   getCourseWithCurriculum,
+  linkCoursePaywall,
+  purchaseCoursePaywall,
+  unlinkCoursePaywall,
   updateCourse,
 } from '@/features/courses/service';
 import { handleApiError, resolveApiUser } from '@/lib/auth/api-helpers';
-import { UnauthorizedError } from '@/lib/errors';
+import { UnauthorizedError, ValidationError } from '@/lib/errors';
 
 export async function GET(
   req: NextRequest,
@@ -12,6 +17,13 @@ export async function GET(
 ) {
   try {
     const user = await resolveApiUser(req);
+    const mode = req.nextUrl.searchParams.get('mode');
+
+    if (mode === 'paywalls') {
+      const paywalls = await getCoursePaywalls(params.circleId, params.courseId);
+      return NextResponse.json({ paywalls });
+    }
+
     const course = await getCourseWithCurriculum(
       user?.id ?? null,
       params.circleId,
@@ -39,6 +51,57 @@ export async function PATCH(
       body
     );
     return NextResponse.json({ course });
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
+
+export async function POST(
+  req: NextRequest,
+  { params }: { params: { circleId: string; courseId: string } }
+) {
+  try {
+    const user = await resolveApiUser(req);
+    if (!user) throw new UnauthorizedError();
+
+    const body = await req.json().catch(() => ({}));
+    const action = body.action;
+
+    if (action === 'create_paywall') {
+      const paywall = await createCoursePaywall(
+        user.id,
+        params.circleId,
+        params.courseId,
+        body.paywall
+      );
+      return NextResponse.json({ paywall }, { status: 201 });
+    }
+
+    if (action === 'link_paywall') {
+      if (!body.planId) throw new ValidationError('planId is required');
+      await linkCoursePaywall(user.id, params.circleId, params.courseId, body.planId);
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === 'unlink_paywall') {
+      if (!body.planId) throw new ValidationError('planId is required');
+      await unlinkCoursePaywall(user.id, params.circleId, params.courseId, body.planId);
+      return NextResponse.json({ success: true });
+    }
+
+    if (action === 'purchase_paywall') {
+      if (!body.planId) throw new ValidationError('planId is required');
+      const result = await purchaseCoursePaywall(
+        user.id,
+        params.circleId,
+        params.courseId,
+        body.planId,
+        body.paymentMethod || 'stripe'
+      );
+      return NextResponse.json(result, { status: 200 });
+    }
+
+    throw new ValidationError(`Unknown action: "${action}"`);
   } catch (error) {
     return handleApiError(error);
   }

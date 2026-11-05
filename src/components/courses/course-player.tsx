@@ -27,10 +27,12 @@ import {
   FileCode,
   Check,
   BookOpen,
+  CreditCard,
   Settings,
 } from 'lucide-react';
 import {
   CourseItem,
+  CoursePaywallPlan,
   CourseLessonItem,
   LessonCommentItem,
   AssignmentSubmissionItem,
@@ -59,6 +61,11 @@ export function CoursePlayer({
   // Student Preview Mode state for instructors
   const [previewAsStudent, setPreviewAsStudent] = useState(false);
   const effectiveIsStaff = isStaff && !previewAsStudent;
+
+  // Course Paywall & Checkout State
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+  const [selectedPaywallPlan, setSelectedPaywallPlan] = useState<CoursePaywallPlan | null>(null);
+  const [isPurchasing, setIsPurchasing] = useState(false);
 
   // Flatten lessons
   const allLessons: CourseLessonItem[] = [];
@@ -243,6 +250,43 @@ export function CoursePlayer({
       isMounted = false;
     };
   }, [circleId, course.id, activeLesson?.id]);
+
+  async function handlePurchasePaywall() {
+    if (!selectedPaywallPlan) return;
+    setIsPurchasing(true);
+    try {
+      const res = await fetch(`/api/circles/${circleId}/courses/${course.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'purchase_paywall',
+          planId: selectedPaywallPlan.id,
+          paymentMethod: 'stripe',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to complete checkout.');
+
+      setCourse((prev) => ({
+        ...prev,
+        viewer_can_access: true,
+        has_paywall_access: true,
+        is_enrolled: true,
+      }));
+      setShowCheckoutModal(false);
+      setToast({
+        type: 'success',
+        message: '🎉 Course access unlocked! You now have full access to all lessons and materials.',
+      });
+    } catch (err) {
+      setToast({
+        type: 'error',
+        message: err instanceof Error ? err.message : 'Unable to complete checkout.',
+      });
+    } finally {
+      setIsPurchasing(false);
+    }
+  }
 
   async function handleToggleComplete(lessonId: string, currentCompleted: boolean) {
     if (!isMember) return;
@@ -555,7 +599,11 @@ export function CoursePlayer({
   const isActiveModuleLocked = Boolean(activeModule?.is_locked) && !effectiveIsStaff;
   const isLessonPrereqLocked = Boolean(activeLesson?.is_locked) && !effectiveIsStaff;
 
-  if (course.viewer_can_access === false && !effectiveIsStaff) {
+  const isPaywalled = course.access_rule === 'paywall';
+  const hasCoursePaywallAccess = effectiveIsStaff || Boolean(course.has_paywall_access);
+  const isLessonPaywallLocked = isPaywalled && !hasCoursePaywallAccess && !activeLesson?.is_free_preview;
+
+  if (course.viewer_can_access === false && !effectiveIsStaff && course.access_rule !== 'paywall') {
     return (
       <div className="space-y-6">
         <div className="rounded-2xl border border-stone-200/80 bg-white p-5 shadow-xs">
@@ -882,6 +930,20 @@ export function CoursePlayer({
                                   Opt
                                 </span>
                               )}
+                              {lesson.is_free_preview && (
+                                <span
+                                  className={`rounded px-1.5 py-0.2 text-[9px] font-bold uppercase tracking-wider ${
+                                    isActive
+                                      ? 'bg-emerald-600 text-white'
+                                      : 'bg-emerald-50 text-emerald-700 border border-emerald-200/80'
+                                  }`}
+                                >
+                                  Preview
+                                </span>
+                              )}
+                              {isPaywalled && !hasCoursePaywallAccess && !lesson.is_free_preview && (
+                                <Lock className="h-3 w-3 text-stone-400 shrink-0" />
+                              )}
                             </button>
 
                             <div className="flex items-center gap-2 shrink-0">
@@ -1030,8 +1092,83 @@ export function CoursePlayer({
                 </div>
               )}
             </div>
+          ) : isLessonPaywallLocked ? (
+            <div className="rounded-2xl border border-stone-200 bg-white p-8 text-center shadow-xs">
+              <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-900 border border-amber-200/80">
+                <Lock className="h-6 w-6" />
+              </div>
+              <h3 className="mt-4 text-lg font-bold text-stone-900">
+                {activeLesson?.title || 'This Lesson is Locked'}
+              </h3>
+              <p className="mt-1.5 text-xs text-stone-500 max-w-md mx-auto leading-relaxed">
+                This lesson is part of a premium paid course. Purchase an access pass below to instantly unlock all modules, lessons, assignments, and discussions.
+              </p>
+
+              {course.paywall_plans && course.paywall_plans.length > 0 ? (
+                <div className="mt-6 max-w-lg mx-auto space-y-3 text-left">
+                  {course.paywall_plans.map((plan) => (
+                    <div
+                      key={plan.id}
+                      className="flex items-center justify-between rounded-xl border border-stone-200/90 bg-stone-50/60 p-4 transition-all hover:bg-stone-50 hover:border-black/30"
+                    >
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h4 className="text-xs font-bold text-stone-900">{plan.name}</h4>
+                          <span className="rounded bg-stone-200/80 px-1.5 py-0.5 text-[9px] font-semibold text-stone-700">
+                            {plan.billing_type === 'recurring' ? `${plan.interval_unit ? plan.interval_unit.toUpperCase() : 'MONTHLY'} Sub` : 'Lifetime Access'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-stone-500 mt-0.5">
+                          {plan.description || 'Full access to this course'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-sm font-extrabold text-stone-900">
+                          {plan.currency} {(plan.amount_cents / 100).toFixed(2)}
+                        </span>
+                        <Button
+                          onClick={() => {
+                            setSelectedPaywallPlan(plan);
+                            setShowCheckoutModal(true);
+                          }}
+                          className="bg-black text-white hover:bg-stone-800 text-xs px-3.5 py-1.5 rounded-lg font-semibold shadow-2xs"
+                        >
+                          Unlock
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-6 rounded-xl border border-stone-200 bg-stone-50 p-4 text-xs text-stone-600 max-w-md mx-auto">
+                  This course is currently paywalled, but no pricing plans have been attached yet. Please check back soon or contact the instructor.
+                </div>
+              )}
+            </div>
           ) : activeLesson ? (
             <div className="rounded-2xl border border-stone-200/80 bg-white p-6 shadow-xs space-y-6">
+              {/* Free Preview Banner if paywalled */}
+              {isPaywalled && !hasCoursePaywallAccess && activeLesson.is_free_preview && (
+                <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/90 px-4 py-2.5 text-xs text-emerald-950 shadow-2xs">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white uppercase tracking-wider">
+                      Free Preview
+                    </span>
+                    <span>You are viewing a free preview lesson. Unlock the full course to access all lessons, quizzes, and resources.</span>
+                  </div>
+                  {course.paywall_plans && course.paywall_plans.length > 0 && (
+                    <Button
+                      onClick={() => {
+                        setSelectedPaywallPlan(course.paywall_plans![0]);
+                        setShowCheckoutModal(true);
+                      }}
+                      className="bg-emerald-800 text-white hover:bg-emerald-900 text-xs px-3 py-1.5 rounded-lg font-semibold"
+                    >
+                      Unlock Full Course
+                    </Button>
+                  )}
+                </div>
+              )}
               {/* Top Lesson Title & Action Bar */}
               <div className="flex flex-col justify-between gap-4 border-b border-stone-100 pb-5 sm:flex-row sm:items-center">
                 <div>
@@ -1852,6 +1989,78 @@ export function CoursePlayer({
       )}
 
 
+      {/* Checkout & Instant Paywall Purchase Modal */}
+      {showCheckoutModal && selectedPaywallPlan && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+          <div className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-4 w-4 text-stone-900" />
+                <h3 className="text-sm font-bold text-stone-900">Unlock Course Access</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowCheckoutModal(false)}
+                className="text-stone-400 hover:text-stone-700 text-xs font-semibold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-4">
+              <div>
+                <h4 className="text-base font-bold text-stone-900">{course.title}</h4>
+                <p className="text-xs text-stone-500 mt-0.5">
+                  Plan: <strong>{selectedPaywallPlan.name}</strong> ({selectedPaywallPlan.billing_type === 'recurring' ? `${selectedPaywallPlan.interval_unit ? selectedPaywallPlan.interval_unit.toUpperCase() : 'MONTHLY'} Subscription` : 'One-time Payment'})
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 space-y-2">
+                <div className="flex items-center justify-between text-xs text-stone-600">
+                  <span>Course Access Pass</span>
+                  <span className="font-bold text-stone-900">
+                    {selectedPaywallPlan.currency} {(selectedPaywallPlan.amount_cents / 100).toFixed(2)}
+                  </span>
+                </div>
+                <div className="border-t border-stone-200/80 pt-2 flex items-center justify-between text-sm font-extrabold text-stone-900">
+                  <span>Total Due Today</span>
+                  <span>{selectedPaywallPlan.currency} {(selectedPaywallPlan.amount_cents / 100).toFixed(2)}</span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-stone-800 mb-1.5">Payment Method</label>
+                <div className="rounded-lg border border-stone-200 bg-stone-50/50 p-3 flex items-center gap-3">
+                  <CreditCard className="h-4 w-4 text-stone-700" />
+                  <div className="flex-1">
+                    <p className="text-xs font-bold text-stone-900">Instant Demo / Stripe Simulation</p>
+                    <p className="text-[11px] text-stone-500">Instant activation & receipt generation</p>
+                  </div>
+                  <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">Active</span>
+                </div>
+              </div>
+
+              <div className="pt-3 border-t border-stone-100 flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  onClick={() => setShowCheckoutModal(false)}
+                  className="bg-stone-100 text-stone-700 hover:bg-stone-200 text-xs px-3.5 py-2 rounded-lg font-semibold"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handlePurchasePaywall}
+                  disabled={isPurchasing}
+                  className="bg-black text-white hover:bg-stone-800 text-xs px-4 py-2 rounded-lg font-semibold shadow-2xs"
+                >
+                  {isPurchasing ? 'Processing...' : `Pay ${selectedPaywallPlan.currency} ${(selectedPaywallPlan.amount_cents / 100).toFixed(2)} & Start Learning`}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

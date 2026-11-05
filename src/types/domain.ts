@@ -950,6 +950,21 @@ export interface CourseModuleItem {
   lessons: CourseLessonItem[];
 }
 
+
+export interface CoursePaywallPlan {
+  id: string;
+  circle_id: string;
+  slug?: string;
+  name: string;
+  description: string;
+  billing_type: 'one_time' | 'recurring' | 'installments' | 'sliding_scale' | 'metered_pack';
+  amount_cents: number;
+  currency: string;
+  interval_unit?: 'day' | 'week' | 'month' | 'quarter' | 'year' | null;
+  is_active: boolean;
+  entitlement_id?: string;
+}
+
 export interface CourseItem {
   id: string;
   circle_id: string;
@@ -967,10 +982,12 @@ export interface CourseItem {
   cohort_start_date?: string | null;
   cohort_end_date?: string | null;
   require_sequential_completion?: boolean;
-  access_rule?: 'open' | 'members_only' | 'min_level' | 'staff_only';
+  access_rule?: 'open' | 'members_only' | 'paywall' | 'min_level' | 'staff_only';
   min_level_required?: number;
   viewer_can_access?: boolean;
   viewer_level?: number;
+  paywall_plans?: CoursePaywallPlan[];
+  has_paywall_access?: boolean;
   created_at: string;
   updated_at: string;
   instructor?: Pick<UserProfile, 'id' | 'username' | 'display_name' | 'avatar_url'>;

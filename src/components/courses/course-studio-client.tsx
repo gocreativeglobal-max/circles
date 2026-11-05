@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -30,6 +30,7 @@ import {
   CourseItem,
   CourseModuleItem,
   CourseLessonItem,
+  CoursePaywallPlan,
 } from '@/types/domain';
 import { Button } from '@/components/ui/button';
 import { LessonBlockBuilder } from './lesson-block-builder';
@@ -39,6 +40,7 @@ interface CourseStudioClientProps {
   circleSlug: string;
   initialCourse: CourseItem;
   isStaff: boolean;
+  isFinancesEnabled?: boolean;
 }
 
 type StudioTab =
@@ -55,6 +57,7 @@ export function CourseStudioClient({
   circleSlug,
   initialCourse,
   isStaff: _isStaff,
+  isFinancesEnabled = true,
 }: CourseStudioClientProps) {
   const [course, setCourse] = useState<CourseItem>(initialCourse);
   const [activeTab, setActiveTab] = useState<StudioTab>('overview');
@@ -111,9 +114,24 @@ export function CourseStudioClient({
 
   // Paywall & Access Tab state
   const [accessRule, setAccessRule] = useState<
-    'open' | 'members_only' | 'min_level' | 'staff_only'
+    'open' | 'members_only' | 'paywall' | 'min_level' | 'staff_only'
   >(initialCourse.access_rule || 'open');
   const [minLevel, setMinLevel] = useState(initialCourse.min_level_required || 1);
+  const [financesEnabled, setFinancesEnabled] = useState(isFinancesEnabled);
+  const [isEnablingFinances, setIsEnablingFinances] = useState(false);
+  const [paywallPlans, setPaywallPlans] = useState<CoursePaywallPlan[]>(
+    initialCourse.paywall_plans || []
+  );
+  const [allCirclePlans, setAllCirclePlans] = useState<CoursePaywallPlan[]>([]);
+  const [_isLoadingCirclePlans, setIsLoadingCirclePlans] = useState(false);
+  const [selectedExistingPlanId, setSelectedExistingPlanId] = useState('');
+  const [showNewPaywallModal, setShowNewPaywallModal] = useState(false);
+  const [newPlanName, setNewPlanName] = useState('');
+  const [newPlanDescription, setNewPlanDescription] = useState('');
+  const [newPlanPrice, setNewPlanPrice] = useState('49');
+  const [newPlanCurrency, setNewPlanCurrency] = useState('USD');
+  const [newPlanBillingType, setNewPlanBillingType] = useState<'one_time' | 'recurring'>('one_time');
+  const [newPlanBillingPeriod, setNewPlanBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
 
   // Status message & loading
   const [isSaving, setIsSaving] = useState(false);
@@ -591,6 +609,138 @@ export function CourseStudioClient({
       showFeedback('success', 'Access rules updated.');
     } catch (err) {
       showFeedback('error', err instanceof Error ? err.message : 'Unable to save access rules.');
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function loadCirclePlans() {
+    setIsLoadingCirclePlans(true);
+    try {
+      const res = await fetch(`/api/circles/${circleId}/finances?mode=plans`);
+      if (res.ok) {
+        const data = await res.json();
+        setAllCirclePlans(data.plans || []);
+      }
+    } catch {
+      // fallback
+    } finally {
+      setIsLoadingCirclePlans(false);
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'paywalls' && financesEnabled) {
+      void loadCirclePlans();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, financesEnabled]);
+
+  async function handleEnableFinances() {
+    setIsEnablingFinances(true);
+    try {
+      const res = await fetch(`/api/circles/${circleId}/capabilities`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ capabilityKey: 'finances', isEnabled: true }),
+      });
+      if (res.ok) {
+        setFinancesEnabled(true);
+        showFeedback('success', 'Finances module enabled! You can now configure course paywalls.');
+        loadCirclePlans();
+      } else {
+        throw new Error('Failed to enable finances capability.');
+      }
+    } catch (err) {
+      showFeedback('error', err instanceof Error ? err.message : 'Unable to enable finances.');
+    } finally {
+      setIsEnablingFinances(false);
+    }
+  }
+
+  async function handleCreatePaywall(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newPlanName.trim()) return;
+    setIsSaving(true);
+    try {
+      const res = await fetch(`/api/circles/${circleId}/courses/${course.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'create_paywall',
+          paywall: {
+            name: newPlanName.trim(),
+            description: newPlanDescription.trim(),
+            amountCents: Math.round((parseFloat(newPlanPrice) || 0) * 100),
+            currency: newPlanCurrency,
+            billingType: newPlanBillingType,
+            intervalUnit: newPlanBillingType === 'recurring' ? 'month' : null,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to create paywall plan.');
+      if (data.paywall) {
+        setPaywallPlans((prev) => [...prev, data.paywall]);
+        setShowNewPaywallModal(false);
+        setNewPlanName('');
+        setNewPlanDescription('');
+        setNewPlanPrice('49');
+        setAccessRule('paywall');
+        showFeedback('success', 'Paywall created and linked to this course.');
+      }
+    } catch (err) {
+      showFeedback('error', err instanceof Error ? err.message : 'Unable to create paywall.');
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleLinkExistingPlan() {
+    if (!selectedExistingPlanId) return;
+    setIsSaving(true);
+    try {
+      const res = await fetch(`/api/circles/${circleId}/courses/${course.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'link_paywall',
+          planId: selectedExistingPlanId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to link plan.');
+      const found = allCirclePlans.find((p) => p.id === selectedExistingPlanId);
+      if (found) {
+        setPaywallPlans((prev) => [...prev, found]);
+      }
+      setSelectedExistingPlanId('');
+      setAccessRule('paywall');
+      showFeedback('success', 'Pricing plan linked as course paywall.');
+    } catch (err) {
+      showFeedback('error', err instanceof Error ? err.message : 'Unable to link plan.');
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  async function handleUnlinkPaywall(planId: string) {
+    setIsSaving(true);
+    try {
+      const res = await fetch(`/api/circles/${circleId}/courses/${course.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'unlink_paywall',
+          planId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to unlink plan.');
+      setPaywallPlans((prev) => prev.filter((p) => p.id !== planId));
+      showFeedback('success', 'Paywall plan unlinked.');
+    } catch (err) {
+      showFeedback('error', err instanceof Error ? err.message : 'Unable to unlink plan.');
     } finally {
       setIsSaving(false);
     }
@@ -1295,96 +1445,386 @@ export function CourseStudioClient({
         {/* TAB 4: PAYWALLS & ACCESS */}
         {/* ==================================================================== */}
         {activeTab === 'paywalls' && (
-          <div className="max-w-2xl rounded-2xl border border-stone-200 bg-white p-6 shadow-2xs">
-            <h2 className="text-base font-bold text-stone-900">Paywalls & Access Rules</h2>
-            <p className="text-xs text-stone-500 mt-0.5">
-              Configure who has permission to view this course and its lessons.
-            </p>
-
-            <form onSubmit={handleSavePaywalls} className="mt-6 space-y-4">
-              <div className="space-y-3">
-                {[
-                  {
-                    value: 'open',
-                    title: 'Open Access',
-                    desc: 'Anyone who can access this Circle can freely enroll and view lessons.',
-                  },
-                  {
-                    value: 'members_only',
-                    title: 'Active Members Only',
-                    desc: 'Requires an active member subscription or membership in this Circle.',
-                  },
-                  {
-                    value: 'min_level',
-                    title: 'Gamified Level Gated',
-                    desc: 'Restricts access to members who reached a minimum Community Level via XP.',
-                  },
-                  {
-                    value: 'staff_only',
-                    title: 'Staff Only',
-                    desc: 'Restricted exclusively to Circle owners, admins, and moderators.',
-                  },
-                ].map((item) => (
-                  <label
-                    key={item.value}
-                    className={`flex items-start gap-3 rounded-xl border p-4 cursor-pointer transition-all ${
-                      accessRule === item.value
-                        ? 'border-black bg-stone-50'
-                        : 'border-stone-200 hover:bg-stone-50/50'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="accessRule"
-                      value={item.value}
-                      checked={accessRule === item.value}
-                      onChange={() =>
-                        setAccessRule(
-                          item.value as 'open' | 'members_only' | 'min_level' | 'staff_only'
-                        )
-                      }
-                      className="mt-1"
-                    />
-                    <div>
-                      <p className="text-xs font-bold text-stone-900">{item.title}</p>
-                      <p className="text-[11px] text-stone-500 mt-0.5">{item.desc}</p>
+          <div className="space-y-6 max-w-2xl">
+            {/* Finances capability check */}
+            {!financesEnabled && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-5 shadow-2xs">
+                <div className="flex items-start gap-3">
+                  <div className="p-2 rounded-xl bg-amber-100 text-amber-800">
+                    <CreditCard className="h-5 w-5" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-sm font-bold text-amber-900">
+                      Finances & Payments are not enabled
+                    </h3>
+                    <p className="mt-1 text-xs text-amber-700 leading-relaxed">
+                      To gate this course behind paid access passes, one-time fees, or recurring subscriptions, enable the Finances capability for this Circle.
+                    </p>
+                    <div className="mt-3">
+                      <Button
+                        type="button"
+                        onClick={handleEnableFinances}
+                        disabled={isEnablingFinances}
+                        className="bg-amber-900 text-white hover:bg-amber-800 text-xs px-3.5 py-1.5 rounded-lg font-semibold shadow-2xs"
+                      >
+                        {isEnablingFinances ? 'Enabling...' : 'Enable Finances Capability'}
+                      </Button>
                     </div>
-                  </label>
-                ))}
-              </div>
-
-              {accessRule === 'min_level' && (
-                <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-4">
-                  <label className="block text-xs font-bold text-stone-800">
-                    Minimum Community Level Required
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="100"
-                    value={minLevel}
-                    onChange={(e) => setMinLevel(parseInt(e.target.value, 10) || 1)}
-                    className="mt-1 w-32 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs text-stone-900 focus:border-black focus:outline-none"
-                  />
-                  <p className="text-[11px] text-stone-500 mt-1">
-                    Members earn XP by watching lessons, submitting assignments, and posting in discussions.
-                  </p>
+                  </div>
                 </div>
-              )}
-
-              <div className="pt-4 border-t border-stone-100 flex justify-end">
-                <Button
-                  type="submit"
-                  disabled={isSaving}
-                  className="bg-black text-white hover:bg-stone-800 text-xs px-4 py-2 rounded-lg font-semibold shadow-2xs"
-                >
-                  {isSaving ? 'Saving...' : 'Save access rules'}
-                </Button>
               </div>
-            </form>
+            )}
+
+            <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-2xs">
+              <h2 className="text-base font-bold text-stone-900">Course Access & Paywall Configuration</h2>
+              <p className="text-xs text-stone-500 mt-0.5">
+                Configure whether this course is free, restricted by community level, or gated behind paid paywalls.
+              </p>
+
+              <form onSubmit={handleSavePaywalls} className="mt-6 space-y-5">
+                <div className="space-y-3">
+                  {[
+                    {
+                      value: 'open',
+                      title: 'Open Access',
+                      desc: 'Anyone who can access this Circle can freely enroll and view lessons.',
+                    },
+                    {
+                      value: 'members_only',
+                      title: 'Active Members Only',
+                      desc: 'Requires an active member subscription or membership in this Circle.',
+                    },
+                    {
+                      value: 'paywall',
+                      title: 'Behind a Paywall (Paid Course)',
+                      desc: 'Students must purchase a linked pricing plan or pass to access paid lessons.',
+                    },
+                    {
+                      value: 'min_level',
+                      title: 'Gamified Level Gated',
+                      desc: 'Restricts access to members who reached a minimum Community Level via XP.',
+                    },
+                    {
+                      value: 'staff_only',
+                      title: 'Staff Only',
+                      desc: 'Restricted exclusively to Circle owners, admins, and moderators.',
+                    },
+                  ].map((item) => (
+                    <label
+                      key={item.value}
+                      className={`flex items-start gap-3 rounded-xl border p-4 cursor-pointer transition-all ${
+                        accessRule === item.value
+                          ? 'border-black bg-stone-50 ring-1 ring-black/5'
+                          : 'border-stone-200 hover:bg-stone-50/50'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="accessRule"
+                        value={item.value}
+                        checked={accessRule === item.value}
+                        onChange={() =>
+                          setAccessRule(
+                            item.value as 'open' | 'members_only' | 'paywall' | 'min_level' | 'staff_only'
+                          )
+                        }
+                        className="mt-1"
+                      />
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs font-bold text-stone-900">{item.title}</p>
+                          {item.value === 'paywall' && (
+                            <span className="rounded-md bg-stone-900 text-white px-1.5 py-0.5 text-[10px] font-semibold">
+                              Monetized
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-stone-500 mt-0.5">{item.desc}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+
+                {/* Level Gated Configuration */}
+                {accessRule === 'min_level' && (
+                  <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
+                    <label className="block text-xs font-bold text-stone-800">
+                      Minimum Community Level Required
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="100"
+                      value={minLevel}
+                      onChange={(e) => setMinLevel(parseInt(e.target.value, 10) || 1)}
+                      className="mt-1 w-32 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs text-stone-900 focus:border-black focus:outline-none"
+                    />
+                    <p className="text-[11px] text-stone-500 mt-1">
+                      Members earn XP by watching lessons, submitting assignments, and posting in discussions.
+                    </p>
+                  </div>
+                )}
+
+                {/* Paywall Configuration Section */}
+                {accessRule === 'paywall' && (
+                  <div className="space-y-4 rounded-xl border border-stone-200 bg-stone-50/70 p-5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-xs font-bold text-stone-900 uppercase tracking-wider">
+                          Linked Course Paywalls
+                        </h3>
+                        <p className="text-[11px] text-stone-500 mt-0.5">
+                          Students can purchase any of these plans to unlock full access to this course.
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        onClick={() => setShowNewPaywallModal(true)}
+                        className="bg-black text-white hover:bg-stone-800 text-xs px-3 py-1.5 rounded-lg font-semibold shadow-2xs inline-flex items-center gap-1.5"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>Create Paywall</span>
+                      </Button>
+                    </div>
+
+                    {paywallPlans.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-stone-300 bg-white p-6 text-center">
+                        <CreditCard className="mx-auto h-8 w-8 text-stone-400" />
+                        <p className="mt-2 text-xs font-bold text-stone-800">No Paywalls Linked Yet</p>
+                        <p className="mt-1 text-[11px] text-stone-500 max-w-sm mx-auto">
+                          Create a dedicated one-time fee or link an existing membership plan so students can purchase access.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2.5">
+                        {paywallPlans.map((plan) => (
+                          <div
+                            key={plan.id}
+                            className="flex items-center justify-between rounded-xl border border-stone-200 bg-white p-3.5 shadow-2xs"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-stone-100 text-stone-700">
+                                <CreditCard className="h-4 w-4" />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <h4 className="text-xs font-bold text-stone-900">{plan.name}</h4>
+                                  <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-semibold text-stone-700">
+                                    {plan.billing_type === 'recurring' ? `${plan.interval_unit ? plan.interval_unit.toUpperCase() : 'MONTHLY'} Sub` : 'One-time'}
+                                  </span>
+                                </div>
+                                <p className="text-[11px] text-stone-500">
+                                  {plan.description || 'Access to course lessons and materials'}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3">
+                              <div className="text-right">
+                                <span className="text-sm font-bold text-stone-900">
+                                  {plan.currency} {(plan.amount_cents / 100).toFixed(2)}
+                                </span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleUnlinkPaywall(plan.id)}
+                                className="text-stone-400 hover:text-rose-600 p-1.5 transition-colors"
+                                title="Unlink paywall"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Attach existing plan dropdown */}
+                    {allCirclePlans.length > 0 && (
+                      <div className="pt-3 border-t border-stone-200/80">
+                        <label className="block text-[11px] font-bold text-stone-700">
+                          Or attach an existing Circle pricing plan:
+                        </label>
+                        <div className="mt-1.5 flex items-center gap-2">
+                          <select
+                            value={selectedExistingPlanId}
+                            onChange={(e) => setSelectedExistingPlanId(e.target.value)}
+                            className="flex-1 rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs text-stone-900 focus:border-black focus:outline-none"
+                          >
+                            <option value="">-- Select an existing plan --</option>
+                            {allCirclePlans
+                              .filter((p) => !paywallPlans.some((linked) => linked.id === p.id))
+                              .map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.name} — {p.currency} {(p.amount_cents / 100).toFixed(2)} ({p.billing_type})
+                                </option>
+                              ))}
+                          </select>
+                          <Button
+                            type="button"
+                            onClick={handleLinkExistingPlan}
+                            disabled={!selectedExistingPlanId || isSaving}
+                            className="bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs px-3 py-2 rounded-lg font-semibold shrink-0"
+                          >
+                            Attach Plan
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="pt-4 border-t border-stone-100 flex justify-end">
+                  <Button
+                    type="submit"
+                    disabled={isSaving}
+                    className="bg-black text-white hover:bg-stone-800 text-xs px-4 py-2 rounded-lg font-semibold shadow-2xs"
+                  >
+                    {isSaving ? 'Saving...' : 'Save access rules'}
+                  </Button>
+                </div>
+              </form>
+            </div>
           </div>
         )}
 
+        {/* Modal: Create New Course Paywall */}
+        {showNewPaywallModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
+            <div className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl animate-in fade-in zoom-in-95 duration-150">
+              <div className="flex items-center justify-between pb-3 border-b border-stone-100">
+                <div className="flex items-center gap-2">
+                  <CreditCard className="h-4 w-4 text-stone-900" />
+                  <h3 className="text-sm font-bold text-stone-900">Create Course Paywall</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowNewPaywallModal(false)}
+                  className="text-stone-400 hover:text-stone-700 text-xs font-semibold"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <form onSubmit={handleCreatePaywall} className="mt-4 space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-stone-800">
+                    Paywall / Plan Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Lifetime Course Access"
+                    value={newPlanName}
+                    onChange={(e) => setNewPlanName(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs text-stone-900 focus:border-black focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-stone-800">
+                    Description (Optional)
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder="e.g. Complete access to all 12 modules, downloadable resources, and certificates."
+                    value={newPlanDescription}
+                    onChange={(e) => setNewPlanDescription(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs text-stone-900 focus:border-black focus:outline-none"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-bold text-stone-800">Price Amount</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      required
+                      value={newPlanPrice}
+                      onChange={(e) => setNewPlanPrice(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs text-stone-900 focus:border-black focus:outline-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-stone-800">Currency</label>
+                    <select
+                      value={newPlanCurrency}
+                      onChange={(e) => setNewPlanCurrency(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs text-stone-900 focus:border-black focus:outline-none"
+                    >
+                      <option value="USD">USD ($)</option>
+                      <option value="EUR">EUR (€)</option>
+                      <option value="GBP">GBP (£)</option>
+                      <option value="CAD">CAD ($)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-stone-800">Billing Type</label>
+                  <div className="mt-1 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setNewPlanBillingType('one_time')}
+                      className={`rounded-lg border px-3 py-2 text-xs font-semibold text-center transition-all ${
+                        newPlanBillingType === 'one_time'
+                          ? 'border-black bg-stone-900 text-white'
+                          : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-50'
+                      }`}
+                    >
+                      One-Time Payment
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setNewPlanBillingType('recurring')}
+                      className={`rounded-lg border px-3 py-2 text-xs font-semibold text-center transition-all ${
+                        newPlanBillingType === 'recurring'
+                          ? 'border-black bg-stone-900 text-white'
+                          : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-50'
+                      }`}
+                    >
+                      Subscription
+                    </button>
+                  </div>
+                </div>
+
+                {newPlanBillingType === 'recurring' && (
+                  <div>
+                    <label className="block text-xs font-bold text-stone-800">Billing Frequency</label>
+                    <select
+                      value={newPlanBillingPeriod}
+                      onChange={(e) => setNewPlanBillingPeriod(e.target.value as 'monthly' | 'yearly')}
+                      className="mt-1 w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs text-stone-900 focus:border-black focus:outline-none"
+                    >
+                      <option value="monthly">Monthly</option>
+                      <option value="yearly">Yearly</option>
+                    </select>
+                  </div>
+                )}
+
+                <div className="pt-3 border-t border-stone-100 flex items-center justify-end gap-2">
+                  <Button
+                    type="button"
+                    onClick={() => setShowNewPaywallModal(false)}
+                    className="bg-stone-100 text-stone-700 hover:bg-stone-200 text-xs px-3.5 py-2 rounded-lg font-semibold"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={isSaving}
+                    className="bg-black text-white hover:bg-stone-800 text-xs px-4 py-2 rounded-lg font-semibold shadow-2xs"
+                  >
+                    {isSaving ? 'Creating...' : 'Create & Attach Paywall'}
+                  </Button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         {/* ==================================================================== */}
         {/* TAB 6: MEMBERS */}
