@@ -311,20 +311,34 @@ export function JobsBoard({
                   </p>
                 </div>
 
-                {isMember && job.status === 'open' && (
-                  <div className="shrink-0">
-                    {job.viewer_application_status ? (
-                      <span className="inline-flex items-center gap-1 rounded-xl bg-zinc-950 px-3 py-1.5 text-xs font-semibold text-white border border-zinc-900">
-                        <CheckCircle2 className="h-3.5 w-3.5" />
-                        <span>Applied</span>
-                      </span>
-                    ) : (
-                      <Button size="sm" onClick={() => handleApply(job.id)}>
-                        Apply Privately
-                      </Button>
-                    )}
-                  </div>
-                )}
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  {job.link_url && (
+                    <a
+                      href={job.link_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-semibold text-stone-800 hover:bg-stone-100 hover:text-black transition-all"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5 text-stone-600" />
+                      <span>View Link</span>
+                    </a>
+                  )}
+
+                  {isMember && job.status === 'open' && (
+                    <div>
+                      {job.viewer_application_status ? (
+                        <span className="inline-flex items-center gap-1 rounded-xl bg-zinc-950 px-3 py-1.5 text-xs font-semibold text-white border border-zinc-900">
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                          <span>Applied</span>
+                        </span>
+                      ) : (
+                        <Button size="sm" onClick={() => handleApply(job.id)}>
+                          Apply Privately
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="flex flex-wrap items-center gap-4 border-t border-stone-100 pt-3 text-xs text-stone-400">
@@ -334,6 +348,19 @@ export function JobsBoard({
                     <MapPin className="h-3 w-3" />
                     {job.location}
                   </span>
+                )}
+                {job.link_url && (
+                  <a
+                    href={job.link_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-stone-400 hover:text-stone-700 transition-colors"
+                  >
+                    <Globe className="h-3 w-3" />
+                    <span className="truncate max-w-[200px]">
+                      {job.link_url.replace(/^https?:\/\//i, '').replace(/\/$/, '')}
+                    </span>
+                  </a>
                 )}
                 <span className="ml-auto inline-flex items-center gap-1 text-[11px] font-mono text-zinc-700">
                   <ShieldCheck className="h-3 w-3" />

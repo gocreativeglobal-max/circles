@@ -479,7 +479,14 @@ describe('Remaining Capabilities, Domain Workflows & Security Hardening', () => 
       workMode: 'remote',
       compensationText: '$190k - $220k',
       description: 'Lead PostgreSQL RLS architecture and zero-trust services.',
+      linkUrl: 'https://acme.cloud/careers/security-lead',
     });
+    expect(job.link_url).toBe('https://acme.cloud/careers/security-lead');
+
+    const updatedJob = await updateJobOpportunity(poster.id, circle.id, job.id, {
+      linkUrl: 'https://acme.cloud/careers/security-staff',
+    });
+    expect(updatedJob.link_url).toBe('https://acme.cloud/careers/security-staff');
 
     const application = await submitJobApplication(applicant.id, circle.id, job.id, {
       coverNote: '10 years building multi-tenant systems with strict RLS.',
