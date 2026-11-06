@@ -1,9 +1,26 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { Suspense, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, ArrowRight, Lock, Mail, Sparkles } from 'lucide-react';
+import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
+
+function AuthErrorBanner() {
+  const searchParams = useSearchParams();
+  const oauthError = searchParams.get('error');
+  if (!oauthError) return null;
+
+  return (
+    <div
+      role="alert"
+      className="mb-5 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50/80 p-3 text-xs text-amber-900"
+    >
+      <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-amber-600" />
+      <span>{oauthError}</span>
+    </div>
+  );
+}
 
 export default function LoginPage() {
   const router = useRouter();
@@ -53,6 +70,10 @@ export default function LoginPage() {
           </p>
         </div>
 
+        <Suspense fallback={null}>
+          <AuthErrorBanner />
+        </Suspense>
+
         {error && (
           <div
             role="alert"
@@ -62,6 +83,17 @@ export default function LoginPage() {
             <span>{error}</span>
           </div>
         )}
+
+        <GoogleSignInButton label="Continue with Google" />
+
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-stone-200" />
+          </div>
+          <div className="relative flex justify-center text-[10px] uppercase tracking-wider">
+            <span className="bg-white px-2 font-mono text-stone-400">or sign in with email</span>
+          </div>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -112,7 +144,7 @@ export default function LoginPage() {
             disabled={loading}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-black py-2.5 text-sm font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_1px_3px_rgba(0,0,0,0.15)] hover:bg-zinc-800 disabled:opacity-50 transition-all active:scale-[0.98]"
           >
-            <span>{loading ? 'Authenticating...' : 'Sign In'}</span>
+            <span>{loading ? 'Authenticating...' : 'Sign In with Email'}</span>
             <ArrowRight className="h-4 w-4" />
           </button>
         </form>

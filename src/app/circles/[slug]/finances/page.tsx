@@ -12,7 +12,7 @@ import {
 } from '@/features/finances/service';
 import { canReadCircleContent } from '@/lib/authorization/permissions';
 import { CircleFinancesClient } from '@/components/circles/circle-finances-client';
-import { CapabilityDisabledError } from '@/lib/errors';
+import { isCapabilityDisabledError } from '@/lib/errors';
 import {
   CommunityTreasuryLedgerItem,
   InvoiceItem,
@@ -71,7 +71,7 @@ export default async function CircleFinancesPage({
       treasuryLedger = await getTreasuryLedger(user.id, circle.id).catch(() => []);
     }
   } catch (err) {
-    if (err instanceof CapabilityDisabledError) {
+    if (isCapabilityDisabledError(err)) {
       return (
         <div className="mx-auto max-w-4xl px-4 py-12">
           <div className="rounded-2xl border border-stone-200/90 bg-white p-10 text-center shadow-xs">

@@ -125,3 +125,21 @@ export function getDatabaseBackendMode(): DatabaseBackendMode {
 
   return 'embedded_pglite';
 }
+
+export function getGoogleOAuthCredentials(): { clientId: string; clientSecret: string } | null {
+  const clientId = process.env.GOOGLE_CLIENT_ID?.trim();
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim();
+  if (!clientId || !clientSecret) return null;
+  return { clientId, clientSecret };
+}
+
+export function getAppBaseUrl(): string {
+  const raw = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (raw && !raw.includes('localhost')) {
+    return raw.replace(/\/+$/, '');
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`;
+  }
+  return raw ? raw.replace(/\/+$/, '') : 'http://localhost:3000';
+}

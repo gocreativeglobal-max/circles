@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, ArrowRight, AtSign, Lock, Mail, Sparkles, User } from 'lucide-react';
+import { GoogleSignInButton } from '@/components/auth/GoogleSignInButton';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -64,6 +65,17 @@ export default function RegisterPage() {
             <span>{error}</span>
           </div>
         )}
+
+        <GoogleSignInButton label="Sign up with Google" />
+
+        <div className="relative my-6">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-stone-200" />
+          </div>
+          <div className="relative flex justify-center text-[10px] uppercase tracking-wider">
+            <span className="bg-white px-2 font-mono text-stone-400">or sign up with email</span>
+          </div>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -160,7 +172,7 @@ export default function RegisterPage() {
             disabled={loading}
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-black py-2.5 text-sm font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_1px_3px_rgba(0,0,0,0.15)] hover:bg-zinc-800 disabled:opacity-50 transition-all active:scale-[0.98]"
           >
-            <span>{loading ? 'Registering...' : 'Create Account'}</span>
+            <span>{loading ? 'Registering...' : 'Create Account with Email'}</span>
             <ArrowRight className="h-4 w-4" />
           </button>
         </form>

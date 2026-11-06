@@ -229,8 +229,8 @@ export async function listCourses(
     >(
       `SELECT 
          c.*,
-         p.username AS instructor_username,
-         p.display_name AS instructor_display_name,
+         COALESCE(p.username, 'instructor') AS instructor_username,
+         COALESCE(p.display_name, 'Instructor') AS instructor_display_name,
          p.avatar_url AS instructor_avatar_url,
          (
            SELECT COUNT(*)::text 
@@ -238,13 +238,14 @@ export async function listCourses(
            WHERE l.course_id = c.id AND l.circle_id = c.circle_id AND l.status = 'published'
          ) AS total_lessons_count
        FROM public.courses c
-       JOIN public.profiles p ON p.id = c.instructor_id
+       LEFT JOIN public.profiles p ON p.id = c.instructor_id
        WHERE c.circle_id = $1
        ORDER BY c.sort_order ASC, c.created_at DESC;`,
       [circleId]
     );
 
     const completionMap: Record<string, number> = {};
+    const enrollmentSet = new Set<string>();
     if (actorUserId) {
       const compRes = await tx.query<{ course_id: string; completed_count: string }>(
         `SELECT course_id, COUNT(*)::text AS completed_count
@@ -255,6 +256,15 @@ export async function listCourses(
       );
       for (const row of compRes.rows) {
         completionMap[row.course_id] = parseInt(row.completed_count, 10);
+      }
+
+      const enrollRes = await tx.query<{ course_id: string }>(
+        `SELECT course_id FROM public.course_enrollments
+         WHERE circle_id = $1 AND student_id = $2;`,
+        [circleId, actorUserId]
+      ).catch(() => ({ rows: [] }));
+      for (const row of enrollRes.rows) {
+        enrollmentSet.add(row.course_id);
       }
     }
 
@@ -273,9 +283,9 @@ export async function listCourses(
         description: row.description,
         thumbnail_url: row.thumbnail_url,
         difficulty_level: row.difficulty_level,
-        estimated_duration_hours: Number(row.estimated_duration_hours),
+        estimated_duration_hours: Number(row.estimated_duration_hours || 0),
         status: row.status,
-        sort_order: row.sort_order,
+        sort_order: row.sort_order ?? 0,
         pacing_format: row.pacing_format ?? 'self_paced',
         schedule_type: row.schedule_type ?? 'relative_drip',
         cohort_start_date: row.cohort_start_date ?? null,
@@ -283,18 +293,19 @@ export async function listCourses(
         require_sequential_completion: Boolean(row.require_sequential_completion),
         access_rule: row.access_rule ?? 'open',
         min_level_required: Number(row.min_level_required ?? 1),
+        published_version: Number(row.published_version ?? 1),
         created_at: row.created_at,
         updated_at: row.updated_at,
         instructor: {
           id: row.instructor_id,
-          username: row.instructor_username,
-          display_name: row.instructor_display_name,
-          avatar_url: row.instructor_avatar_url,
+          username: row.instructor_username || 'instructor',
+          display_name: row.instructor_display_name || 'Instructor',
+          avatar_url: row.instructor_avatar_url || null,
         },
         total_lessons_count: totalLessons,
         completed_lessons_count: completedLessons,
         progress_percentage: progressPercentage,
-        is_enrolled: completedLessons > 0,
+        is_enrolled: completedLessons > 0 || enrollmentSet.has(row.id),
       };
     });
   });
@@ -322,11 +333,11 @@ export async function getCourseWithCurriculum(
     >(
       `SELECT 
          c.*,
-         p.username AS instructor_username,
-         p.display_name AS instructor_display_name,
+         COALESCE(p.username, 'instructor') AS instructor_username,
+         COALESCE(p.display_name, 'Instructor') AS instructor_display_name,
          p.avatar_url AS instructor_avatar_url
        FROM public.courses c
-       JOIN public.profiles p ON p.id = c.instructor_id
+       LEFT JOIN public.profiles p ON p.id = c.instructor_id
        WHERE c.circle_id = $1 AND ${isUuid ? 'c.id = $2' : 'c.slug = $2'}
        LIMIT 1;`,
       [circleId, courseIdOrSlug]

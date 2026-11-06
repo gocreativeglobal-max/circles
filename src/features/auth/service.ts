@@ -114,6 +114,101 @@ export async function authenticateUser(input: unknown): Promise<{ user: UserProf
   return { user, sessionToken };
 }
 
+export interface GoogleUserInfo {
+  email: string;
+  name?: string;
+  picture?: string;
+  sub: string;
+}
+
+export async function authenticateWithGoogle(
+  googleUser: GoogleUserInfo
+): Promise<{ user: UserProfile; sessionToken: string }> {
+  const email = googleUser.email.trim().toLowerCase();
+  const displayName = (googleUser.name?.trim() || email.split('@')[0] || 'Member').slice(0, 80);
+
+  const user = await withServiceRoleTransaction(async (tx) => {
+    // 1. Check if user profile already exists with this email
+    const existingRes = await tx.query<UserProfile & { platform_role: string | null }>(
+      `SELECT p.*, pr.role AS platform_role
+       FROM public.profiles p
+       LEFT JOIN public.platform_roles pr ON pr.user_id = p.id
+       WHERE lower(p.email) = lower($1)
+       LIMIT 1;`,
+      [email]
+    );
+
+    if (existingRes.rows.length > 0) {
+      const existing = existingRes.rows[0];
+      if (!existing.avatar_url && googleUser.picture) {
+        await tx.query(
+          `UPDATE public.profiles SET avatar_url = $1, updated_at = NOW() WHERE id = $2;`,
+          [googleUser.picture, existing.id]
+        );
+        existing.avatar_url = googleUser.picture;
+      }
+      return {
+        ...existing,
+        is_platform_admin: Boolean(existing.platform_role),
+      };
+    }
+
+    // 2. Generate a sanitized unique username (alphanumeric + underscore, 3-32 chars)
+    let baseUsername = email
+      .split('@')[0]
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, '')
+      .slice(0, 20);
+    if (baseUsername.length < 3) {
+      baseUsername = `user_${baseUsername}`.slice(0, 20);
+    }
+
+    let username = baseUsername;
+    const userCheck = await tx.query<{ id: string }>(
+      `SELECT id FROM public.profiles WHERE lower(username) = lower($1) LIMIT 1;`,
+      [username]
+    );
+    if (userCheck.rows.length > 0) {
+      const suffix = crypto.randomBytes(2).toString('hex');
+      username = `${baseUsername}_${suffix}`.slice(0, 32);
+    }
+
+    const userId = crypto.randomUUID();
+    const dummyPasswordHash = `oauth:google:${crypto.randomBytes(16).toString('hex')}`;
+
+    await tx.query(
+      `INSERT INTO auth.users (id, email, encrypted_password, raw_user_meta_data)
+       VALUES ($1, $2, $3, $4::jsonb);`,
+      [
+        userId,
+        email,
+        dummyPasswordHash,
+        JSON.stringify({
+          display_name: displayName,
+          avatar_url: googleUser.picture,
+          provider: 'google',
+          google_sub: googleUser.sub,
+        }),
+      ]
+    );
+
+    const profileRes = await tx.query<UserProfile>(
+      `INSERT INTO public.profiles (id, email, username, display_name, avatar_url, bio, profile_visibility)
+       VALUES ($1, $2, $3, $4, $5, '', 'public')
+       RETURNING *;`,
+      [userId, email, username, displayName, googleUser.picture || null]
+    );
+
+    return {
+      ...profileRes.rows[0],
+      is_platform_admin: false,
+    };
+  });
+
+  const sessionToken = await issuePersistedSession(user.id, user.email);
+  return { user, sessionToken };
+}
+
 export async function signOutUser(rawToken?: string | null): Promise<void> {
   await revokeSessionToken(rawToken);
 }
