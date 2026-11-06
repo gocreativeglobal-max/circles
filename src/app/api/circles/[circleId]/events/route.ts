@@ -78,6 +78,10 @@ export async function POST(
       ...body,
       circleId: params.circleId,
       coverImageUrl: body.coverImageUrl ?? body.cover_image_url,
+      hostId: body.hostId ?? body.host_id,
+      repeatFrequency: body.repeatFrequency ?? body.repeat_frequency,
+      liveRoomDefaultView: body.liveRoomDefaultView ?? body.live_room_default_view,
+      hostControls: body.hostControls ?? body.host_controls,
     });
     return NextResponse.json({ event }, { status: 201 });
   } catch (error) {
@@ -117,6 +121,10 @@ export async function PATCH(
       {
         ...body,
         coverImageUrl: body.coverImageUrl ?? body.cover_image_url,
+        hostId: body.hostId ?? body.host_id,
+        repeatFrequency: body.repeatFrequency ?? body.repeat_frequency,
+        liveRoomDefaultView: body.liveRoomDefaultView ?? body.live_room_default_view,
+        hostControls: body.hostControls ?? body.host_controls,
       }
     );
     return NextResponse.json({ event });

@@ -5,9 +5,10 @@ import { getAuthenticatedUser } from '@/lib/auth/session';
 import { getCircleBySlugOrId } from '@/features/circles/service';
 import { listCircleEvents } from '@/features/events/service';
 import { listCircleSpaces } from '@/features/spaces/service';
+import { listCircleMembers } from '@/features/memberships/service';
 import { canReadCircleContent } from '@/lib/authorization/permissions';
 import { EventsBoard } from '@/components/circles/events-board';
-import { CircleEventItem, CircleSpace } from '@/types/domain';
+import { CircleEventItem, CircleMembership, CircleSpace } from '@/types/domain';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,6 +64,13 @@ export default async function CircleEventsPage({
     spaces = [];
   }
 
+  let members: CircleMembership[] = [];
+  try {
+    members = await listCircleMembers(user?.id ?? null, circle.id);
+  } catch {
+    members = [];
+  }
+
   const isMember = circle.current_user_membership_status === 'active';
 
   return (
@@ -76,6 +84,7 @@ export default async function CircleEventsPage({
       currentUserId={user?.id ?? null}
       currentUserRole={circle.current_user_role ?? null}
       spaces={spaces}
+      members={members}
     />
   );
 }

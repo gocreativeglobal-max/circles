@@ -270,6 +270,17 @@ export interface AuditLogItem {
   created_at: string;
 }
 
+export interface EventHostControls {
+  record_live?: boolean;
+  auto_post_recording?: boolean;
+  mute_on_entry?: boolean;
+  hide_attendees?: boolean;
+  disable_chat?: boolean;
+  disable_live_link_sharing?: boolean;
+  hide_location_from_non_attendees?: boolean;
+  [key: string]: unknown;
+}
+
 export interface CircleEventItem {
   id: string;
   circle_id: string;
@@ -279,7 +290,7 @@ export interface CircleEventItem {
   title: string;
   description: string;
   event_type: 'event' | 'meetup' | 'workshop' | 'online';
-  location_type: 'in_person' | 'online' | 'hybrid';
+  location_type: 'in_person' | 'online' | 'hybrid' | 'live_room' | 'zoom';
   venue_text: string;
   meeting_url: string | null;
   starts_at: string;
@@ -288,15 +299,30 @@ export interface CircleEventItem {
   capacity: number | null;
   registration_closes_at: string | null;
   cover_image_url?: string | null;
+  topics?: string[];
+  host_id?: string | null;
+  repeat_frequency?: 'none' | 'weekly' | 'biweekly' | 'monthly';
+  live_room_default_view?: 'gallery' | 'speaker';
+  visibility?: 'community' | 'space_members' | 'secret';
+  host_controls?: EventHostControls;
+  location_hidden?: boolean;
   status: 'draft' | 'published' | 'cancelled' | 'completed';
   created_at: string;
   updated_at: string;
   organizer?: Pick<UserProfile, 'id' | 'username' | 'display_name' | 'avatar_url'>;
+  host?: (Pick<UserProfile, 'id' | 'username' | 'display_name' | 'avatar_url'> & { email?: string }) | null;
   going_count?: number;
   waitlisted_count?: number;
   attended_count?: number;
   viewer_rsvp_status?: 'going' | 'waitlisted' | 'cancelled' | null;
   viewer_attended?: boolean;
+  attendees?: Array<{
+    user_id: string;
+    status: 'going' | 'waitlisted' | 'cancelled';
+    username: string;
+    display_name: string;
+    avatar_url: string | null;
+  }>;
 }
 
 export interface EventRsvpItem {

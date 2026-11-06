@@ -5,6 +5,7 @@ import {
   CircleEventItem,
   CircleRole,
   CircleVisibility,
+  EventHostControls,
   EventRsvpItem,
   MembershipStatus,
 } from '@/types/domain';
@@ -18,13 +19,48 @@ import {
 import { canReadCircleContent } from '@/lib/authorization/permissions';
 import { createNotification } from '@/features/notifications/service';
 
+export const hostControlsInputSchema = z
+  .object({
+    record_live: z.boolean().optional(),
+    auto_post_recording: z.boolean().optional(),
+    mute_on_entry: z.boolean().optional(),
+    hide_attendees: z.boolean().optional(),
+    disable_chat: z.boolean().optional(),
+    disable_live_link_sharing: z.boolean().optional(),
+    hide_location_from_non_attendees: z.boolean().optional(),
+    recordLive: z.boolean().optional(),
+    autoPostRecording: z.boolean().optional(),
+    muteOnEntry: z.boolean().optional(),
+    hideAttendees: z.boolean().optional(),
+    disableChat: z.boolean().optional(),
+    disableLiveLinkSharing: z.boolean().optional(),
+    hideLocationFromNonAttendees: z.boolean().optional(),
+  })
+  .default({});
+
+export function normalizeHostControls(
+  controls?: EventHostControls | Record<string, unknown> | null
+) {
+  return {
+    record_live: Boolean(controls?.record_live ?? controls?.recordLive ?? false),
+    auto_post_recording: Boolean(controls?.auto_post_recording ?? controls?.autoPostRecording ?? false),
+    mute_on_entry: Boolean(controls?.mute_on_entry ?? controls?.muteOnEntry ?? false),
+    hide_attendees: Boolean(controls?.hide_attendees ?? controls?.hideAttendees ?? false),
+    disable_chat: Boolean(controls?.disable_chat ?? controls?.disableChat ?? false),
+    disable_live_link_sharing: Boolean(controls?.disable_live_link_sharing ?? controls?.disableLiveLinkSharing ?? false),
+    hide_location_from_non_attendees: Boolean(
+      controls?.hide_location_from_non_attendees ?? controls?.hideLocationFromNonAttendees ?? false
+    ),
+  };
+}
+
 export const createEventSchema = z.object({
   circleId: z.string().uuid(),
   spaceId: z.string().uuid().nullable().optional(),
   title: z.string().trim().min(3).max(160),
   description: z.string().trim().max(8000).default(''),
   eventType: z.enum(['event', 'meetup', 'workshop', 'online']).default('event'),
-  locationType: z.enum(['in_person', 'online', 'hybrid']).default('in_person'),
+  locationType: z.enum(['in_person', 'online', 'hybrid', 'live_room', 'zoom']).default('live_room'),
   venueText: z.string().trim().max(300).default(''),
   meetingUrl: z
     .string()
@@ -47,6 +83,12 @@ export const createEventSchema = z.object({
     .optional()
     .or(z.literal(''))
     .transform((v) => (v === '' ? null : v)),
+  topics: z.array(z.string().trim().max(40)).max(5).default([]),
+  hostId: z.string().uuid().nullable().optional(),
+  repeatFrequency: z.enum(['none', 'weekly', 'biweekly', 'monthly']).default('none'),
+  liveRoomDefaultView: z.enum(['gallery', 'speaker']).default('gallery'),
+  visibility: z.enum(['community', 'space_members', 'secret']).default('community'),
+  hostControls: hostControlsInputSchema.optional(),
 });
 
 export const updateEventSchema = z.object({
@@ -54,7 +96,7 @@ export const updateEventSchema = z.object({
   title: z.string().trim().min(3).max(160).optional(),
   description: z.string().trim().max(8000).optional(),
   eventType: z.enum(['event', 'meetup', 'workshop', 'online']).optional(),
-  locationType: z.enum(['in_person', 'online', 'hybrid']).optional(),
+  locationType: z.enum(['in_person', 'online', 'hybrid', 'live_room', 'zoom']).optional(),
   venueText: z.string().trim().max(300).optional(),
   meetingUrl: z
     .string()
@@ -76,6 +118,12 @@ export const updateEventSchema = z.object({
     .optional()
     .or(z.literal(''))
     .transform((v) => (v === '' ? null : v)),
+  topics: z.array(z.string().trim().max(40)).max(5).optional(),
+  hostId: z.string().uuid().nullable().optional(),
+  repeatFrequency: z.enum(['none', 'weekly', 'biweekly', 'monthly']).optional(),
+  liveRoomDefaultView: z.enum(['gallery', 'speaker']).optional(),
+  visibility: z.enum(['community', 'space_members', 'secret']).optional(),
+  hostControls: hostControlsInputSchema.optional(),
   status: z.enum(['draft', 'published', 'cancelled', 'completed']).optional(),
 });
 
@@ -164,18 +212,23 @@ export async function createCircleEvent(
     }
 
     const eventId = crypto.randomUUID();
+    const hostControls = normalizeHostControls(parsed.hostControls);
+    const hostId = parsed.hostId ?? actorUserId;
+
     const inserted = await tx.query<CircleEventItem>(
       `INSERT INTO public.circle_events (
-         id, circle_id, space_id, organizer_id, title, description, event_type,
+         id, circle_id, space_id, organizer_id, host_id, title, description, event_type,
          location_type, venue_text, meeting_url, starts_at, ends_at, timezone,
-         capacity, registration_closes_at, cover_image_url, status
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'published')
+         capacity, registration_closes_at, cover_image_url, topics, repeat_frequency,
+         live_room_default_view, visibility, host_controls, status
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, 'published')
        RETURNING *;`,
       [
         eventId,
         parsed.circleId,
         parsed.spaceId ?? null,
         actorUserId,
+        hostId,
         parsed.title,
         parsed.description,
         parsed.eventType,
@@ -188,6 +241,11 @@ export async function createCircleEvent(
         parsed.capacity ?? null,
         parsed.registrationClosesAt ?? null,
         parsed.coverImageUrl ?? null,
+        parsed.topics ?? [],
+        parsed.repeatFrequency ?? 'none',
+        parsed.liveRoomDefaultView ?? 'gallery',
+        parsed.visibility ?? 'community',
+        JSON.stringify(hostControls),
       ]
     );
 
@@ -245,11 +303,23 @@ export async function listCircleEvents(
         organizer_username: string;
         organizer_display_name: string;
         organizer_avatar_url: string | null;
+        organizer_email?: string | null;
+        host_username?: string | null;
+        host_display_name?: string | null;
+        host_avatar_url?: string | null;
+        host_email?: string | null;
         going_count: number;
         waitlisted_count: number;
         attended_count: number;
         viewer_rsvp_status: 'going' | 'waitlisted' | 'cancelled' | null;
         viewer_attended: boolean | null;
+        sample_attendees?: Array<{
+          user_id: string;
+          status: 'going' | 'waitlisted' | 'cancelled';
+          username: string;
+          display_name: string;
+          avatar_url: string | null;
+        }> | null;
       }
     >(
       `SELECT e.*,
@@ -257,14 +327,35 @@ export async function listCircleEvents(
          COALESCE(p.username, 'member') AS organizer_username,
          COALESCE(p.display_name, 'Organizer') AS organizer_display_name,
          p.avatar_url AS organizer_avatar_url,
+         p.email AS organizer_email,
+         hp.username AS host_username,
+         hp.display_name AS host_display_name,
+         hp.avatar_url AS host_avatar_url,
+         hp.email AS host_email,
          (SELECT COUNT(*)::int FROM public.event_rsvps r WHERE r.event_id = e.id AND r.status = 'going') AS going_count,
          (SELECT COUNT(*)::int FROM public.event_rsvps r WHERE r.event_id = e.id AND r.status = 'waitlisted') AS waitlisted_count,
          (SELECT COUNT(*)::int FROM public.event_rsvps r WHERE r.event_id = e.id AND r.attended = true) AS attended_count,
          (SELECT r.status FROM public.event_rsvps r WHERE r.event_id = e.id AND r.user_id = $2 LIMIT 1) AS viewer_rsvp_status,
-         (SELECT r.attended FROM public.event_rsvps r WHERE r.event_id = e.id AND r.user_id = $2 LIMIT 1) AS viewer_attended
+         (SELECT r.attended FROM public.event_rsvps r WHERE r.event_id = e.id AND r.user_id = $2 LIMIT 1) AS viewer_attended,
+         (SELECT json_agg(json_build_object(
+            'user_id', r2.user_id,
+            'status', r2.status,
+            'username', ap.username,
+            'display_name', ap.display_name,
+            'avatar_url', ap.avatar_url
+          )) FROM (
+            SELECT r_sub.user_id, r_sub.status
+            FROM public.event_rsvps r_sub
+            WHERE r_sub.event_id = e.id AND r_sub.status = 'going'
+            ORDER BY r_sub.created_at ASC
+            LIMIT 12
+          ) r2
+          JOIN public.profiles ap ON ap.id = r2.user_id
+         ) AS sample_attendees
        FROM public.circle_events e
        LEFT JOIN public.circle_spaces s ON s.id = e.space_id AND s.circle_id = e.circle_id
        LEFT JOIN public.profiles p ON p.id = e.organizer_id
+       LEFT JOIN public.profiles hp ON hp.id = e.host_id
        WHERE e.circle_id = $1
        ORDER BY e.starts_at ASC;`,
       [circleId, actorUserId]
@@ -287,38 +378,75 @@ export async function listCircleEvents(
         }
         return true;
       })
-      .map((row) => ({
-        id: row.id,
-        circle_id: row.circle_id,
-        space_id: row.space_id,
-        space_name: row.space_name ?? null,
-        organizer_id: row.organizer_id,
-        title: row.title,
-        description: row.description,
-        event_type: row.event_type,
-        location_type: row.location_type,
-        venue_text: row.venue_text,
-        meeting_url: row.meeting_url,
-        starts_at: row.starts_at,
-        ends_at: row.ends_at,
-        timezone: row.timezone,
-        capacity: row.capacity,
-        registration_closes_at: row.registration_closes_at,
-        status: row.status,
-        created_at: row.created_at,
-        updated_at: row.updated_at,
-        organizer: {
-          id: row.organizer_id,
-          username: row.organizer_username,
-          display_name: row.organizer_display_name,
-          avatar_url: row.organizer_avatar_url,
-        },
-        going_count: Number(row.going_count ?? 0),
-        waitlisted_count: Number(row.waitlisted_count ?? 0),
-        attended_count: Number(row.attended_count ?? 0),
-        viewer_rsvp_status: row.viewer_rsvp_status ?? null,
-        viewer_attended: Boolean(row.viewer_attended),
-      }));
+      .map((row) => {
+        const isStaffOrHost =
+          actorUserId === row.organizer_id ||
+          (row.host_id && actorUserId === row.host_id) ||
+          Boolean(membership?.role && ['owner', 'admin', 'moderator'].includes(membership.role));
+        const isGoing = row.viewer_rsvp_status === 'going';
+
+        const hostControls = normalizeHostControls(row.host_controls);
+        const shouldHideLocation =
+          hostControls.hide_location_from_non_attendees && !isStaffOrHost && !isGoing;
+        const hideAttendees = hostControls.hide_attendees && !isStaffOrHost;
+
+        return {
+          id: row.id,
+          circle_id: row.circle_id,
+          space_id: row.space_id,
+          space_name: row.space_name ?? null,
+          organizer_id: row.organizer_id,
+          host_id: row.host_id ?? row.organizer_id,
+          title: row.title,
+          description: row.description,
+          event_type: row.event_type,
+          location_type: row.location_type,
+          venue_text: shouldHideLocation ? 'Location visible to registered attendees' : row.venue_text,
+          meeting_url: shouldHideLocation ? null : row.meeting_url,
+          location_hidden: shouldHideLocation,
+          starts_at: row.starts_at,
+          ends_at: row.ends_at,
+          timezone: row.timezone,
+          capacity: row.capacity,
+          registration_closes_at: row.registration_closes_at,
+          cover_image_url: row.cover_image_url ?? null,
+          topics: Array.isArray(row.topics) ? row.topics : [],
+          repeat_frequency: row.repeat_frequency ?? 'none',
+          live_room_default_view: row.live_room_default_view ?? 'gallery',
+          visibility: row.visibility ?? 'community',
+          host_controls: hostControls,
+          status: row.status,
+          created_at: row.created_at,
+          updated_at: row.updated_at,
+          organizer: {
+            id: row.organizer_id,
+            username: row.organizer_username,
+            display_name: row.organizer_display_name,
+            avatar_url: row.organizer_avatar_url,
+          },
+          host: row.host_id
+            ? {
+                id: row.host_id,
+                username: row.host_username ?? 'host',
+                display_name: row.host_display_name ?? 'Event Host',
+                avatar_url: row.host_avatar_url ?? null,
+                email: row.host_email ?? undefined,
+              }
+            : {
+                id: row.organizer_id,
+                username: row.organizer_username,
+                display_name: row.organizer_display_name,
+                avatar_url: row.organizer_avatar_url,
+                email: row.organizer_email ?? undefined,
+              },
+          going_count: Number(row.going_count ?? 0),
+          waitlisted_count: Number(row.waitlisted_count ?? 0),
+          attended_count: Number(row.attended_count ?? 0),
+          viewer_rsvp_status: row.viewer_rsvp_status ?? null,
+          viewer_attended: Boolean(row.viewer_attended),
+          attendees: hideAttendees ? [] : Array.isArray(row.sample_attendees) ? row.sample_attendees : [],
+        };
+      });
   });
 }
 
@@ -360,6 +488,10 @@ export async function updateCircleEvent(
       throw new ValidationError('Event end time must be after start time.');
     }
 
+    const hostControls = parsed.hostControls
+      ? normalizeHostControls(parsed.hostControls)
+      : existing.host_controls;
+
     await tx.query(
       `UPDATE public.circle_events
        SET title = $1,
@@ -375,8 +507,14 @@ export async function updateCircleEvent(
            event_type = $11,
            space_id = $12,
            cover_image_url = $13,
+           topics = COALESCE($14, topics),
+           host_id = COALESCE($15, host_id),
+           repeat_frequency = COALESCE($16, repeat_frequency),
+           live_room_default_view = COALESCE($17, live_room_default_view),
+           visibility = COALESCE($18, visibility),
+           host_controls = COALESCE($19::jsonb, host_controls),
            updated_at = NOW()
-       WHERE id = $14 AND circle_id = $15;`,
+       WHERE id = $20 AND circle_id = $21;`,
       [
         parsed.title ?? existing.title,
         parsed.description ?? existing.description,
@@ -393,6 +531,12 @@ export async function updateCircleEvent(
         parsed.eventType ?? existing.event_type,
         parsed.spaceId !== undefined ? parsed.spaceId : existing.space_id,
         parsed.coverImageUrl !== undefined ? parsed.coverImageUrl : existing.cover_image_url,
+        parsed.topics ? parsed.topics : null,
+        parsed.hostId !== undefined ? parsed.hostId : null,
+        parsed.repeatFrequency ?? null,
+        parsed.liveRoomDefaultView ?? null,
+        parsed.visibility ?? null,
+        parsed.hostControls ? JSON.stringify(hostControls) : null,
         eventId,
         circleId,
       ]
@@ -404,6 +548,11 @@ export async function updateCircleEvent(
         organizer_username: string;
         organizer_display_name: string;
         organizer_avatar_url: string | null;
+        organizer_email?: string | null;
+        host_username?: string | null;
+        host_display_name?: string | null;
+        host_avatar_url?: string | null;
+        host_email?: string | null;
         going_count: number;
         waitlisted_count: number;
         attended_count: number;
@@ -416,6 +565,11 @@ export async function updateCircleEvent(
          COALESCE(p.username, 'member') AS organizer_username,
          COALESCE(p.display_name, 'Organizer') AS organizer_display_name,
          p.avatar_url AS organizer_avatar_url,
+         p.email AS organizer_email,
+         hp.username AS host_username,
+         hp.display_name AS host_display_name,
+         hp.avatar_url AS host_avatar_url,
+         hp.email AS host_email,
          (SELECT COUNT(*)::int FROM public.event_rsvps r WHERE r.event_id = e.id AND r.status = 'going') AS going_count,
          (SELECT COUNT(*)::int FROM public.event_rsvps r WHERE r.event_id = e.id AND r.status = 'waitlisted') AS waitlisted_count,
          (SELECT COUNT(*)::int FROM public.event_rsvps r WHERE r.event_id = e.id AND r.attended = true) AS attended_count,
@@ -424,6 +578,7 @@ export async function updateCircleEvent(
        FROM public.circle_events e
        LEFT JOIN public.circle_spaces s ON s.id = e.space_id AND s.circle_id = e.circle_id
        LEFT JOIN public.profiles p ON p.id = e.organizer_id
+       LEFT JOIN public.profiles hp ON hp.id = e.host_id
        WHERE e.id = $1 AND e.circle_id = $3
        LIMIT 1;`,
       [eventId, actorUserId, circleId]
@@ -436,6 +591,7 @@ export async function updateCircleEvent(
       space_id: updatedRow.space_id,
       space_name: updatedRow.space_name ?? null,
       organizer_id: updatedRow.organizer_id,
+      host_id: updatedRow.host_id ?? updatedRow.organizer_id,
       title: updatedRow.title,
       description: updatedRow.description,
       event_type: updatedRow.event_type,
@@ -447,6 +603,12 @@ export async function updateCircleEvent(
       timezone: updatedRow.timezone,
       capacity: updatedRow.capacity,
       registration_closes_at: updatedRow.registration_closes_at,
+      cover_image_url: updatedRow.cover_image_url ?? null,
+      topics: Array.isArray(updatedRow.topics) ? updatedRow.topics : [],
+      repeat_frequency: updatedRow.repeat_frequency ?? 'none',
+      live_room_default_view: updatedRow.live_room_default_view ?? 'gallery',
+      visibility: updatedRow.visibility ?? 'community',
+      host_controls: normalizeHostControls(updatedRow.host_controls),
       status: updatedRow.status,
       created_at: updatedRow.created_at,
       updated_at: updatedRow.updated_at,
@@ -456,6 +618,21 @@ export async function updateCircleEvent(
         display_name: updatedRow.organizer_display_name,
         avatar_url: updatedRow.organizer_avatar_url,
       },
+      host: updatedRow.host_id
+        ? {
+            id: updatedRow.host_id,
+            username: updatedRow.host_username ?? 'host',
+            display_name: updatedRow.host_display_name ?? 'Event Host',
+            avatar_url: updatedRow.host_avatar_url ?? null,
+            email: updatedRow.host_email ?? undefined,
+          }
+        : {
+            id: updatedRow.organizer_id,
+            username: updatedRow.organizer_username,
+            display_name: updatedRow.organizer_display_name,
+            avatar_url: updatedRow.organizer_avatar_url,
+            email: updatedRow.organizer_email ?? undefined,
+          },
       going_count: Number(updatedRow.going_count ?? 0),
       waitlisted_count: Number(updatedRow.waitlisted_count ?? 0),
       attended_count: Number(updatedRow.attended_count ?? 0),
