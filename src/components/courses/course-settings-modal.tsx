@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { CourseItem } from '@/types/domain';
 import { Button } from '@/components/ui/button';
+import { ImageUploader } from '@/components/ui/image-uploader';
 
 interface CourseSettingsModalProps {
   circleId: string;
@@ -235,33 +236,21 @@ export function CourseSettingsModal({
             />
           </div>
 
-          {/* Thumbnail Image URL */}
+          {/* Thumbnail Image */}
           <div>
-            <label className="text-xs font-bold text-stone-800 flex items-center gap-1.5">
+            <label className="text-xs font-bold text-stone-800 flex items-center gap-1.5 mb-1.5">
               <ImageIcon className="h-3.5 w-3.5 text-stone-500" />
-              <span>Cover Image / Thumbnail URL</span>
+              <span>Cover Image / Thumbnail</span>
             </label>
-            <input
-              type="text"
+            <ImageUploader
+              circleId={circleId}
               value={thumbnailUrl}
-              onChange={(e) => setThumbnailUrl(e.target.value)}
-              placeholder="https://images.unsplash.com/... or direct image link"
-              className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
+              onChange={(val) => setThumbnailUrl(val as string)}
+              multiple={false}
+              aspectRatio="video"
+              label="Upload Course Cover"
+              helperText="16:9 banner or cover image (JPEG, PNG, WebP up to 10MB)"
             />
-            {thumbnailUrl && (
-              <div className="mt-2 flex items-center gap-2">
-                <span className="text-[10px] text-stone-400">Preview:</span>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={thumbnailUrl}
-                  alt="Thumbnail preview"
-                  className="h-10 w-16 object-cover rounded-lg border border-stone-200"
-                  onError={(e) => {
-                    (e.target as HTMLElement).style.display = 'none';
-                  }}
-                />
-              </div>
-            )}
           </div>
 
           {/* Difficulty & Estimated Hours & Status */}

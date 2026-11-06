@@ -429,6 +429,7 @@ export interface JobOpportunityItem {
   description: string;
   requirements: string;
   application_deadline: string | null;
+  link_url?: string | null;
   status: 'open' | 'closed' | 'archived';
   created_at: string;
   updated_at: string;

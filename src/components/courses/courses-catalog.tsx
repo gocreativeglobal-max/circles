@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { CourseItem, LeaderboardEntry, MemberXpSummary } from '@/types/domain';
 import { Button } from '@/components/ui/button';
+import { ImageUploader } from '@/components/ui/image-uploader';
 import { LearningPathsView } from './learning-paths-view';
 import { CourseSettingsModal } from './course-settings-modal';
 
@@ -58,6 +59,7 @@ export function CoursesCatalog({
   const [scheduleType, setScheduleType] = useState<'relative_drip' | 'calendar_date'>('relative_drip');
   const [cohortStartDate, setCohortStartDate] = useState('');
   const [cohortEndDate, setCohortEndDate] = useState('');
+  const [thumbnailUrl, setThumbnailUrl] = useState('');
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
   const [isSlugManual, setIsSlugManual] = useState(false);
@@ -128,6 +130,7 @@ export function CoursesCatalog({
           title,
           slug,
           description,
+          thumbnailUrl: thumbnailUrl.trim() || null,
           difficultyLevel: difficulty,
           estimatedDurationHours: parseFloat(durationHours) || 0,
           pacingFormat,
@@ -153,6 +156,7 @@ export function CoursesCatalog({
       setSlug('');
       setIsSlugManual(false);
       setDescription('');
+      setThumbnailUrl('');
       setPacingFormat('self_paced');
       setScheduleType('relative_drip');
       setCohortStartDate('');
@@ -409,6 +413,18 @@ export function CoursesCatalog({
                           )}
                         </div>
                       </div>
+
+                      {course.thumbnail_url && (
+                        <div className="relative mt-3 aspect-video w-full overflow-hidden rounded-xl bg-stone-100 border border-stone-200/70">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={course.thumbnail_url}
+                            alt={course.title}
+                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+                            loading="lazy"
+                          />
+                        </div>
+                      )}
 
                       <h3 className="mt-3 text-base font-bold text-stone-900 group-hover:text-black line-clamp-1">
                         {course.title}
@@ -714,6 +730,22 @@ export function CoursesCatalog({
                 <label className="block text-xs font-bold uppercase tracking-wider text-stone-900">
                   Step 2: Course Details
                 </label>
+
+                {/* Course Thumbnail Upload */}
+                <div>
+                  <label className="block text-xs font-semibold text-stone-700 mb-1.5">
+                    Course Thumbnail / Cover Image
+                  </label>
+                  <ImageUploader
+                    circleId={circleId}
+                    value={thumbnailUrl}
+                    onChange={(val) => setThumbnailUrl(val as string)}
+                    multiple={false}
+                    aspectRatio="video"
+                    label="Upload Course Cover"
+                    helperText="16:9 banner or cover image (JPEG, PNG, WebP up to 10MB)"
+                  />
+                </div>
 
                 <div>
                   <label className="block text-xs font-semibold text-stone-700">Course Title *</label>

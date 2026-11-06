@@ -18,6 +18,14 @@ import {
 import { canReadCircleContent } from '@/lib/authorization/permissions';
 import { createNotification } from '@/features/notifications/service';
 
+export function sanitizeUrl(val?: string | null): string | null {
+  if (!val) return null;
+  const trimmed = val.trim();
+  if (!trimmed) return null;
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  return `https://${trimmed}`;
+}
+
 export const createJobOpportunitySchema = z.object({
   circleId: z.string().uuid(),
   title: z.string().trim().min(3).max(160),
@@ -31,6 +39,7 @@ export const createJobOpportunitySchema = z.object({
   description: z.string().trim().min(5).max(10000),
   requirements: z.string().trim().max(6000).default(''),
   applicationDeadline: z.string().datetime().nullable().optional(),
+  linkUrl: z.string().trim().max(2048).nullable().optional(),
 });
 
 export const updateJobOpportunitySchema = z.object({
@@ -44,6 +53,7 @@ export const updateJobOpportunitySchema = z.object({
   compensationText: z.string().trim().max(180).nullable().optional(),
   description: z.string().trim().min(5).max(10000).optional(),
   requirements: z.string().trim().max(6000).optional(),
+  linkUrl: z.string().trim().max(2048).nullable().optional(),
   status: z.enum(['open', 'closed', 'archived']).optional(),
 });
 
@@ -126,12 +136,14 @@ export async function createJobOpportunity(
       );
     }
 
+    const sanitizedLink = sanitizeUrl(parsed.linkUrl);
+
     const res = await tx.query<JobOpportunityItem>(
       `INSERT INTO public.job_opportunities (
          id, circle_id, poster_id, title, organization_name, opportunity_type,
          work_mode, location, compensation_text, description, requirements,
-         application_deadline, status
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'open')
+         application_deadline, link_url, status
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'open')
        RETURNING *;`,
       [
         crypto.randomUUID(),
@@ -146,6 +158,7 @@ export async function createJobOpportunity(
         parsed.description,
         parsed.requirements,
         parsed.applicationDeadline ?? null,
+        sanitizedLink,
       ]
     );
 
@@ -210,6 +223,7 @@ export async function listJobOpportunities(
       description: r.description,
       requirements: r.requirements,
       application_deadline: r.application_deadline,
+      link_url: r.link_url ?? null,
       status: r.status,
       created_at: r.created_at,
       updated_at: r.updated_at,
@@ -275,6 +289,9 @@ export async function updateJobOpportunity(
       throw new ForbiddenError('Only the opportunity poster or a Circle moderator can edit this posting.');
     }
 
+    const sanitizedLink =
+      parsed.linkUrl !== undefined ? sanitizeUrl(parsed.linkUrl) : existing.link_url;
+
     const updated = await tx.query<JobOpportunityItem>(
       `UPDATE public.job_opportunities
        SET title = $1,
@@ -285,9 +302,10 @@ export async function updateJobOpportunity(
            compensation_text = $6,
            description = $7,
            requirements = $8,
-           status = $9,
+           link_url = $9,
+           status = $10,
            updated_at = NOW()
-       WHERE id = $10 AND circle_id = $11
+       WHERE id = $11 AND circle_id = $12
        RETURNING *;`,
       [
         parsed.title ?? existing.title,
@@ -300,6 +318,7 @@ export async function updateJobOpportunity(
           : existing.compensation_text,
         parsed.description ?? existing.description,
         parsed.requirements ?? existing.requirements,
+        sanitizedLink ?? null,
         parsed.status ?? existing.status,
         opportunityId,
         circleId,

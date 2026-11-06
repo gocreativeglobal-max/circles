@@ -33,6 +33,7 @@ import {
   CoursePaywallPlan,
 } from '@/types/domain';
 import { Button } from '@/components/ui/button';
+import { ImageUploader } from '@/components/ui/image-uploader';
 import { LessonBlockBuilder } from './lesson-block-builder';
 import {
   BACHS_ACCEPTED_CURRENCIES,
@@ -1388,15 +1389,17 @@ export function CourseStudioClient({
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-stone-800">
-                  Thumbnail / Cover Image URL
+                <label className="block text-xs font-bold text-stone-800 mb-1.5">
+                  Course Cover / Thumbnail
                 </label>
-                <input
-                  type="url"
-                  placeholder="https://..."
+                <ImageUploader
+                  circleId={circleId}
                   value={custThumbnail}
-                  onChange={(e) => setCustThumbnail(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs text-stone-900 focus:border-black focus:outline-none"
+                  onChange={(val) => setCustThumbnail(val as string)}
+                  multiple={false}
+                  aspectRatio="video"
+                  label="Upload Course Cover"
+                  helperText="16:9 banner or cover image (JPEG, PNG, WebP up to 10MB)"
                 />
               </div>
 

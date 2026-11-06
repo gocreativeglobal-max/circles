@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Briefcase, Building2, CheckCircle2, Lock, MapPin, Plus, ShieldCheck } from 'lucide-react';
+import { Briefcase, Building2, CheckCircle2, ExternalLink, Globe, Lock, MapPin, Plus, ShieldCheck } from 'lucide-react';
 import { JobApplicationItem, JobOpportunityItem } from '@/types/domain';
 import { Button } from '@/components/ui/button';
 
@@ -31,6 +31,7 @@ export function JobsBoard({
   const [location, setLocation] = useState('');
   const [compensationText, setCompensationText] = useState('');
   const [description, setDescription] = useState('');
+  const [linkUrl, setLinkUrl] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -50,6 +51,7 @@ export function JobsBoard({
           location: location || null,
           compensationText: compensationText || null,
           description,
+          linkUrl: linkUrl || null,
         }),
       });
       const data = await res.json();
@@ -58,6 +60,7 @@ export function JobsBoard({
       setTitle('');
       setOrganizationName('');
       setDescription('');
+      setLinkUrl('');
       setShowCreate(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to post opportunity.');
@@ -236,6 +239,23 @@ export function JobsBoard({
               className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/60 px-3.5 py-2 text-xs sm:text-sm text-stone-900 focus:border-black focus:bg-white focus:outline-none focus:ring-2 focus:ring-black/10"
             />
           </div>
+
+          <div>
+            <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-600">
+              Optional Link / External Website
+            </label>
+            <div className="relative mt-1.5">
+              <Globe className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-stone-400" />
+              <input
+                type="url"
+                value={linkUrl}
+                onChange={(e) => setLinkUrl(e.target.value)}
+                placeholder="https://example.com/careers/role or project link"
+                className="w-full rounded-xl border border-stone-200 bg-stone-50/60 pl-9 pr-3.5 py-2 text-xs sm:text-sm text-stone-900 focus:border-black focus:bg-white focus:outline-none focus:ring-2 focus:ring-black/10"
+              />
+            </div>
+          </div>
+
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="ghost" size="sm" onClick={() => setShowCreate(false)}>
               Cancel
