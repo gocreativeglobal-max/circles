@@ -6,6 +6,12 @@ export interface PlatformTierDefinition {
   badge: string;
   platformFeePercentage: number;
   monthlyPriceUsd: number;
+  storageBytes: number;
+  storageFormatted: string;
+  maxFileUploadBytes: number;
+  maxFileUploadFormatted: string;
+  adPolicy: string;
+  allFeaturesUnlocked: boolean;
   description: string;
   features: string[];
 }
@@ -17,11 +23,20 @@ export const PLATFORM_TIERS: Record<PlatformPlanTier, PlatformTierDefinition> = 
     badge: '10% Platform Fee',
     platformFeePercentage: 10,
     monthlyPriceUsd: 0,
-    description: 'Zero upfront cost. Perfect for launching courses and community validation.',
+    storageBytes: 500 * 1024 * 1024, // 500 MB
+    storageFormatted: '500 MB',
+    maxFileUploadBytes: 10 * 1024 * 1024, // 10 MB
+    maxFileUploadFormatted: '10 MB',
+    adPolicy: 'Platform-supported ads',
+    allFeaturesUnlocked: true,
+    description: 'Zero upfront cost. All core LMS & community features 100% unlocked for everyone.',
     features: [
-      'Unlimited members & spaces',
-      'Course studio & flexible lessons',
+      'Unlimited members & discussion spaces',
+      'Full Course Studio, quizzes & question banks',
+      'Dripped content scheduling & cohort releases',
       'Bachs global payments & mobile money',
+      'Transparent Community Treasury Ledger',
+      '500 MB media storage (YouTube/Loom embeds free)',
       '10% platform fee on paid sales',
       'Standard community support',
     ],
@@ -32,13 +47,20 @@ export const PLATFORM_TIERS: Record<PlatformPlanTier, PlatformTierDefinition> = 
     badge: '5% Platform Fee',
     platformFeePercentage: 5,
     monthlyPriceUsd: 29,
-    description: 'For growing creators and academies scaling their monthly revenue.',
+    storageBytes: 50 * 1024 * 1024 * 1024, // 50 GB
+    storageFormatted: '50 GB',
+    maxFileUploadBytes: 100 * 1024 * 1024, // 100 MB
+    maxFileUploadFormatted: '100 MB',
+    adPolicy: '100% Ad-Free for members',
+    allFeaturesUnlocked: true,
+    description: 'For growing creators. 50% lower fee, 100x more storage, and completely ad-free.',
     features: [
-      'Everything in Starter',
-      'Reduced 5% platform fee',
-      'Advanced quiz analytics & dripped cohorts',
-      'Custom branding & white-label emails',
-      'Priority support',
+      'Everything in Starter (All software tools included)',
+      '50% lower platform fee: Reduced to 5%',
+      '50 GB high-capacity native media storage',
+      '100% Ad-Free experience for all circle members',
+      'Custom branding & white-label transactional emails',
+      'Priority email support',
     ],
   },
   platinum: {
@@ -47,13 +69,20 @@ export const PLATFORM_TIERS: Record<PlatformPlanTier, PlatformTierDefinition> = 
     badge: '2% Platform Fee',
     platformFeePercentage: 2,
     monthlyPriceUsd: 99,
-    description: 'For established academies and high-volume membership communities.',
+    storageBytes: 250 * 1024 * 1024 * 1024, // 250 GB
+    storageFormatted: '250 GB',
+    maxFileUploadBytes: 500 * 1024 * 1024, // 500 MB
+    maxFileUploadFormatted: '500 MB',
+    adPolicy: 'Ad-Free + Sell Own Sponsors (Keep 100%)',
+    allFeaturesUnlocked: true,
+    description: 'For established academies and high-volume communities. Lowest 2% fee and 250 GB storage.',
     features: [
       'Everything in Pro',
-      'Lowest 2% platform fee',
-      'Dedicated account manager',
+      'Lowest platform fee: Reduced to 2%',
+      '250 GB enterprise media storage',
+      'Circle Sponsor Engine (Sell your own ads & keep 100%)',
       'Direct ERP & automated payouts via Bachs',
-      'Highest member concurrency limits',
+      'Dedicated account manager',
     ],
   },
   enterprise: {
@@ -62,12 +91,19 @@ export const PLATFORM_TIERS: Record<PlatformPlanTier, PlatformTierDefinition> = 
     badge: 'Custom Fee',
     platformFeePercentage: 1, // Negotiable default
     monthlyPriceUsd: 0, // Custom contract
+    storageBytes: 1024 * 1024 * 1024 * 1024, // 1 TB
+    storageFormatted: '1 TB+',
+    maxFileUploadBytes: 2 * 1024 * 1024 * 1024, // 2 GB
+    maxFileUploadFormatted: '2 GB',
+    adPolicy: 'Strictly White-Label & Ad-Free',
+    allFeaturesUnlocked: true,
     description: 'Tailored solutions for universities, institutions, and global organizations.',
     features: [
       'Custom negotiated platform fee rate',
+      '1 TB+ pooled cloud storage (Custom S3/R2 direct)',
       'Custom domain & dedicated infrastructure',
-      'SLA guarantees & 24/7 phone support',
-      'Bespoke integration & data export',
+      '99.9% uptime SLA & 24/7 phone/emergency support',
+      'Bespoke ERP integrations (Xero, QuickBooks, Yardi)',
     ],
   },
 };
@@ -110,4 +146,14 @@ export function calculatePlatformFee(
     feeCents,
     creatorNetCents,
   };
+}
+
+/**
+ * Formats a raw byte count into human-readable representation.
+ */
+export function formatBytes(bytes: number): string {
+  if (bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / Math.pow(1024, i)).toFixed(i > 1 ? 1 : 0)} ${units[i]}`;
 }

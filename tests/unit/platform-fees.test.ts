@@ -2,73 +2,96 @@ import { describe, it, expect } from 'vitest';
 import {
   PLATFORM_TIERS,
   calculatePlatformFee,
+  formatBytes,
 } from '../../src/features/finances/platform-fee-constants';
 
-describe('Circles Tiered Platform Fees', () => {
-  describe('Tier Definitions', () => {
-    it('defines Free / Starter tier at 10% fee and $0/month', () => {
+describe('Circles Tiered Platform Fees & Storage Quotas', () => {
+  describe('Tier Definitions & Storage Allocations', () => {
+    it('defines Free / Starter tier at 10% fee, $0/month, and 500 MB storage', () => {
       const free = PLATFORM_TIERS.free;
       expect(free.platformFeePercentage).toBe(10);
       expect(free.monthlyPriceUsd).toBe(0);
       expect(free.badge).toContain('10%');
+      expect(free.storageFormatted).toBe('500 MB');
+      expect(free.storageBytes).toBe(500 * 1024 * 1024);
+      expect(free.maxFileUploadBytes).toBe(10 * 1024 * 1024);
+      expect(free.allFeaturesUnlocked).toBe(true);
+      expect(free.adPolicy).toBe('Platform-supported ads');
     });
 
-    it('defines Pro Creator tier at 5% fee and $29/month', () => {
+    it('defines Pro Creator tier at 5% fee, $29/month, and 50 GB storage', () => {
       const pro = PLATFORM_TIERS.pro;
       expect(pro.platformFeePercentage).toBe(5);
       expect(pro.monthlyPriceUsd).toBe(29);
       expect(pro.badge).toContain('5%');
+      expect(pro.storageFormatted).toBe('50 GB');
+      expect(pro.storageBytes).toBe(50 * 1024 * 1024 * 1024);
+      expect(pro.maxFileUploadBytes).toBe(100 * 1024 * 1024);
+      expect(pro.allFeaturesUnlocked).toBe(true);
+      expect(pro.adPolicy).toBe('100% Ad-Free for members');
     });
 
-    it('defines Platinum High-Volume tier at 2% fee and $99/month', () => {
+    it('defines Platinum High-Volume tier at 2% fee, $99/month, and 250 GB storage', () => {
       const platinum = PLATFORM_TIERS.platinum;
       expect(platinum.platformFeePercentage).toBe(2);
       expect(platinum.monthlyPriceUsd).toBe(99);
       expect(platinum.badge).toContain('2%');
+      expect(platinum.storageFormatted).toBe('250 GB');
+      expect(platinum.storageBytes).toBe(250 * 1024 * 1024 * 1024);
+      expect(platinum.maxFileUploadBytes).toBe(500 * 1024 * 1024);
+      expect(platinum.allFeaturesUnlocked).toBe(true);
     });
 
-    it('defines Enterprise tier with custom platform fee and negotiable contract', () => {
+    it('defines Enterprise tier with custom platform fee and 1 TB+ storage', () => {
       const enterprise = PLATFORM_TIERS.enterprise;
       expect(enterprise.monthlyPriceUsd).toBe(0);
       expect(enterprise.badge).toContain('Custom');
+      expect(enterprise.storageFormatted).toBe('1 TB+');
+      expect(enterprise.storageBytes).toBe(1024 * 1024 * 1024 * 1024);
+      expect(enterprise.allFeaturesUnlocked).toBe(true);
+    });
+  });
+
+  describe('Byte Formatting Helper', () => {
+    it('formats byte quantities into readable strings', () => {
+      expect(formatBytes(0)).toBe('0 B');
+      expect(formatBytes(1024)).toBe('1 KB');
+      expect(formatBytes(500 * 1024 * 1024)).toBe('500.0 MB');
+      expect(formatBytes(50 * 1024 * 1024 * 1024)).toBe('50.0 GB');
     });
   });
 
   describe('Platform Fee Calculations', () => {
     it('calculates 10% platform fee for Free tier', () => {
-      // $100.00 gross (10,000 cents)
       const res = calculatePlatformFee('free', 10000);
       expect(res.planTier).toBe('free');
       expect(res.feePercentage).toBe(10);
-      expect(res.feeCents).toBe(1000); // $10.00
-      expect(res.creatorNetCents).toBe(9000); // $90.00
+      expect(res.feeCents).toBe(1000);
+      expect(res.creatorNetCents).toBe(9000);
     });
 
     it('calculates 5% platform fee for Pro tier', () => {
-      // $100.00 gross (10,000 cents)
       const res = calculatePlatformFee('pro', 10000);
       expect(res.planTier).toBe('pro');
       expect(res.feePercentage).toBe(5);
-      expect(res.feeCents).toBe(500); // $5.00
-      expect(res.creatorNetCents).toBe(9500); // $95.00
+      expect(res.feeCents).toBe(500);
+      expect(res.creatorNetCents).toBe(9500);
     });
 
     it('calculates 2% platform fee for Platinum tier', () => {
-      // $100.00 gross (10,000 cents)
       const res = calculatePlatformFee('platinum', 10000);
       expect(res.planTier).toBe('platinum');
       expect(res.feePercentage).toBe(2);
-      expect(res.feeCents).toBe(200); // $2.00
-      expect(res.creatorNetCents).toBe(9800); // $98.00
+      expect(res.feeCents).toBe(200);
+      expect(res.creatorNetCents).toBe(9800);
     });
 
     it('calculates Enterprise tier with custom fee percentage', () => {
-      // $100.00 gross with 1.5% custom fee
       const res = calculatePlatformFee('enterprise', 10000, 1.5);
       expect(res.planTier).toBe('enterprise');
       expect(res.feePercentage).toBe(1.5);
-      expect(res.feeCents).toBe(150); // $1.50
-      expect(res.creatorNetCents).toBe(9850); // $98.50
+      expect(res.feeCents).toBe(150);
+      expect(res.creatorNetCents).toBe(9850);
     });
 
     it('uses default Enterprise fee percentage (1%) when no custom rate is provided', () => {
@@ -80,16 +103,10 @@ describe('Circles Tiered Platform Fees', () => {
     });
 
     it('handles rounding accurately for odd cents', () => {
-      // $49.99 (4999 cents) on Free (10%)
-      // 4999 * 0.10 = 499.9 -> rounds to 500 cents ($5.00)
-      // Net: 4999 - 500 = 4499 cents ($44.99)
       const resFree = calculatePlatformFee('free', 4999);
       expect(resFree.feeCents).toBe(500);
       expect(resFree.creatorNetCents).toBe(4499);
 
-      // $49.99 (4999 cents) on Platinum (2%)
-      // 4999 * 0.02 = 99.98 -> rounds to 100 cents ($1.00)
-      // Net: 4999 - 100 = 4899 cents ($48.99)
       const resPlat = calculatePlatformFee('platinum', 4999);
       expect(resPlat.feeCents).toBe(100);
       expect(resPlat.creatorNetCents).toBe(4899);

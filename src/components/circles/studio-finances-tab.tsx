@@ -21,6 +21,7 @@ import {
   Zap,
   Crown,
   Check,
+  HardDrive,
 } from 'lucide-react';
 import {
   BillingType,
@@ -87,6 +88,16 @@ export function StudioFinancesTab({
       created_at: string;
     }>
   >([]);
+  const [storageUsage, setStorageUsage] = useState<{
+    usedBytes: number;
+    quotaBytes: number;
+    quotaFormatted: string;
+    usedFormatted: string;
+    usedPercentage: number;
+    maxFileUploadBytes: number;
+    maxFileUploadFormatted: string;
+    isOverQuota: boolean;
+  } | null>(null);
   const [tierSaving, setTierSaving] = useState(false);
 
   // Modals state
@@ -166,6 +177,9 @@ export function StudioFinancesTab({
       if (tierRes?.planTier) {
         setCurrentTier(tierRes.planTier);
         setCustomFeePct(tierRes.customPlatformFeePercentage ?? null);
+      }
+      if (tierRes?.storageUsage) {
+        setStorageUsage(tierRes.storageUsage);
       }
       if (platformLedgerRes?.ledger) {
         setPlatformLedger(platformLedgerRes.ledger);
@@ -971,13 +985,81 @@ export function StudioFinancesTab({
             </div>
           </div>
 
+          {/* Storage Meter & Unit Economics Cost-Protection Card */}
+          <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="rounded-xl bg-forest-50 p-2.5 text-forest-700">
+                  <HardDrive className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-sm font-bold text-stone-900">Circle Media & Attachment Storage</h4>
+                    <span className="rounded-md bg-stone-100 px-2 py-0.5 text-[11px] font-semibold text-stone-600">
+                      {PLATFORM_TIERS[currentTier]?.storageFormatted} Quota
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-stone-500">
+                    {storageUsage?.usedFormatted || '0 B'} used of{' '}
+                    {storageUsage?.quotaFormatted || PLATFORM_TIERS[currentTier]?.storageFormatted}{' '}
+                    allocated limit
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge variant={storageUsage?.isOverQuota ? 'rose' : 'outline'}>
+                  {storageUsage?.isOverQuota
+                    ? 'Quota Exceeded'
+                    : `${storageUsage?.usedPercentage || 0}% Used`}
+                </Badge>
+                {currentTier === 'free' && (
+                  <Button size="sm" onClick={() => handleSwitchTier('pro')} disabled={tierSaving}>
+                    Upgrade to Pro (50 GB)
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Storage Progress Bar */}
+            <div className="mt-4">
+              <div className="h-2.5 w-full overflow-hidden rounded-full bg-stone-100">
+                <div
+                  className={`h-full transition-all duration-500 rounded-full ${
+                    (storageUsage?.usedPercentage || 0) > 90
+                      ? 'bg-red-600'
+                      : (storageUsage?.usedPercentage || 0) > 75
+                      ? 'bg-amber-500'
+                      : 'bg-forest-600'
+                  }`}
+                  style={{ width: `${Math.min(100, Math.max(storageUsage?.usedPercentage || 0.5, 0.5))}%` }}
+                />
+              </div>
+              <div className="mt-2.5 flex flex-col sm:flex-row sm:items-center justify-between text-[11px] text-stone-500 gap-1">
+                <span>
+                  Max single file upload: <strong>{storageUsage?.maxFileUploadFormatted || PLATFORM_TIERS[currentTier]?.maxFileUploadFormatted}</strong>
+                </span>
+                <span>
+                  {currentTier === 'free' ? (
+                    <span className="text-forest-700 font-medium">
+                      ✓ Unlimited video lessons supported via YouTube (Unlisted), Vimeo & Loom embeds
+                    </span>
+                  ) : (
+                    <span className="text-emerald-700 font-medium">
+                      ✓ Native high-definition video & document storage unlocked
+                    </span>
+                  )}
+                </span>
+              </div>
+            </div>
+          </div>
+
           {/* Pricing Tier Grid */}
           <div>
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <h4 className="text-lg font-bold text-stone-900">Choose Your Platform Tier</h4>
                 <p className="text-xs text-stone-500">
-                  Select the tier that fits your circle scale. Upgrade anytime to unlock lower transaction fees.
+                  All LMS tools, quizzes, and community features are 100% unlocked on all plans. Tiers scale by transaction fees and storage.
                 </p>
               </div>
             </div>
@@ -1024,19 +1106,31 @@ export function StudioFinancesTab({
                         )}
                       </div>
 
-                      <div className="mt-2 inline-flex items-center rounded-lg bg-emerald-100/70 px-2.5 py-1 text-xs font-bold text-emerald-800">
-                        {tierKey === 'enterprise' && customFeePct != null
-                          ? `${customFeePct}% Platform Fee`
-                          : tierDef.badge}
+                      <div className="mt-2.5 flex flex-wrap gap-1.5">
+                        <span className="inline-flex items-center rounded-lg bg-emerald-100/70 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
+                          {tierKey === 'enterprise' && customFeePct != null
+                            ? `${customFeePct}% Fee`
+                            : tierDef.badge}
+                        </span>
+                        <span className="inline-flex items-center rounded-lg bg-stone-100 px-2 py-0.5 text-[11px] font-semibold text-stone-700">
+                          <HardDrive className="h-3 w-3 mr-1 text-stone-500" />
+                          {tierDef.storageFormatted} Storage
+                        </span>
+                      </div>
+
+                      <div className="mt-2">
+                        <span className="text-[11px] font-medium text-stone-500">
+                          Ads: <strong>{tierDef.adPolicy}</strong>
+                        </span>
                       </div>
 
                       <p className="mt-3 text-xs text-stone-600 leading-relaxed">
                         {tierDef.description}
                       </p>
 
-                      <div className="mt-5 border-t border-stone-200/80 pt-4">
+                      <div className="mt-4 border-t border-stone-200/80 pt-3.5">
                         <span className="text-[11px] font-bold uppercase tracking-wider text-stone-400">
-                          Included
+                          Included Features
                         </span>
                         <ul className="mt-2.5 space-y-2 text-xs text-stone-700">
                           {tierDef.features.map((feat, idx) => (

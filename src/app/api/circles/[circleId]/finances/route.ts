@@ -17,6 +17,7 @@ import {
   updateCircleTier,
   getCirclePlatformLedger,
   getCircleTierInfo,
+  getCircleStorageUsage,
 } from '@/features/finances/platform-fees';
 import { withRlsTransaction } from '@/lib/db/postgres';
 import { handleApiError, resolveApiUser } from '@/lib/auth/api-helpers';
@@ -74,13 +75,16 @@ export async function GET(
 
     if (mode === 'platform_tier') {
       if (!user) throw new UnauthorizedError();
-      const info = await withRlsTransaction(user.id, (tx) =>
-        getCircleTierInfo(tx, params.circleId)
-      );
-      return NextResponse.json({
-        ...info,
-        tiers: PLATFORM_TIERS,
+      const data = await withRlsTransaction(user.id, async (tx) => {
+        const info = await getCircleTierInfo(tx, params.circleId);
+        const storageUsage = await getCircleStorageUsage(tx, params.circleId);
+        return {
+          ...info,
+          storageUsage,
+          tiers: PLATFORM_TIERS,
+        };
       });
+      return NextResponse.json(data);
     }
 
     if (mode === 'platform_ledger') {

@@ -4,8 +4,9 @@ import { withRlsTransaction } from '@/lib/db/postgres';
 import { MediaUploadItem } from '@/types/domain';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { getVerifiedSessionSecret } from '@/lib/config/env';
+import { getCircleStorageUsage } from '@/features/finances/platform-fees';
 
-export const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+export const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB default (profiles)
 
 export const ALLOWED_UPLOAD_MIME_TYPES: Record<
   string,
@@ -143,9 +144,10 @@ export async function createMediaUpload(
   if (buffer.byteLength === 0) {
     throw new ValidationError('Uploaded file cannot be empty.');
   }
-  if (buffer.byteLength > MAX_UPLOAD_SIZE_BYTES) {
+  const hardGlobalMax = 500 * 1024 * 1024; // 500 MB absolute system ceiling
+  if (buffer.byteLength > hardGlobalMax) {
     throw new ValidationError(
-      `File size (${buffer.byteLength} bytes) exceeds maximum limit of ${MAX_UPLOAD_SIZE_BYTES} bytes.`
+      `File size (${(buffer.byteLength / (1024 * 1024)).toFixed(1)} MB) exceeds absolute system limit of 500 MB.`
     );
   }
 
@@ -166,6 +168,26 @@ export async function createMediaUpload(
       );
       if (memRes.rows[0]?.status !== 'active') {
         throw new ForbiddenError('Only active Circle members can upload media to this Circle.');
+      }
+
+      // Enforce Circle Tier Storage Quotas & Single File Size Limits (e.g. 500 MB on Free)
+      const storageUsage = await getCircleStorageUsage(tx, parsed.circleId);
+      if (buffer.byteLength > storageUsage.maxFileUploadBytes) {
+        throw new ValidationError(
+          `File size (${(buffer.byteLength / (1024 * 1024)).toFixed(1)} MB) exceeds maximum file upload limit of ${storageUsage.maxFileUploadFormatted} for your circle plan.`
+        );
+      }
+      if (storageUsage.usedBytes + buffer.byteLength > storageUsage.quotaBytes) {
+        throw new ValidationError(
+          `Circle storage quota exceeded (${storageUsage.usedFormatted} used of ${storageUsage.quotaFormatted} limit). Upgrade your plan in Circle Studio to unlock higher storage.`
+        );
+      }
+    } else {
+      // Profile / personal uploads use default max upload size
+      if (buffer.byteLength > MAX_UPLOAD_SIZE_BYTES) {
+        throw new ValidationError(
+          `File size exceeds maximum limit of ${(MAX_UPLOAD_SIZE_BYTES / (1024 * 1024)).toFixed(0)} MB for personal avatar uploads.`
+        );
       }
     }
 

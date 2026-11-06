@@ -6,6 +6,7 @@ import {
   PLATFORM_TIERS,
   FeeCalculationResult,
   calculatePlatformFee,
+  formatBytes,
 } from './platform-fee-constants';
 
 export {
@@ -14,7 +15,53 @@ export {
   PLATFORM_TIERS,
   type FeeCalculationResult,
   calculatePlatformFee,
+  formatBytes,
 };
+
+export interface CircleStorageUsage {
+  usedBytes: number;
+  quotaBytes: number;
+  quotaFormatted: string;
+  usedFormatted: string;
+  usedPercentage: number;
+  maxFileUploadBytes: number;
+  maxFileUploadFormatted: string;
+  isOverQuota: boolean;
+}
+
+/**
+ * Calculates current active storage consumption and limits for a Circle.
+ */
+export async function getCircleStorageUsage(
+  tx: DbTransaction,
+  circleId: string
+): Promise<CircleStorageUsage> {
+  const tierInfo = await getCircleTierInfo(tx, circleId);
+  const tierDef = PLATFORM_TIERS[tierInfo.planTier] || PLATFORM_TIERS.free;
+
+  const res = await tx.query<{ total_bytes: string }>(
+    `SELECT COALESCE(SUM(size_bytes), 0) AS total_bytes
+     FROM public.media_uploads
+     WHERE circle_id = $1 AND status = 'active';`,
+    [circleId]
+  );
+
+  const usedBytes = parseInt(res.rows[0]?.total_bytes || '0', 10);
+  const quotaBytes = tierDef.storageBytes;
+  const usedPercentage =
+    quotaBytes > 0 ? Math.min(100, Math.round((usedBytes / quotaBytes) * 1000) / 10) : 0;
+
+  return {
+    usedBytes,
+    quotaBytes,
+    quotaFormatted: tierDef.storageFormatted,
+    usedFormatted: formatBytes(usedBytes),
+    usedPercentage,
+    maxFileUploadBytes: tierDef.maxFileUploadBytes,
+    maxFileUploadFormatted: tierDef.maxFileUploadFormatted,
+    isOverQuota: usedBytes >= quotaBytes,
+  };
+}
 
 /**
  * Queries the circle's tier from the database.
