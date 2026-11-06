@@ -1254,7 +1254,7 @@ export function StudioFinancesTab({
                       Member Ad Experience
                     </td>
                     <td className="px-5 py-3.5 text-center text-amber-700 font-medium">
-                      Platform Partner Ads
+                      Circles Platform Ads
                     </td>
                     <td className="px-5 py-3.5 text-center text-emerald-700 font-bold">
                       ✓ 100% Ad-Free
@@ -1293,20 +1293,6 @@ export function StudioFinancesTab({
                   </tr>
                   <tr>
                     <td className="px-5 py-3.5 font-medium text-stone-900">
-                      Circle Sponsor Engine (Sell Your Own Ads & Keep 100%)
-                    </td>
-                    <td className="px-5 py-3.5 text-center text-stone-400">
-                      —
-                    </td>
-                    <td className="px-5 py-3.5 text-center text-stone-400">
-                      —
-                    </td>
-                    <td className="px-5 py-3.5 text-center text-emerald-700 font-bold">
-                      ✓ Unlocked (Keep 100%)
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="px-5 py-3.5 font-medium text-stone-900">
                       Direct Accounting ERP Sync (QuickBooks, Xero, Yardi)
                     </td>
                     <td className="px-5 py-3.5 text-center text-stone-400">
@@ -1321,44 +1307,6 @@ export function StudioFinancesTab({
                   </tr>
                 </tbody>
               </table>
-            </div>
-          </div>
-
-          {/* Circle Sponsor Engine (Platinum Feature Tool / Teaser) */}
-          <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex items-start gap-3">
-                <div className="rounded-xl bg-amber-50 p-2.5 text-amber-700 shrink-0">
-                  <Crown className="h-5 w-5" />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <h4 className="text-sm font-bold text-stone-900">Circle Sponsor Engine</h4>
-                    <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-800">
-                      Platinum Feature
-                    </span>
-                  </div>
-                  <p className="mt-1 text-xs text-stone-600 max-w-xl leading-relaxed">
-                    Sell your own corporate sponsorships to brand partners, place custom partner cards in your community feeds, and keep <strong>100% of whatever sponsorship revenue you negotiate</strong>.
-                  </p>
-                </div>
-              </div>
-
-              {currentTier === 'platinum' || currentTier === 'enterprise' ? (
-                <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-2 text-xs font-bold text-emerald-800 shrink-0">
-                  ✓ Sponsor Engine Active
-                </div>
-              ) : (
-                <Button
-                  onClick={() => handleSwitchTier('platinum')}
-                  disabled={tierSaving}
-                  size="sm"
-                  className="shrink-0 gap-1.5"
-                >
-                  <Crown className="h-3.5 w-3.5 text-amber-300" />
-                  Upgrade to Platinum ($99)
-                </Button>
-              )}
             </div>
           </div>
 

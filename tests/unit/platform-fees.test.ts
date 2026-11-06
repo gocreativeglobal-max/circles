@@ -18,7 +18,7 @@ describe('Circles Tiered Platform Fees, Storage & Feature Gating', () => {
       expect(free.storageBytes).toBe(500 * 1024 * 1024);
       expect(free.maxFileUploadBytes).toBe(10 * 1024 * 1024);
       expect(free.allFeaturesUnlocked).toBe(true);
-      expect(free.adPolicy).toBe('Platform-supported ads');
+      expect(free.adPolicy).toBe('Circles Ad-Supported (Platform Ads)');
     });
 
     it('defines Pro Creator tier at 5% fee, $29/month, and 50 GB storage', () => {
@@ -54,7 +54,7 @@ describe('Circles Tiered Platform Fees, Storage & Feature Gating', () => {
     });
   });
 
-  describe('The 5 Exceptional Feature Gates', () => {
+  describe('The Premium Feature Gates', () => {
     it('gates Ad-Free Experience to Pro and above', () => {
       expect(isTierFeatureAllowed('free', 'ad_free_experience')).toBe(false);
       expect(isTierFeatureAllowed('pro', 'ad_free_experience')).toBe(true);
@@ -73,13 +73,6 @@ describe('Circles Tiered Platform Fees, Storage & Feature Gating', () => {
       expect(isTierFeatureAllowed('platinum', 'white_label_emails')).toBe(true);
     });
 
-    it('gates Circle Sponsor Engine strictly to Platinum and Enterprise', () => {
-      expect(isTierFeatureAllowed('free', 'circle_sponsor_engine')).toBe(false);
-      expect(isTierFeatureAllowed('pro', 'circle_sponsor_engine')).toBe(false);
-      expect(isTierFeatureAllowed('platinum', 'circle_sponsor_engine')).toBe(true);
-      expect(isTierFeatureAllowed('enterprise', 'circle_sponsor_engine')).toBe(true);
-    });
-
     it('gates Direct Accounting ERP Sync strictly to Platinum and Enterprise', () => {
       expect(isTierFeatureAllowed('free', 'direct_erp_sync')).toBe(false);
       expect(isTierFeatureAllowed('pro', 'direct_erp_sync')).toBe(false);
@@ -92,14 +85,14 @@ describe('Circles Tiered Platform Fees, Storage & Feature Gating', () => {
         /not included in your circle's Free \/ Starter plan.*upgrade to Pro/i
       );
 
-      // Pro circle attempting Circle Sponsor Engine
-      expect(() => assertCircleTierEntitlement('pro', 'circle_sponsor_engine')).toThrow(
+      // Pro circle attempting Direct ERP Sync
+      expect(() => assertCircleTierEntitlement('pro', 'direct_erp_sync')).toThrow(
         /not included in your circle's Pro Creator plan.*upgrade to Platinum/i
       );
 
       // Permitted cases do not throw
       expect(() => assertCircleTierEntitlement('pro', 'custom_domain')).not.toThrow();
-      expect(() => assertCircleTierEntitlement('platinum', 'circle_sponsor_engine')).not.toThrow();
+      expect(() => assertCircleTierEntitlement('platinum', 'direct_erp_sync')).not.toThrow();
       expect(() => assertCircleTierEntitlement('enterprise', 'direct_erp_sync')).not.toThrow();
     });
   });

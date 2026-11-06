@@ -35,7 +35,7 @@ export function assertCircleTierEntitlement(
   }
 
   const upgradeTarget =
-    feature === 'circle_sponsor_engine' || feature === 'direct_erp_sync'
+    feature === 'direct_erp_sync'
       ? 'Platinum ($99/mo)'
       : 'Pro ($29/mo)';
 
@@ -43,7 +43,6 @@ export function assertCircleTierEntitlement(
     ad_free_experience: 'Ad-Free Community Experience',
     custom_domain: 'Custom Domain Mapping',
     white_label_emails: 'White-Label Branding & Email Sender',
-    circle_sponsor_engine: 'Circle Sponsor Engine',
     direct_erp_sync: 'Direct Accounting ERP & Webhook Sync',
     priority_support: 'Priority Support',
   };

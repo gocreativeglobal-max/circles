@@ -4,7 +4,6 @@ export type GatedTierFeature =
   | 'ad_free_experience'
   | 'custom_domain'
   | 'white_label_emails'
-  | 'circle_sponsor_engine'
   | 'direct_erp_sync'
   | 'priority_support';
 
@@ -20,11 +19,10 @@ export interface PlatformTierDefinition {
   maxFileUploadFormatted: string;
   adPolicy: string;
   allFeaturesUnlocked: boolean;
-  // The 5 Exceptional Gated Features:
+  // Gated Premium Features (all ads handled exclusively by Circles):
   adFreeExperience: boolean;
   customDomainAllowed: boolean;
   whiteLabelEmailsAllowed: boolean;
-  circleSponsorEngineAllowed: boolean;
   directErpSyncAllowed: boolean;
   prioritySupportAllowed: boolean;
   description: string;
@@ -42,12 +40,11 @@ export const PLATFORM_TIERS: Record<PlatformPlanTier, PlatformTierDefinition> = 
     storageFormatted: '500 MB',
     maxFileUploadBytes: 10 * 1024 * 1024, // 10 MB
     maxFileUploadFormatted: '10 MB',
-    adPolicy: 'Platform-supported ads',
+    adPolicy: 'Circles Ad-Supported (Platform Ads)',
     allFeaturesUnlocked: true,
     adFreeExperience: false,
     customDomainAllowed: false,
     whiteLabelEmailsAllowed: false,
-    circleSponsorEngineAllowed: false,
     directErpSyncAllowed: false,
     prioritySupportAllowed: false,
     description: 'Zero upfront cost. All core LMS & community features 100% unlocked for everyone.',
@@ -59,6 +56,7 @@ export const PLATFORM_TIERS: Record<PlatformPlanTier, PlatformTierDefinition> = 
       'Transparent Community Treasury Ledger',
       '500 MB media storage (YouTube/Loom embeds free)',
       '10% platform fee on paid sales',
+      'Circles ad-supported feed placements',
       'Standard community support',
     ],
   },
@@ -77,7 +75,6 @@ export const PLATFORM_TIERS: Record<PlatformPlanTier, PlatformTierDefinition> = 
     adFreeExperience: true,
     customDomainAllowed: true,
     whiteLabelEmailsAllowed: true,
-    circleSponsorEngineAllowed: false,
     directErpSyncAllowed: false,
     prioritySupportAllowed: true,
     description: 'For growing creators. 50% lower fee, 100x more storage, and completely ad-free.',
@@ -101,12 +98,11 @@ export const PLATFORM_TIERS: Record<PlatformPlanTier, PlatformTierDefinition> = 
     storageFormatted: '250 GB',
     maxFileUploadBytes: 500 * 1024 * 1024, // 500 MB
     maxFileUploadFormatted: '500 MB',
-    adPolicy: 'Ad-Free + Sell Own Sponsors (Keep 100%)',
+    adPolicy: '100% Ad-Free for members',
     allFeaturesUnlocked: true,
     adFreeExperience: true,
     customDomainAllowed: true,
     whiteLabelEmailsAllowed: true,
-    circleSponsorEngineAllowed: true,
     directErpSyncAllowed: true,
     prioritySupportAllowed: true,
     description: 'For established academies and high-volume communities. Lowest 2% fee and 250 GB storage.',
@@ -114,9 +110,10 @@ export const PLATFORM_TIERS: Record<PlatformPlanTier, PlatformTierDefinition> = 
       'Everything in Pro',
       'Lowest platform fee: Reduced to 2%',
       '250 GB enterprise media storage',
-      'Circle Sponsor Engine (Sell your own ads & keep 100%)',
+      '100% Ad-Free experience for all circle members',
       'Direct ERP & automated accounting sync (QuickBooks, Xero, Yardi)',
       'Automated payouts via Bachs settlement',
+      'Highest member concurrency & active learner quotas',
       'Dedicated account manager',
     ],
   },
@@ -135,7 +132,6 @@ export const PLATFORM_TIERS: Record<PlatformPlanTier, PlatformTierDefinition> = 
     adFreeExperience: true,
     customDomainAllowed: true,
     whiteLabelEmailsAllowed: true,
-    circleSponsorEngineAllowed: true,
     directErpSyncAllowed: true,
     prioritySupportAllowed: true,
     description: 'Tailored solutions for universities, institutions, and global organizations.',
@@ -143,6 +139,7 @@ export const PLATFORM_TIERS: Record<PlatformPlanTier, PlatformTierDefinition> = 
       'Custom negotiated platform fee rate',
       '1 TB+ pooled cloud storage (Custom S3/R2 direct)',
       'Custom domain & dedicated infrastructure',
+      '100% Ad-Free & fully white-labeled',
       '99.9% uptime SLA & 24/7 phone/emergency support',
       'Bespoke ERP integrations & SSO/SAML',
     ],
@@ -204,8 +201,6 @@ export function isTierFeatureAllowed(
       return def.customDomainAllowed;
     case 'white_label_emails':
       return def.whiteLabelEmailsAllowed;
-    case 'circle_sponsor_engine':
-      return def.circleSponsorEngineAllowed;
     case 'direct_erp_sync':
       return def.directErpSyncAllowed;
     case 'priority_support':
