@@ -48,8 +48,7 @@ export default async function CircleOverviewPage({
   const isMember = circle.current_user_membership_status === 'active';
 
   return (
-    <div className="space-y-8">
-      {/* New Member & Admin Onboarding Flow */}
+    <div className="space-y-6">
       {canReadContent && (
         <CircleOnboardingChecklist
           circle={circle}
@@ -59,20 +58,11 @@ export default async function CircleOverviewPage({
         />
       )}
 
-      {/* Main Unified Activity Stream vs Gate */}
       {!canReadContent ? (
-        <section className="rounded-2xl border border-amber-200 bg-white p-10 text-center shadow-sm">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-50 text-amber-700">
-            <Lock className="h-6 w-6" />
-          </div>
-          <h2 className="mt-4 text-xl font-bold text-stone-900">
-            Member-Only Community Environment
-          </h2>
-          <p className="mx-auto mt-2 max-w-lg text-sm text-stone-600">
-            <strong>{circle.name}</strong> is discoverable in the directory, but its stream,
-            discussions, and marketplace are restricted to approved members. Use the{' '}
-            <strong>Request to Join Circle</strong> button above to apply for membership.
-          </p>
+        <section className="rounded-xl border border-stone-200 bg-white p-10 text-center">
+          <Lock className="mx-auto h-6 w-6 text-stone-400" />
+          <h2 className="mt-3 text-base font-semibold text-stone-900">Members only</h2>
+          <p className="mt-1 text-sm text-stone-500">Join to see what&apos;s happening.</p>
         </section>
       ) : (
         <section className="space-y-4">

@@ -36,12 +36,15 @@ export const hostControlsInputSchema = z
     disableLiveLinkSharing: z.boolean().optional(),
     hideLocationFromNonAttendees: z.boolean().optional(),
   })
+  .passthrough()
   .default({});
 
 export function normalizeHostControls(
   controls?: EventHostControls | Record<string, unknown> | null
 ) {
+  const extra = (controls && typeof controls === 'object' ? controls : {}) as Record<string, unknown>;
   return {
+    ...extra,
     record_live: Boolean(controls?.record_live ?? controls?.recordLive ?? false),
     auto_post_recording: Boolean(controls?.auto_post_recording ?? controls?.autoPostRecording ?? false),
     mute_on_entry: Boolean(controls?.mute_on_entry ?? controls?.muteOnEntry ?? false),

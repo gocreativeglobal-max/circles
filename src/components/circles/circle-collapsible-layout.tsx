@@ -1,19 +1,9 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import {
-  Bell,
-  ChevronRight,
-  Home,
-  Menu,
-  PanelLeft,
-  PanelLeftClose,
-  Sliders,
-  Sparkles,
-  X,
-} from 'lucide-react';
+import { Bell, Hash, Home, Menu, PanelLeft, PanelLeftClose, Settings, X } from 'lucide-react';
 import { Circle, CircleNavigationItem, CircleSpace } from '@/types/domain';
 import { DynamicIcon } from '@/components/ui/icon-map';
 
@@ -28,23 +18,10 @@ export interface CircleCollapsibleLayoutProps {
   children: React.ReactNode;
 }
 
-// Clean descriptive subtitles maintaining the platform's monochrome theme
-const CAPABILITY_SUBTITLES: Record<string, string> = {
-  discussions: 'Conversations & posts',
-  marketplace: 'Listings, housing & gigs',
-  events: 'Meetups & gatherings',
-  polls: 'Votes & decisions',
-  resources: 'Shared files & guides',
-  courses: 'Learning modules',
-  governance: 'Proposals & committees',
-  projects: 'Collaborative projects',
-  challenges: 'Points & badges',
-  fundraising: 'Donations & funds',
-  finances: 'Ledger & dues',
-  members: 'Directory & roles',
-  spaces: 'Subgroups & channels',
-};
-
+/**
+ * Circle.so-style shell: a quiet, flat sidebar (links + spaces) and a calm content column.
+ * Mobile uses a bottom dock plus a simple slide-in list.
+ */
 export function CircleCollapsibleLayout({
   circle,
   navigation,
@@ -53,38 +30,26 @@ export function CircleCollapsibleLayout({
 }: CircleCollapsibleLayoutProps) {
   const pathname = usePathname();
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
-  // Load user preference for sidebar collapse on desktop
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('circles_sidebar_collapsed_v1');
-      if (saved === 'true') {
-        setIsCollapsed(true);
-      }
+      if (localStorage.getItem('circles_sidebar_collapsed_v1') === 'true') setIsCollapsed(true);
     } catch {
       // Ignore localStorage read errors in private browsing
     }
   }, []);
 
-  // Close mobile drawer on route change
-  useEffect(() => {
-    setMobileDrawerOpen(false);
-  }, [pathname]);
+  useEffect(() => setDrawerOpen(false), [pathname]);
 
-  // Lock body scroll when mobile drawer is open
   useEffect(() => {
-    if (mobileDrawerOpen) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
-    }
+    document.body.style.overflow = drawerOpen ? 'hidden' : '';
     return () => {
       document.body.style.overflow = '';
     };
-  }, [mobileDrawerOpen]);
+  }, [drawerOpen]);
 
-  function handleToggleCollapse() {
+  function toggleCollapse() {
     setIsCollapsed((prev) => {
       const next = !prev;
       try {
@@ -96,526 +61,214 @@ export function CircleCollapsibleLayout({
     });
   }
 
-  // Find currently active item for mobile header label
-  const activeNavItem = useMemo(() => {
-    const matched = navigation.navigationItems.find((item) => {
-      if (item.href === `/circles/${circle.slug}`) {
-        return pathname === item.href;
-      }
-      return pathname.startsWith(item.href);
-    });
-    return matched ?? navigation.navigationItems[0];
-  }, [pathname, navigation.navigationItems, circle.slug]);
+  const homeHref = `/circles/${circle.slug}`;
+  const studioHref = `${homeHref}/studio`;
+  const isActive = (href: string) => (href === homeHref ? pathname === href : pathname.startsWith(href));
+  const showSpaces =
+    navigation.enabledCapabilityKeys.includes('spaces') && navigation.visibleSpaces.length > 0;
 
-  const isStudioActive = pathname.startsWith(`/circles/${circle.slug}/studio`);
+  const dockItems = navigation.navigationItems
+    .filter((item) => item.href !== homeHref)
+    .slice(0, 2);
 
-  // Extract key communication and secondary tool for the bottom dock
-  const communicationItem = useMemo(() => {
+  // Shared link list used by desktop sidebar and mobile drawer
+  function renderNav(collapsed: boolean) {
     return (
-      navigation.navigationItems.find(
-        (item) => item.href.includes('/discussions') || item.href.includes('/spaces')
-      ) ?? null
-    );
-  }, [navigation.navigationItems]);
+      <div className="space-y-5">
+        <nav className="space-y-0.5">
+          {navigation.navigationItems.map((item) => (
+            <SidebarLink
+              key={item.id}
+              href={item.href}
+              label={item.label}
+              active={isActive(item.href)}
+              collapsed={collapsed}
+              icon={<DynamicIcon name={item.icon} className="h-4 w-4 shrink-0" />}
+            />
+          ))}
+        </nav>
 
-  const secondaryFeaturedItem = useMemo(() => {
-    return (
-      navigation.navigationItems.find(
-        (item) =>
-          item.href.includes('/marketplace') ||
-          item.href.includes('/events') ||
-          item.href.includes('/courses') ||
-          item.href.includes('/polls')
-      ) ?? null
+        {showSpaces && (
+          <div className="space-y-0.5">
+            {!collapsed && (
+              <Link
+                href={`${homeHref}/spaces`}
+                className="block px-3 pb-1 text-[11px] font-semibold uppercase tracking-wider text-stone-400 hover:text-stone-600"
+              >
+                Spaces
+              </Link>
+            )}
+            {navigation.visibleSpaces.map((sp) => (
+              <SidebarLink
+                key={sp.id}
+                href={`${homeHref}/discussions?spaceId=${sp.id}`}
+                label={sp.name}
+                active={pathname.includes(`spaceId=${sp.id}`)}
+                collapsed={collapsed}
+                icon={<Hash className="h-4 w-4 shrink-0" />}
+              />
+            ))}
+          </div>
+        )}
+
+        {isStaff && (
+          <div className="border-t border-stone-100 pt-3">
+            <SidebarLink
+              href={studioHref}
+              label="Settings"
+              active={pathname.startsWith(studioHref)}
+              collapsed={collapsed}
+              icon={<Settings className="h-4 w-4 shrink-0" />}
+            />
+          </div>
+        )}
+      </div>
     );
-  }, [navigation.navigationItems]);
+  }
 
   return (
-    <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-      {/* ======================================================== */}
-      {/* 1. MOBILE TOP STICKY TAB STRIP (< lg)                    */}
-      {/* ======================================================== */}
-      <div className="lg:hidden mb-4 space-y-2">
-        {/* Dynamic Horizontal Segmented Quick Tabs */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none -mx-4 px-4 sm:mx-0 sm:px-0">
-          {navigation.navigationItems.map((item) => {
-            const isActive =
-              item.href === `/circles/${circle.slug}`
-                ? pathname === item.href
-                : pathname.startsWith(item.href);
-
-            return (
-              <Link
-                key={item.id}
-                href={item.href}
-                className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-1.5 text-xs font-semibold transition-all shrink-0 ${
-                  isActive
-                    ? 'bg-stone-900 text-white shadow-xs'
-                    : 'border border-stone-200/90 bg-white text-stone-700 hover:border-stone-300 hover:bg-stone-50'
-                }`}
-              >
-                <DynamicIcon
-                  name={item.icon}
-                  className={`h-3.5 w-3.5 ${isActive ? 'text-white' : 'text-stone-500'}`}
-                />
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
-
-          {isStaff && (
-            <Link
-              href={`/circles/${circle.slug}/studio`}
-              className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-1.5 text-xs font-semibold transition-all shrink-0 ${
-                isStudioActive
-                  ? 'bg-black text-white shadow-xs'
-                  : 'border border-stone-200/90 bg-stone-100 text-stone-900 hover:bg-stone-200'
-              }`}
-            >
-              <Sliders className="h-3.5 w-3.5" />
-              <span>Studio</span>
-            </Link>
-          )}
-
-          {/* Full Navigation Trigger Pill */}
-          <button
-            type="button"
-            onClick={() => setMobileDrawerOpen(true)}
-            className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-xl border border-stone-200/90 bg-stone-100/80 px-3 py-1.5 text-xs font-semibold text-stone-800 shadow-2xs hover:bg-stone-200 transition-colors shrink-0"
-          >
-            <Menu className="h-3.5 w-3.5 text-stone-700" />
-            <span>Navigation</span>
-          </button>
-        </div>
-      </div>
-
-      {/* ======================================================== */}
-      {/* 2. FACEBOOK-STYLE 2-COLUMN NAVIGATION SHEET (< lg)       */}
-      {/* ======================================================== */}
-      {mobileDrawerOpen && (
+    <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      {/* Mobile drawer */}
+      {drawerOpen && (
         <div className="fixed inset-0 z-50 lg:hidden">
-          {/* Backdrop Overlay */}
           <div
-            className="fixed inset-0 bg-stone-950/50 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
-            onClick={() => setMobileDrawerOpen(false)}
+            className="fixed inset-0 bg-stone-950/40"
+            onClick={() => setDrawerOpen(false)}
             aria-hidden="true"
           />
-
-          {/* Bottom Sheet / Side Drawer Container */}
-          <div className="fixed inset-y-0 right-0 max-w-sm w-full bg-white shadow-2xl flex flex-col z-50 animate-in slide-in-from-right duration-250 ease-out">
-            {/* Header: Circle Avatar & Title */}
-            <div className="flex items-center justify-between border-b border-stone-200 p-4">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-black text-base font-bold text-white shadow-xs">
-                  {circle.name.slice(0, 1).toUpperCase()}
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-stone-900 truncate max-w-[200px]">
-                    {circle.name}
-                  </h3>
-                  <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-stone-500">
-                    {isStudioActive ? 'Studio' : activeNavItem?.label ?? 'Overview'} · Navigation
-                  </span>
-                </div>
-              </div>
+          <div className="fixed inset-y-0 left-0 z-50 flex w-72 flex-col bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3">
+              <span className="truncate text-sm font-semibold text-stone-900">{circle.name}</span>
               <button
                 type="button"
-                onClick={() => setMobileDrawerOpen(false)}
-                className="rounded-xl p-2 text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors"
-                aria-label="Close navigation"
+                onClick={() => setDrawerOpen(false)}
+                className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                aria-label="Close menu"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
-
-            {/* Scrollable Content: 2-Column Shortcut Card Grid */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-5">
-              <div>
-                <p className="mb-2.5 px-1 text-[11px] font-mono font-bold uppercase tracking-wider text-stone-400">
-                  Navigation & Shortcuts
-                </p>
-
-                {/* 2-Column Card Grid (Monochrome Theme) */}
-                <div className="grid grid-cols-2 gap-2.5">
-                  {navigation.navigationItems.map((item) => {
-                    const isActive =
-                      item.href === `/circles/${circle.slug}`
-                        ? pathname === item.href
-                        : pathname.startsWith(item.href);
-
-                    // Infer capability key from href or ID
-                    const capKey = item.href.split('/').pop() || 'overview';
-                    const subtitle =
-                      CAPABILITY_SUBTITLES[capKey] || 'Community feature';
-
-                    return (
-                      <Link
-                        key={item.id}
-                        href={item.href}
-                        onClick={() => setMobileDrawerOpen(false)}
-                        className={`group flex flex-col justify-between rounded-2xl border p-3.5 transition-all ${
-                          isActive
-                            ? 'border-black bg-black text-white shadow-sm ring-1 ring-black/10'
-                            : 'border-stone-200/90 bg-stone-50/80 hover:bg-stone-100/90 hover:border-stone-300 text-stone-900'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-2.5">
-                          <div
-                            className={`flex h-8 w-8 items-center justify-center rounded-xl shadow-2xs transition-colors ${
-                              isActive
-                                ? 'bg-white text-black'
-                                : 'bg-black text-white group-hover:bg-zinc-800'
-                            }`}
-                          >
-                            <DynamicIcon name={item.icon} className="h-4 w-4" />
-                          </div>
-                          <ChevronRight
-                            className={`h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5 ${
-                              isActive ? 'text-white/60' : 'text-stone-400'
-                            }`}
-                          />
-                        </div>
-                        <div>
-                          <span
-                            className={`block text-xs font-bold truncate ${
-                              isActive ? 'text-white' : 'text-stone-900'
-                            }`}
-                          >
-                            {item.label}
-                          </span>
-                          <span
-                            className={`block text-[10px] mt-0.5 line-clamp-1 ${
-                              isActive ? 'text-white/70' : 'text-stone-500'
-                            }`}
-                          >
-                            {subtitle}
-                          </span>
-                        </div>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Spaces Subgroup Section (if spaces enabled) */}
-              {navigation.enabledCapabilityKeys.includes('spaces') &&
-                navigation.visibleSpaces.length > 0 && (
-                  <div className="border-t border-stone-100 pt-4">
-                    <div className="flex items-center justify-between px-1 mb-2">
-                      <p className="text-[11px] font-mono font-bold uppercase tracking-wider text-stone-400">
-                        Discussion Spaces
-                      </p>
-                      <Link
-                        href={`/circles/${circle.slug}/spaces`}
-                        onClick={() => setMobileDrawerOpen(false)}
-                        className="text-[11px] font-mono font-semibold text-stone-900 hover:underline uppercase"
-                      >
-                        All ({navigation.visibleSpaces.length})
-                      </Link>
-                    </div>
-                    <div className="grid grid-cols-1 gap-1">
-                      {navigation.visibleSpaces.map((sp) => {
-                        const isSpaceActive = pathname.includes(`spaceId=${sp.id}`);
-                        return (
-                          <Link
-                            key={sp.id}
-                            href={`/circles/${circle.slug}/discussions?spaceId=${sp.id}`}
-                            onClick={() => setMobileDrawerOpen(false)}
-                            className={`flex items-center justify-between rounded-xl px-3 py-2 text-xs font-medium transition-colors ${
-                              isSpaceActive
-                                ? 'bg-stone-900 text-white font-semibold'
-                                : 'text-stone-700 hover:bg-stone-100'
-                            }`}
-                          >
-                            <span className="flex items-center gap-2.5 truncate">
-                              <DynamicIcon
-                                name={sp.icon}
-                                className={`h-3.5 w-3.5 shrink-0 ${
-                                  isSpaceActive ? 'text-white' : 'text-stone-500'
-                                }`}
-                              />
-                              <span className="truncate">{sp.name}</span>
-                            </span>
-                          </Link>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+            <div className="flex-1 overflow-y-auto p-3">
+              {renderNav(false)}
             </div>
-
-            {/* Studio / Admin Footer */}
-            {isStaff && (
-              <div className="border-t border-stone-200 p-4 bg-stone-50">
-                <Link
-                  href={`/circles/${circle.slug}/studio`}
-                  onClick={() => setMobileDrawerOpen(false)}
-                  className="flex items-center justify-between rounded-xl bg-zinc-950 px-4 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-zinc-800 transition-colors"
-                >
-                  <span className="flex items-center gap-2">
-                    <Sliders className="h-4 w-4" />
-                    <span>Circle Studio (Management)</span>
-                  </span>
-                  <Sparkles className="h-3.5 w-3.5 text-stone-300" />
-                </Link>
-              </div>
-            )}
           </div>
         </div>
       )}
 
-      {/* ======================================================== */}
-      {/* 3. PERSISTENT MOBILE BOTTOM DOCK (< lg)                  */}
-      {/* ======================================================== */}
+      {/* Mobile bottom dock */}
       <nav
-        aria-label="Mobile Bottom Navigation"
-        className="fixed bottom-0 inset-x-0 z-40 h-14 bg-white/95 backdrop-blur-md border-t border-stone-200/90 flex items-center justify-around px-2 pb-[env(safe-area-inset-bottom)] lg:hidden shadow-[0_-2px_10px_rgba(0,0,0,0.04)]"
+        aria-label="Mobile navigation"
+        className="fixed inset-x-0 bottom-0 z-40 flex h-14 items-center justify-around border-t border-stone-200 bg-white/95 px-2 pb-[env(safe-area-inset-bottom)] backdrop-blur lg:hidden"
       >
-        {/* 1. Feed / Overview */}
-        <Link
-          href={`/circles/${circle.slug}`}
-          className={`flex flex-col items-center justify-center py-1 px-3 text-[10px] font-semibold transition-colors ${
-            pathname === `/circles/${circle.slug}`
-              ? 'text-stone-950 font-bold'
-              : 'text-stone-500 hover:text-stone-900'
-          }`}
-        >
-          <Home className="h-4 w-4 mb-0.5" />
-          <span>Feed</span>
-        </Link>
-
-        {/* 2. Primary Communication Tool (e.g. Discussions) */}
-        {communicationItem && (
-          <Link
-            href={communicationItem.href}
-            className={`flex flex-col items-center justify-center py-1 px-3 text-[10px] font-semibold transition-colors ${
-              pathname.startsWith(communicationItem.href)
-                ? 'text-stone-950 font-bold'
-                : 'text-stone-500 hover:text-stone-900'
-            }`}
-          >
-            <DynamicIcon name={communicationItem.icon} className="h-4 w-4 mb-0.5" />
-            <span>{communicationItem.label}</span>
-          </Link>
-        )}
-
-        {/* 3. Secondary Key Active Tool (Marketplace / Events / Courses / Polls) */}
-        {secondaryFeaturedItem && (
-          <Link
-            href={secondaryFeaturedItem.href}
-            className={`flex flex-col items-center justify-center py-1 px-3 text-[10px] font-semibold transition-colors ${
-              pathname.startsWith(secondaryFeaturedItem.href)
-                ? 'text-stone-950 font-bold'
-                : 'text-stone-500 hover:text-stone-900'
-            }`}
-          >
-            <DynamicIcon name={secondaryFeaturedItem.icon} className="h-4 w-4 mb-0.5" />
-            <span>{secondaryFeaturedItem.label}</span>
-          </Link>
-        )}
-
-        {/* 4. Global Notifications */}
-        <Link
+        <DockLink href={homeHref} label="Home" active={pathname === homeHref} icon={<Home className="h-5 w-5" />} />
+        {dockItems.map((item) => (
+          <DockLink
+            key={item.id}
+            href={item.href}
+            label={item.label}
+            active={isActive(item.href)}
+            icon={<DynamicIcon name={item.icon} className="h-5 w-5" />}
+          />
+        ))}
+        <DockLink
           href="/notifications"
-          className={`flex flex-col items-center justify-center py-1 px-3 text-[10px] font-semibold transition-colors ${
-            pathname === '/notifications'
-              ? 'text-stone-950 font-bold'
-              : 'text-stone-500 hover:text-stone-900'
-          }`}
-        >
-          <Bell className="h-4 w-4 mb-0.5" />
-          <span>Alerts</span>
-        </Link>
-
-        {/* 5. Full Navigation Sheet Trigger */}
+          label="Alerts"
+          active={pathname === '/notifications'}
+          icon={<Bell className="h-5 w-5" />}
+        />
         <button
           type="button"
-          onClick={() => setMobileDrawerOpen(true)}
-          className={`flex flex-col items-center justify-center py-1 px-3 text-[10px] font-semibold transition-colors ${
-            mobileDrawerOpen
-              ? 'text-stone-950 font-bold'
-              : 'text-stone-500 hover:text-stone-900'
-          }`}
+          onClick={() => setDrawerOpen(true)}
+          aria-label="Open menu"
+          className="flex flex-col items-center gap-0.5 px-3 py-1 text-[10px] font-medium text-stone-500"
         >
-          <Menu className="h-4 w-4 mb-0.5" />
-          <span>Navigation</span>
+          <Menu className="h-5 w-5" />
+          <span>Menu</span>
         </button>
       </nav>
 
-      {/* ======================================================== */}
-      {/* 4. DESKTOP COLLAPSIBLE SIDEBAR + MAIN CONTENT (lg+)      */}
-      {/* ======================================================== */}
       <div className="flex items-start gap-8 pb-16 lg:pb-0">
-        {/* DESKTOP SIDEBAR */}
+        {/* Desktop sidebar */}
         <aside
-          aria-label="Circle Navigation"
-          className={`hidden lg:block shrink-0 transition-all duration-300 ease-in-out ${
-            isCollapsed ? 'w-16' : 'w-64'
+          aria-label="Circle navigation"
+          className={`hidden shrink-0 transition-[width] duration-200 lg:block ${
+            isCollapsed ? 'w-14' : 'w-56'
           }`}
         >
-          <div className="sticky top-20 rounded-2xl border border-stone-200/80 bg-white p-2.5 shadow-xs space-y-4">
-            {/* Header & Collapse/Expand Toggle */}
-            <div className="flex items-center justify-between px-2 py-1">
-              {!isCollapsed && (
-                <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-stone-400">
-                  Navigation
-                </p>
-              )}
+          <div className="sticky top-20">
+            <div className={`mb-2 flex ${isCollapsed ? 'justify-center' : 'justify-end'}`}>
               <button
                 type="button"
-                onClick={handleToggleCollapse}
-                className={`inline-flex items-center justify-center rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors ${
-                  isCollapsed ? 'w-full' : 'ml-auto'
-                }`}
-                title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                onClick={toggleCollapse}
+                className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
                 aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                title={isCollapsed ? 'Expand' : 'Collapse'}
               >
-                {isCollapsed ? (
-                  <PanelLeft className="h-4 w-4 text-stone-600" />
-                ) : (
-                  <PanelLeftClose className="h-4 w-4 text-stone-500" />
-                )}
+                {isCollapsed ? <PanelLeft className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
               </button>
             </div>
-
-            {/* Navigation Links */}
-            <nav className="space-y-1">
-              {navigation.navigationItems.map((item) => {
-                const isActive =
-                  item.href === `/circles/${circle.slug}`
-                    ? pathname === item.href
-                    : pathname.startsWith(item.href);
-
-                return (
-                  <Link
-                    key={item.id}
-                    href={item.href}
-                    title={isCollapsed ? item.label : undefined}
-                    className={`group relative flex items-center rounded-xl text-xs sm:text-sm font-medium transition-all ${
-                      isCollapsed
-                        ? 'h-10 w-10 justify-center mx-auto'
-                        : 'gap-2.5 px-3 py-2'
-                    } ${
-                      isActive
-                        ? 'bg-stone-900 text-white font-semibold shadow-xs'
-                        : 'text-stone-600 hover:bg-stone-100/80 hover:text-stone-900'
-                    }`}
-                  >
-                    <DynamicIcon
-                      name={item.icon}
-                      className={`h-4 w-4 shrink-0 transition-colors ${
-                        isActive
-                          ? 'text-white'
-                          : 'text-stone-500 group-hover:text-stone-900'
-                      }`}
-                    />
-                    {!isCollapsed && (
-                      <span className="truncate">{item.label}</span>
-                    )}
-
-                    {/* Tooltip for collapsed view */}
-                    {isCollapsed && (
-                      <div className="pointer-events-none absolute left-full ml-3 z-50 hidden rounded-lg bg-stone-900 px-2.5 py-1 text-xs font-semibold text-white shadow-md whitespace-nowrap group-hover:block">
-                        {item.label}
-                      </div>
-                    )}
-                  </Link>
-                );
-              })}
-            </nav>
-
-            {/* Spaces Sub-navigation (if capability enabled) */}
-            {navigation.enabledCapabilityKeys.includes('spaces') &&
-              navigation.visibleSpaces.length > 0 && (
-                <div className="pt-2 border-t border-stone-100 space-y-1">
-                  {!isCollapsed ? (
-                    <>
-                      <div className="flex items-center justify-between px-2.5 py-1">
-                        <p className="text-[10px] font-mono font-bold uppercase tracking-wider text-stone-400">
-                          Spaces
-                        </p>
-                        <Link
-                          href={`/circles/${circle.slug}/spaces`}
-                          className="text-[10px] font-mono font-semibold text-stone-900 hover:underline uppercase"
-                        >
-                          All ({navigation.visibleSpaces.length})
-                        </Link>
-                      </div>
-                      <div className="space-y-0.5">
-                        {navigation.visibleSpaces.map((sp) => {
-                          const isSpaceActive = pathname.includes(`spaceId=${sp.id}`);
-                          return (
-                            <Link
-                              key={sp.id}
-                              href={`/circles/${circle.slug}/discussions?spaceId=${sp.id}`}
-                              className={`flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-xs font-medium transition-colors ${
-                                isSpaceActive
-                                  ? 'bg-stone-100 text-stone-900 font-semibold'
-                                  : 'text-stone-600 hover:bg-stone-50 hover:text-stone-900'
-                              }`}
-                            >
-                              <DynamicIcon
-                                name={sp.icon}
-                                className="h-3.5 w-3.5 text-stone-500 shrink-0"
-                              />
-                              <span className="truncate">{sp.name}</span>
-                            </Link>
-                          );
-                        })}
-                      </div>
-                    </>
-                  ) : (
-                    <div className="flex justify-center pt-1">
-                      <Link
-                        href={`/circles/${circle.slug}/spaces`}
-                        title={`Spaces (${navigation.visibleSpaces.length})`}
-                        className="group relative flex h-10 w-10 items-center justify-center rounded-xl text-stone-500 hover:bg-stone-100 hover:text-stone-900 transition-colors"
-                      >
-                        <Menu className="h-4 w-4" />
-                        <div className="pointer-events-none absolute left-full ml-3 z-50 hidden rounded-lg bg-stone-900 px-2.5 py-1 text-xs font-semibold text-white shadow-md whitespace-nowrap group-hover:block">
-                          Spaces ({navigation.visibleSpaces.length})
-                        </div>
-                      </Link>
-                    </div>
-                  )}
-                </div>
-              )}
-
-            {/* Circle Studio Shortcut */}
-            {isStaff && (
-              <div className="pt-2 border-t border-stone-100">
-                <Link
-                  href={`/circles/${circle.slug}/studio`}
-                  title={isCollapsed ? 'Circle Studio' : undefined}
-                  className={`group relative flex items-center rounded-xl text-xs sm:text-sm font-semibold transition-all ${
-                    isCollapsed
-                      ? 'h-10 w-10 justify-center mx-auto bg-stone-100 text-stone-900 hover:bg-stone-200'
-                      : 'gap-2.5 px-3 py-2 bg-stone-100 text-stone-900 hover:bg-stone-200'
-                  }`}
-                >
-                  <Sliders className="h-4 w-4 text-stone-900 shrink-0" />
-                  {!isCollapsed && (
-                    <>
-                      <span>Circle Studio</span>
-                      <Sparkles className="h-3.5 w-3.5 ml-auto text-stone-400" />
-                    </>
-                  )}
-                  {isCollapsed && (
-                    <div className="pointer-events-none absolute left-full ml-3 z-50 hidden rounded-lg bg-stone-900 px-2.5 py-1 text-xs font-semibold text-white shadow-md whitespace-nowrap group-hover:block">
-                      Circle Studio
-                    </div>
-                  )}
-                </Link>
-              </div>
-            )}
+            {renderNav(isCollapsed)}
           </div>
         </aside>
 
-        {/* PRIMARY CONTENT COLUMN */}
-        <main className="flex-1 min-w-0 transition-all duration-300">
-          {children}
-        </main>
+        <main className="min-w-0 flex-1">{children}</main>
       </div>
     </div>
+  );
+}
+
+function SidebarLink({
+  href,
+  label,
+  icon,
+  active,
+  collapsed,
+}: {
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+  active: boolean;
+  collapsed: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      title={collapsed ? label : undefined}
+      aria-current={active ? 'page' : undefined}
+      className={`flex items-center rounded-lg text-sm transition-colors ${
+        collapsed ? 'mx-auto h-9 w-9 justify-center' : 'gap-2.5 px-3 py-1.5'
+      } ${
+        active
+          ? 'bg-stone-200/60 font-medium text-stone-900'
+          : 'text-stone-600 hover:bg-stone-100 hover:text-stone-900'
+      }`}
+    >
+      <span className={active ? 'text-[#2D6A4F]' : 'text-stone-400'}>{icon}</span>
+      {!collapsed && <span className="truncate">{label}</span>}
+    </Link>
+  );
+}
+
+function DockLink({
+  href,
+  label,
+  icon,
+  active,
+}: {
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+  active: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={`flex flex-col items-center gap-0.5 px-3 py-1 text-[10px] font-medium ${
+        active ? 'text-[#1B4332]' : 'text-stone-500'
+      }`}
+    >
+      {icon}
+      <span className="max-w-[64px] truncate">{label}</span>
+    </Link>
   );
 }
