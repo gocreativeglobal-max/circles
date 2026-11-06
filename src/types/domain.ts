@@ -188,6 +188,8 @@ export interface PostItem {
   space?: Pick<CircleSpace, 'id' | 'name' | 'slug' | 'icon'> | null;
   viewer_has_liked?: boolean;
   viewer_has_saved?: boolean;
+  poll_id?: string | null;
+  poll?: CirclePollItem | null;
 }
 
 export interface CommentItem {
@@ -326,6 +328,7 @@ export interface CirclePollItem {
   id: string;
   circle_id: string;
   space_id: string | null;
+  post_id?: string | null;
   creator_id: string;
   question: string;
   description: string;
@@ -352,17 +355,29 @@ export interface AvailabilitySchedule {
   timezone?: string;
 }
 
+export type ListingTransactionType = 'free' | 'fixed' | 'rate' | 'range' | 'negotiable';
+export type ListingRateInterval = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'annually';
+export type ListingActionType = 'inquiry' | 'booking' | 'application' | 'link';
+
 export interface MarketplaceListingItem {
   id: string;
   circle_id: string;
   seller_id: string;
-  listing_type: 'product' | 'service' | 'rental' | 'housing' | 'directory';
+  listing_type: string;
   category: string;
   title: string;
   description: string;
   price_amount: number | null;
   price_currency: string;
   pricing_unit: 'fixed' | 'hourly' | 'daily' | 'monthly' | 'free' | 'negotiable';
+  transaction_type?: ListingTransactionType;
+  rate_interval?: ListingRateInterval | null;
+  price_min?: number | null;
+  price_max?: number | null;
+  action_type?: ListingActionType;
+  action_url?: string | null;
+  custom_fields?: Record<string, unknown>;
+  tags?: string[];
   condition: 'new' | 'like_new' | 'good' | 'fair' | 'not_applicable' | null;
   location: string | null;
   contact_preference: 'in_app_inquiry' | 'email' | 'both';

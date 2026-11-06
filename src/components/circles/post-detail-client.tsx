@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, Bookmark, Heart, MessageSquare, Send } from 'lucide-react';
 import { Circle, CommentItem, PostItem } from '@/types/domain';
+import { InlinePollCard } from '@/components/circles/inline-poll-card';
 
 interface PostDetailClientProps {
   circle: Circle;
@@ -124,6 +125,17 @@ export function PostDetailClient({
         <div className="mt-4 whitespace-pre-line text-sm text-stone-800 leading-relaxed">
           {post.body}
         </div>
+
+        {post.poll && (
+          <InlinePollCard
+            poll={post.poll}
+            circleId={circle.id}
+            isMember={isActiveMember}
+            onPollUpdated={(updatedPoll) =>
+              setPost((prev) => ({ ...prev, poll: updatedPoll }))
+            }
+          />
+        )}
 
         <div className="mt-6 flex items-center justify-between border-t border-stone-100 pt-4 text-xs">
           <div className="flex items-center gap-5">

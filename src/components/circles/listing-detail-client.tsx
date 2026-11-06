@@ -10,15 +10,27 @@ import {
   Check,
   Clock,
   Edit3,
+  ExternalLink,
+  Layers,
   MapPin,
   MessageSquare,
+  Plus,
+  Send,
   Share2,
   ShieldAlert,
   Tag,
+  Trash2,
   X,
   Zap,
 } from 'lucide-react';
-import { Circle, MarketplaceListingItem, ServiceBookingItem } from '@/types/domain';
+import {
+  Circle,
+  ListingActionType,
+  ListingRateInterval,
+  ListingTransactionType,
+  MarketplaceListingItem,
+  ServiceBookingItem,
+} from '@/types/domain';
 import { Button } from '@/components/ui/button';
 import { ImageUploader } from '@/components/ui/image-uploader';
 import { DirectMessageDrawer } from '@/components/messages/direct-message-drawer';
@@ -26,6 +38,7 @@ import {
   generateAvailableSlots,
   generateBookingIcs,
 } from '@/features/marketplace/calendar-utils';
+import { formatListingPrice } from '@/features/marketplace/listing-helpers';
 
 interface ListingDetailClientProps {
   circle: Circle;
@@ -71,17 +84,88 @@ export function ListingDetailClient({
   const [submittingBooking, setSubmittingBooking] = useState(false);
   const [bookingSuccess, setBookingSuccess] = useState<ServiceBookingItem | null>(null);
 
-  // Edit Modal
+  // Edit Modal State
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editTitle, setEditTitle] = useState(listing.title);
   const [editDescription, setEditDescription] = useState(listing.description);
-  const [editPrice, setEditPrice] = useState(
-    listing.price_amount !== null ? String(listing.price_amount) : ''
+  const [editTransactionType, setEditTransactionType] = useState<ListingTransactionType>(
+    listing.transaction_type ||
+      (listing.pricing_unit === 'free'
+        ? 'free'
+        : listing.pricing_unit === 'negotiable'
+        ? 'negotiable'
+        : ['hourly', 'daily', 'monthly'].includes(listing.pricing_unit)
+        ? 'rate'
+        : 'fixed')
   );
+  const [editRateInterval, setEditRateInterval] = useState<ListingRateInterval>(
+    listing.rate_interval ||
+      (listing.pricing_unit === 'hourly'
+        ? 'hourly'
+        : listing.pricing_unit === 'daily'
+        ? 'daily'
+        : listing.pricing_unit === 'monthly'
+        ? 'monthly'
+        : 'monthly')
+  );
+  const [editPrice, setEditPrice] = useState(
+    listing.price_amount !== null && listing.price_amount !== undefined
+      ? String(listing.price_amount)
+      : ''
+  );
+  const [editPriceMin, setEditPriceMin] = useState(
+    listing.price_min !== null && listing.price_min !== undefined ? String(listing.price_min) : ''
+  );
+  const [editPriceMax, setEditPriceMax] = useState(
+    listing.price_max !== null && listing.price_max !== undefined ? String(listing.price_max) : ''
+  );
+  const [editActionType, setEditActionType] = useState<ListingActionType>(
+    listing.action_type ||
+      (listing.listing_type === 'service' || listing.listing_type === 'rental'
+        ? 'booking'
+        : 'inquiry')
+  );
+  const [editActionUrl, setEditActionUrl] = useState(listing.action_url || '');
   const [editLocation, setEditLocation] = useState(listing.location || '');
   const [editStatus, setEditStatus] = useState(listing.status);
   const [editPhotos, setEditPhotos] = useState<string[]>(listing.image_urls || []);
+  const [editCustomFields, setEditCustomFields] = useState<Array<{ key: string; value: string }>>(
+    listing.custom_fields && typeof listing.custom_fields === 'object'
+      ? Object.entries(listing.custom_fields).map(([k, v]) => ({ key: k, value: String(v ?? '') }))
+      : []
+  );
+  const [editTags, setEditTags] = useState<string[]>(Array.isArray(listing.tags) ? listing.tags : []);
+  const [editTagInput, setEditTagInput] = useState('');
   const [savingEdit, setSavingEdit] = useState(false);
+
+  function handleAddEditCustomField() {
+    setEditCustomFields((prev) => [...prev, { key: '', value: '' }]);
+  }
+
+  function handleUpdateEditCustomField(index: number, key: string, value: string) {
+    setEditCustomFields((prev) => {
+      const next = [...prev];
+      next[index] = { key, value };
+      return next;
+    });
+  }
+
+  function handleRemoveEditCustomField(index: number) {
+    setEditCustomFields((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  function handleAddEditTag() {
+    const raw = editTagInput.trim().replace(/^#/, '');
+    if (!raw) return;
+    if (!editTags.includes(raw)) {
+      setEditTags((prev) => [...prev, raw]);
+    }
+    setEditTagInput('');
+  }
+
+  function handleRemoveEditTag(tagToRemove: string) {
+    setEditTags((prev) => prev.filter((t) => t !== tagToRemove));
+  }
 
   const isSeller = currentUserId === listing.seller_id;
   const isStaff = currentUserRole === 'owner' || currentUserRole === 'admin';
@@ -135,13 +219,50 @@ export function ListingDetailClient({
     e.preventDefault();
     setSavingEdit(true);
     try {
+      const fieldsObj: Record<string, string> = {};
+      editCustomFields.forEach(({ key, value }) => {
+        if (key.trim()) {
+          fieldsObj[key.trim()] = value.trim();
+        }
+      });
+
+      const legacyPricingUnit =
+        editTransactionType === 'free'
+          ? 'free'
+          : editTransactionType === 'negotiable'
+          ? 'negotiable'
+          : editTransactionType === 'rate'
+          ? editRateInterval === 'hourly'
+            ? 'hourly'
+            : editRateInterval === 'daily'
+            ? 'daily'
+            : editRateInterval === 'monthly'
+            ? 'monthly'
+            : 'monthly'
+          : 'fixed';
+
       const res = await fetch(`/api/circles/${circle.id}/marketplace/${listing.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: editTitle.trim(),
           description: editDescription.trim(),
-          priceAmount: editPrice ? Number(editPrice) : null,
+          transactionType: editTransactionType,
+          rateInterval: editTransactionType === 'rate' ? editRateInterval : null,
+          priceAmount:
+            (editTransactionType === 'fixed' ||
+              editTransactionType === 'rate' ||
+              editTransactionType === 'negotiable') &&
+            editPrice
+              ? Number(editPrice)
+              : null,
+          priceMin: editTransactionType === 'range' && editPriceMin ? Number(editPriceMin) : null,
+          priceMax: editTransactionType === 'range' && editPriceMax ? Number(editPriceMax) : null,
+          pricingUnit: legacyPricingUnit,
+          actionType: editActionType,
+          actionUrl: editActionType === 'link' && editActionUrl.trim() ? editActionUrl.trim() : null,
+          customFields: fieldsObj,
+          tags: editTags.map((t) => t.trim()).filter(Boolean),
           location: editLocation.trim() || null,
           imageUrls: editPhotos,
           status: editStatus,
@@ -424,6 +545,20 @@ export function ListingDetailClient({
                   </span>
                 )}
               </div>
+
+              {/* Tags */}
+              {Array.isArray(listing.tags) && listing.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-3">
+                  {listing.tags.map((t, idx) => (
+                    <span
+                      key={idx}
+                      className="rounded-md bg-stone-100 px-2 py-0.5 text-xs font-mono text-stone-700 border border-stone-200/80"
+                    >
+                      #{t}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Description */}
@@ -436,25 +571,51 @@ export function ListingDetailClient({
               </div>
             </div>
 
-            {/* Specifications Details */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 border-t border-stone-100 pt-4 text-xs">
-              <div className="rounded-xl border border-stone-100 bg-stone-50/50 p-3">
-                <span className="text-stone-400 block font-mono text-[11px]">Pricing Model</span>
-                <span className="font-bold text-stone-800 capitalize mt-0.5 block">
-                  {listing.pricing_unit}
-                </span>
+            {/* Specifications Details & Custom Attributes */}
+            <div className="border-t border-stone-100 pt-4 space-y-3">
+              <div className="flex items-center gap-1.5">
+                <Layers className="h-4 w-4 text-emerald-800" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-stone-700 font-mono">
+                  Specifications & Attributes
+                </h3>
               </div>
-              <div className="rounded-xl border border-stone-100 bg-stone-50/50 p-3">
-                <span className="text-stone-400 block font-mono text-[11px]">Contact Mode</span>
-                <span className="font-bold text-stone-800 capitalize mt-0.5 block">
-                  {listing.contact_preference.replace('_', ' ')}
-                </span>
-              </div>
-              <div className="rounded-xl border border-stone-100 bg-stone-50/50 p-3">
-                <span className="text-stone-400 block font-mono text-[11px]">Instant Booking</span>
-                <span className="font-bold text-stone-800 mt-0.5 block">
-                  {listing.is_instant_bookable ? 'Enabled ⚡' : 'Host Approval'}
-                </span>
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                <div className="rounded-xl border border-stone-100 bg-stone-50/50 p-3">
+                  <span className="text-stone-400 block font-mono text-[11px]">Pricing Model</span>
+                  <span className="font-bold text-stone-800 capitalize mt-0.5 block">
+                    {listing.transaction_type || listing.pricing_unit}
+                  </span>
+                </div>
+                <div className="rounded-xl border border-stone-100 bg-stone-50/50 p-3">
+                  <span className="text-stone-400 block font-mono text-[11px]">Response Mode</span>
+                  <span className="font-bold text-stone-800 capitalize mt-0.5 block">
+                    {listing.action_type || listing.contact_preference.replace('_', ' ')}
+                  </span>
+                </div>
+                <div className="rounded-xl border border-stone-100 bg-stone-50/50 p-3">
+                  <span className="text-stone-400 block font-mono text-[11px]">Instant Booking</span>
+                  <span className="font-bold text-stone-800 mt-0.5 block">
+                    {listing.is_instant_bookable ? 'Enabled ⚡' : 'Host Approval'}
+                  </span>
+                </div>
+
+                {/* Dynamic Custom Fields */}
+                {listing.custom_fields &&
+                  typeof listing.custom_fields === 'object' &&
+                  Object.entries(listing.custom_fields).map(([k, v], idx) => (
+                    <div
+                      key={`custom-${idx}`}
+                      className="rounded-xl border border-stone-100 bg-stone-50/50 p-3"
+                    >
+                      <span className="text-stone-400 block font-mono text-[11px] truncate">
+                        {k}
+                      </span>
+                      <span className="font-bold text-stone-800 mt-0.5 block truncate">
+                        {String(v)}
+                      </span>
+                    </div>
+                  ))}
               </div>
             </div>
           </div>
@@ -665,33 +826,61 @@ export function ListingDetailClient({
               </span>
               <div className="mt-1 flex items-baseline gap-2">
                 <span className="text-3xl font-extrabold text-stone-900 font-mono">
-                  {listing.pricing_unit === 'free'
-                    ? 'FREE'
-                    : listing.price_amount !== null
-                    ? `${listing.price_currency} ${listing.price_amount.toFixed(2)}`
-                    : listing.pricing_unit}
+                  {formatListingPrice(listing)}
                 </span>
-                {listing.pricing_unit !== 'fixed' && listing.pricing_unit !== 'free' && (
-                  <span className="text-xs font-mono text-stone-500 uppercase">
-                    /{listing.pricing_unit}
-                  </span>
-                )}
               </div>
             </div>
 
             {/* Actions for Visitors */}
             {!isSeller && isMember && (
               <div className="space-y-2.5">
-                <Button
-                  size="md"
-                  onClick={handleOpenInquiry}
-                  className="w-full bg-emerald-800 hover:bg-emerald-900 text-white shadow-xs"
-                >
-                  <MessageSquare className="h-4 w-4 mr-2" />
-                  <span>Message Seller / Inquire</span>
-                </Button>
+                {listing.action_type === 'link' && listing.action_url ? (
+                  <a
+                    href={listing.action_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-emerald-900 transition-colors"
+                  >
+                    <span>Visit / Apply Externally</span>
+                    <ExternalLink className="h-4 w-4" />
+                  </a>
+                ) : listing.action_type === 'booking' || isBookable ? (
+                  <Button
+                    size="md"
+                    onClick={() => {
+                      const el = document.querySelector('section');
+                      el?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="w-full bg-emerald-800 hover:bg-emerald-900 text-white shadow-xs"
+                  >
+                    <Calendar className="h-4 w-4 mr-2" />
+                    <span>
+                      {listing.listing_type === 'rental'
+                        ? 'Request Rental Dates'
+                        : 'Book Appointment'}
+                    </span>
+                  </Button>
+                ) : listing.action_type === 'application' ? (
+                  <Button
+                    size="md"
+                    onClick={handleOpenInquiry}
+                    className="w-full bg-emerald-800 hover:bg-emerald-900 text-white shadow-xs"
+                  >
+                    <Send className="h-4 w-4 mr-2" />
+                    <span>Apply / Submit Pitch</span>
+                  </Button>
+                ) : (
+                  <Button
+                    size="md"
+                    onClick={handleOpenInquiry}
+                    className="w-full bg-emerald-800 hover:bg-emerald-900 text-white shadow-xs"
+                  >
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    <span>Message Seller / Inquire</span>
+                  </Button>
+                )}
 
-                {isBookable && (
+                {isBookable && listing.action_type !== 'booking' && (
                   <Button
                     size="md"
                     variant="outline"
@@ -844,7 +1033,7 @@ export function ListingDetailClient({
       {/* Edit Modal */}
       {editModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-          <div className="w-full max-w-lg rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl space-y-4">
+          <div className="w-full max-w-2xl rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-stone-100 pb-3">
               <h3 className="text-base font-bold text-stone-900">Edit Listing</h3>
               <button
@@ -870,18 +1059,278 @@ export function ListingDetailClient({
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-stone-700 font-mono uppercase mb-1">
-                  Price Amount
+              {/* Transaction & Pricing Model */}
+              <div className="rounded-xl border border-stone-200/90 bg-stone-50/60 p-4 space-y-3">
+                <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-700">
+                  Pricing & Transaction Model
                 </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={editPrice}
-                  onChange={(e) => setEditPrice(e.target.value)}
-                  placeholder="0.00"
-                  className="w-full rounded-xl border border-stone-200 p-2.5 text-sm text-stone-900"
-                />
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+                  {[
+                    { id: 'fixed', label: 'Fixed Price' },
+                    { id: 'rate', label: 'Recurring Rate' },
+                    { id: 'range', label: 'Price Range' },
+                    { id: 'free', label: 'Free' },
+                    { id: 'negotiable', label: 'Negotiable' },
+                  ].map((m) => (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setEditTransactionType(m.id as ListingTransactionType)}
+                      className={`rounded-lg px-2 py-1.5 text-xs font-semibold transition-all ${
+                        editTransactionType === m.id
+                          ? 'bg-stone-900 text-white shadow-xs'
+                          : 'bg-white border border-stone-200 text-stone-600 hover:bg-stone-100'
+                      }`}
+                    >
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="pt-1">
+                  {editTransactionType === 'fixed' && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-stone-600">
+                        {listing.price_currency || 'USD'}
+                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={editPrice}
+                        onChange={(e) => setEditPrice(e.target.value)}
+                        placeholder="0.00"
+                        className="w-40 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs sm:text-sm text-stone-900"
+                      />
+                    </div>
+                  )}
+
+                  {editTransactionType === 'rate' && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs font-bold text-stone-600">
+                        {listing.price_currency || 'USD'}
+                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={editPrice}
+                        onChange={(e) => setEditPrice(e.target.value)}
+                        placeholder="Amount"
+                        className="w-36 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs sm:text-sm text-stone-900"
+                      />
+                      <span className="text-xs text-stone-500 font-mono">per</span>
+                      <select
+                        value={editRateInterval}
+                        onChange={(e) =>
+                          setEditRateInterval(e.target.value as ListingRateInterval)
+                        }
+                        className="rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs sm:text-sm text-stone-900"
+                      >
+                        <option value="hourly">Hour</option>
+                        <option value="daily">Day</option>
+                        <option value="weekly">Week</option>
+                        <option value="monthly">Month</option>
+                        <option value="annually">Year</option>
+                      </select>
+                    </div>
+                  )}
+
+                  {editTransactionType === 'range' && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-xs font-bold text-stone-600">
+                        {listing.price_currency || 'USD'}
+                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={editPriceMin}
+                        onChange={(e) => setEditPriceMin(e.target.value)}
+                        placeholder="Min (e.g. 500)"
+                        className="w-32 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs sm:text-sm text-stone-900"
+                      />
+                      <span className="text-xs text-stone-400 font-mono">to</span>
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={editPriceMax}
+                        onChange={(e) => setEditPriceMax(e.target.value)}
+                        placeholder="Max (e.g. 800)"
+                        className="w-32 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs sm:text-sm text-stone-900"
+                      />
+                    </div>
+                  )}
+
+                  {editTransactionType === 'free' && (
+                    <div className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800 border border-emerald-200 inline-block">
+                      ✓ Free community listing — no payment required
+                    </div>
+                  )}
+
+                  {editTransactionType === 'negotiable' && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-stone-600">
+                        {listing.price_currency || 'USD'}
+                      </span>
+                      <input
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={editPrice}
+                        onChange={(e) => setEditPrice(e.target.value)}
+                        placeholder="Target / Starting Price (Optional)"
+                        className="w-64 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs sm:text-sm text-stone-900"
+                      />
+                      <span className="text-xs text-stone-500 font-mono">(Open to offers)</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Action Type */}
+              <div className="rounded-xl border border-stone-200/90 bg-stone-50/60 p-4 space-y-3">
+                <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-700">
+                  Primary Action / Call to Action
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                  {[
+                    { id: 'inquiry', label: '💬 Direct Message' },
+                    { id: 'booking', label: '📅 Booking Calendar' },
+                    { id: 'application', label: '📝 Application Pitch' },
+                    { id: 'link', label: '🔗 External Link' },
+                  ].map((a) => (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onClick={() => setEditActionType(a.id as ListingActionType)}
+                      className={`rounded-lg px-2 py-1.5 text-xs font-semibold transition-all ${
+                        editActionType === a.id
+                          ? 'bg-stone-900 text-white shadow-xs'
+                          : 'bg-white border border-stone-200 text-stone-600 hover:bg-stone-100'
+                      }`}
+                    >
+                      {a.label}
+                    </button>
+                  ))}
+                </div>
+
+                {editActionType === 'link' && (
+                  <div className="pt-1">
+                    <label className="block text-[10px] font-mono font-bold uppercase tracking-wider text-stone-500 mb-1">
+                      External URL
+                    </label>
+                    <input
+                      type="url"
+                      value={editActionUrl}
+                      onChange={(e) => setEditActionUrl(e.target.value)}
+                      placeholder="https://example.com/apply"
+                      className="w-full rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-900"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Custom Attributes */}
+              <div className="rounded-xl border border-stone-200/90 bg-stone-50/60 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <Layers className="h-4 w-4 text-emerald-800" />
+                    <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-700">
+                      Specifications & Attributes
+                    </label>
+                  </div>
+                  <Button
+                    type="button"
+                    size="xs"
+                    variant="outline"
+                    onClick={handleAddEditCustomField}
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    <span>Add Attribute</span>
+                  </Button>
+                </div>
+
+                {editCustomFields.length > 0 && (
+                  <div className="space-y-2">
+                    {editCustomFields.map((f, idx) => (
+                      <div key={idx} className="flex items-center gap-2">
+                        <input
+                          value={f.key}
+                          onChange={(e) =>
+                            handleUpdateEditCustomField(idx, e.target.value, f.value)
+                          }
+                          placeholder="Key (e.g. Bedrooms)"
+                          className="w-1/3 rounded-xl border border-stone-200 bg-white px-2.5 py-1.5 text-xs text-stone-900 font-mono"
+                        />
+                        <input
+                          value={f.value}
+                          onChange={(e) =>
+                            handleUpdateEditCustomField(idx, f.key, e.target.value)
+                          }
+                          placeholder="Value (e.g. 2 Bed)"
+                          className="w-1/2 rounded-xl border border-stone-200 bg-white px-2.5 py-1.5 text-xs text-stone-900"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveEditCustomField(idx)}
+                          className="rounded-lg p-1.5 text-stone-400 hover:text-rose-600 transition-colors"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Tags */}
+              <div className="rounded-xl border border-stone-200/90 bg-stone-50/60 p-4 space-y-2.5">
+                <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-700">
+                  Search Tags & Keywords
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    value={editTagInput}
+                    onChange={(e) => setEditTagInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddEditTag();
+                      }
+                    }}
+                    placeholder="Add tag and press Enter"
+                    className="flex-1 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-900"
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={handleAddEditTag}
+                  >
+                    Add
+                  </Button>
+                </div>
+                {editTags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {editTags.map((t) => (
+                      <span
+                        key={t}
+                        className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-0.5 text-xs font-mono text-stone-700 border border-stone-200 shadow-2xs"
+                      >
+                        #{t}
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveEditTag(t)}
+                          className="text-stone-400 hover:text-stone-800"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div>

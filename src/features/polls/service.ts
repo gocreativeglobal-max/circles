@@ -20,6 +20,7 @@ import { canReadCircleContent } from '@/lib/authorization/permissions';
 export const createPollSchema = z.object({
   circleId: z.string().uuid(),
   spaceId: z.string().uuid().nullable().optional(),
+  postId: z.string().uuid().nullable().optional(),
   question: z.string().trim().min(3).max(240),
   description: z.string().trim().max(4000).default(''),
   allowMultiple: z.boolean().default(false),
@@ -97,6 +98,7 @@ export async function createCirclePoll(
       id: string;
       circle_id: string;
       space_id: string | null;
+      post_id: string | null;
       creator_id: string;
       question: string;
       description: string;
@@ -109,14 +111,15 @@ export async function createCirclePoll(
       updated_at: string;
     }>(
       `INSERT INTO public.circle_polls (
-         id, circle_id, space_id, creator_id, question, description,
+         id, circle_id, space_id, post_id, creator_id, question, description,
          allow_multiple, results_visibility, closes_at, status
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'open')
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'open')
        RETURNING *;`,
       [
         pollId,
         parsed.circleId,
         parsed.spaceId ?? null,
+        parsed.postId ?? null,
         actorUserId,
         parsed.question,
         parsed.description,
@@ -157,6 +160,162 @@ export async function createCirclePoll(
   });
 }
 
+export async function fetchEnrichedPolls(
+  tx: { query: <T>(sql: string, values?: unknown[]) => Promise<{ rows: T[] }> },
+  circleId: string,
+  actorUserId: string | null,
+  pollIds?: string[]
+): Promise<Map<string, CirclePollItem>> {
+  if (pollIds && pollIds.length === 0) {
+    return new Map();
+  }
+
+  const memRes = actorUserId
+    ? await tx.query<{ role: CircleRole; status: MembershipStatus }>(
+        `SELECT role, status FROM public.circle_memberships WHERE circle_id = $1 AND user_id = $2 LIMIT 1;`,
+        [circleId, actorUserId]
+      )
+    : { rows: [] };
+  const membership = memRes.rows[0] ?? null;
+  const isStaff = membership && ['owner', 'admin', 'moderator'].includes(membership.role);
+
+  let pollsSql = `
+    SELECT p.*,
+      COALESCE(u.username, 'member') AS creator_username,
+      COALESCE(u.display_name, 'Member') AS creator_display_name,
+      u.avatar_url AS creator_avatar_url
+    FROM public.circle_polls p
+    LEFT JOIN public.profiles u ON u.id = p.creator_id
+    WHERE p.circle_id = $1
+  `;
+  const params: unknown[] = [circleId];
+
+  if (pollIds && pollIds.length > 0) {
+    pollsSql += ` AND p.id = ANY($2::uuid[])`;
+    params.push(pollIds);
+  }
+  pollsSql += ` ORDER BY p.created_at DESC;`;
+
+  const pollsRes = await tx.query<{
+    id: string;
+    circle_id: string;
+    space_id: string | null;
+    post_id: string | null;
+    creator_id: string;
+    question: string;
+    description: string;
+    allow_multiple: boolean;
+    results_visibility: 'always' | 'after_vote' | 'after_close';
+    closes_at: string | null;
+    status: 'open' | 'closed' | 'archived';
+    decision_summary: string | null;
+    created_at: string;
+    updated_at: string;
+    creator_username: string;
+    creator_display_name: string;
+    creator_avatar_url: string | null;
+  }>(pollsSql, params);
+
+  if (pollsRes.rows.length === 0) {
+    return new Map();
+  }
+
+  let optionsSql = `
+    SELECT o.*,
+      (SELECT COUNT(*)::int FROM public.poll_votes v WHERE v.option_id = o.id) AS vote_count,
+      EXISTS (
+        SELECT 1 FROM public.poll_votes v
+        WHERE v.option_id = o.id AND v.voter_id = $2
+      ) AS viewer_voted
+    FROM public.poll_options o
+    WHERE o.circle_id = $1
+  `;
+  const optParams: unknown[] = [circleId, actorUserId];
+  if (pollIds && pollIds.length > 0) {
+    optionsSql += ` AND o.poll_id = ANY($3::uuid[])`;
+    optParams.push(pollIds);
+  }
+  optionsSql += ` ORDER BY o.sort_order ASC;`;
+
+  const optionsRes = await tx.query<{
+    id: string;
+    poll_id: string;
+    circle_id: string;
+    label: string;
+    sort_order: number;
+    vote_count: number;
+    viewer_voted: boolean;
+  }>(optionsSql, optParams);
+
+  const nowMs = Date.now();
+  const pollMap = new Map<string, CirclePollItem>();
+
+  for (const poll of pollsRes.rows) {
+    const pollOpts = optionsRes.rows.filter((o) => o.poll_id === poll.id);
+    const viewerHasVoted = pollOpts.some((o) => Boolean(o.viewer_voted));
+    const isClosedByTime =
+      poll.closes_at !== null && new Date(poll.closes_at).getTime() <= nowMs;
+    const effectiveClosed = poll.status !== 'open' || isClosedByTime;
+
+    const resultsVisible =
+      Boolean(isStaff) ||
+      poll.creator_id === actorUserId ||
+      poll.results_visibility === 'always' ||
+      (poll.results_visibility === 'after_vote' && (viewerHasVoted || effectiveClosed)) ||
+      (poll.results_visibility === 'after_close' && effectiveClosed);
+
+    const totalVotes = pollOpts.reduce((acc, o) => acc + Number(o.vote_count ?? 0), 0);
+
+    const enriched: CirclePollItem = {
+      id: poll.id,
+      circle_id: poll.circle_id,
+      space_id: poll.space_id,
+      post_id: poll.post_id ?? null,
+      creator_id: poll.creator_id,
+      question: poll.question,
+      description: poll.description,
+      allow_multiple: poll.allow_multiple,
+      results_visibility: poll.results_visibility,
+      closes_at: poll.closes_at,
+      status: poll.status,
+      decision_summary: poll.decision_summary,
+      created_at: poll.created_at,
+      updated_at: poll.updated_at,
+      creator: {
+        id: poll.creator_id,
+        username: poll.creator_username,
+        display_name: poll.creator_display_name,
+        avatar_url: poll.creator_avatar_url,
+      },
+      total_votes: resultsVisible ? totalVotes : null,
+      results_visible_to_viewer: resultsVisible,
+      viewer_has_voted: viewerHasVoted,
+      options: pollOpts.map((opt) => {
+        const count = Number(opt.vote_count ?? 0);
+        return {
+          id: opt.id,
+          poll_id: opt.poll_id,
+          circle_id: opt.circle_id,
+          label: opt.label,
+          sort_order: opt.sort_order,
+          vote_count: resultsVisible ? count : null,
+          percentage:
+            resultsVisible && totalVotes > 0
+              ? Math.round((count / totalVotes) * 100)
+              : resultsVisible
+              ? 0
+              : null,
+          viewer_voted: Boolean(opt.viewer_voted),
+        };
+      }),
+    };
+
+    pollMap.set(poll.id, enriched);
+  }
+
+  return pollMap;
+}
+
 export async function listCirclePolls(
   actorUserId: string | null,
   circleId: string
@@ -173,119 +332,22 @@ export async function listCirclePolls(
       throw new ForbiddenError('You do not have permission to view polls in this Circle.');
     }
 
-    const pollsRes = await tx.query<{
-      id: string;
-      circle_id: string;
-      space_id: string | null;
-      creator_id: string;
-      question: string;
-      description: string;
-      allow_multiple: boolean;
-      results_visibility: 'always' | 'after_vote' | 'after_close';
-      closes_at: string | null;
-      status: 'open' | 'closed' | 'archived';
-      decision_summary: string | null;
-      created_at: string;
-      updated_at: string;
-      creator_username: string;
-      creator_display_name: string;
-      creator_avatar_url: string | null;
-    }>(
-      `SELECT p.*,
-         COALESCE(u.username, 'member') AS creator_username,
-         COALESCE(u.display_name, 'Member') AS creator_display_name,
-         u.avatar_url AS creator_avatar_url
-       FROM public.circle_polls p
-       LEFT JOIN public.profiles u ON u.id = p.creator_id
-       WHERE p.circle_id = $1
-       ORDER BY p.created_at DESC;`,
-      [circleId]
-    );
-
-    if (pollsRes.rows.length === 0) {
-      return [];
-    }
-
-    const optionsRes = await tx.query<{
-      id: string;
-      poll_id: string;
-      circle_id: string;
-      label: string;
-      sort_order: number;
-      vote_count: number;
-      viewer_voted: boolean;
-    }>(
-      `SELECT o.*,
-         (SELECT COUNT(*)::int FROM public.poll_votes v WHERE v.option_id = o.id) AS vote_count,
-         EXISTS (
-           SELECT 1 FROM public.poll_votes v
-           WHERE v.option_id = o.id AND v.voter_id = $2
-         ) AS viewer_voted
-       FROM public.poll_options o
-       WHERE o.circle_id = $1
-       ORDER BY o.sort_order ASC;`,
-      [circleId, actorUserId]
-    );
-
-    const isStaff = membership && ['owner', 'admin', 'moderator'].includes(membership.role);
-    const nowMs = Date.now();
-
-    return pollsRes.rows.map((poll) => {
-      const pollOpts = optionsRes.rows.filter((o) => o.poll_id === poll.id);
-      const viewerHasVoted = pollOpts.some((o) => Boolean(o.viewer_voted));
-      const isClosedByTime =
-        poll.closes_at !== null && new Date(poll.closes_at).getTime() <= nowMs;
-      const effectiveClosed = poll.status !== 'open' || isClosedByTime;
-
-      const resultsVisible =
-        Boolean(isStaff) ||
-        poll.creator_id === actorUserId ||
-        poll.results_visibility === 'always' ||
-        (poll.results_visibility === 'after_vote' && (viewerHasVoted || effectiveClosed)) ||
-        (poll.results_visibility === 'after_close' && effectiveClosed);
-
-      const totalVotes = pollOpts.reduce((acc, o) => acc + Number(o.vote_count ?? 0), 0);
-
-      return {
-        id: poll.id,
-        circle_id: poll.circle_id,
-        space_id: poll.space_id,
-        creator_id: poll.creator_id,
-        question: poll.question,
-        description: poll.description,
-        allow_multiple: poll.allow_multiple,
-        results_visibility: poll.results_visibility,
-        closes_at: poll.closes_at,
-        status: poll.status,
-        decision_summary: poll.decision_summary,
-        created_at: poll.created_at,
-        updated_at: poll.updated_at,
-        creator: {
-          id: poll.creator_id,
-          username: poll.creator_username,
-          display_name: poll.creator_display_name,
-          avatar_url: poll.creator_avatar_url,
-        },
-        total_votes: resultsVisible ? totalVotes : null,
-        results_visible_to_viewer: resultsVisible,
-        viewer_has_voted: viewerHasVoted,
-        options: pollOpts.map((opt) => {
-          const count = Number(opt.vote_count ?? 0);
-          return {
-            id: opt.id,
-            poll_id: opt.poll_id,
-            circle_id: opt.circle_id,
-            label: opt.label,
-            sort_order: opt.sort_order,
-            vote_count: resultsVisible ? count : null,
-            percentage:
-              resultsVisible && totalVotes > 0 ? Math.round((count / totalVotes) * 100) : resultsVisible ? 0 : null,
-            viewer_voted: Boolean(opt.viewer_voted),
-          };
-        }),
-      };
-    });
+    const pollMap = await fetchEnrichedPolls(tx, circleId, actorUserId);
+    return Array.from(pollMap.values());
   });
+}
+
+export async function getCirclePoll(
+  actorUserId: string | null,
+  circleId: string,
+  pollId: string
+): Promise<CirclePollItem> {
+  const polls = await listCirclePolls(actorUserId, circleId);
+  const found = polls.find((p) => p.id === pollId);
+  if (!found) {
+    throw new NotFoundError('Poll not found.');
+  }
+  return found;
 }
 
 export async function castPollVote(

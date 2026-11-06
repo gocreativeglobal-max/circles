@@ -46,6 +46,8 @@ describe('Phase 3: Remote PostgreSQL Pool Executor, Migration Tracking & Supabas
       '0022',
       '0023',
       '0024',
+      '0025',
+      '0026',
     ]);
     expect(applied.map((m) => m.filename)).toEqual([
       '0001_initial_schema.sql',
@@ -72,6 +74,8 @@ describe('Phase 3: Remote PostgreSQL Pool Executor, Migration Tracking & Supabas
       '0022_bachs_payment_processor.sql',
       '0023_platform_fee_tiers.sql',
       '0024_opportunity_link.sql',
+      '0025_universal_customizable_listings.sql',
+      '0026_polls_in_discussions.sql',
     ]);
     for (const record of applied) {
       expect(record.checksum).toMatch(/^[a-f0-9]{64}$/);
@@ -105,6 +109,8 @@ describe('Phase 3: Remote PostgreSQL Pool Executor, Migration Tracking & Supabas
       '0022_bachs_payment_processor.sql',
       '0023_platform_fee_tiers.sql',
       '0024_opportunity_link.sql',
+      '0025_universal_customizable_listings.sql',
+      '0026_polls_in_discussions.sql',
     ]);
 
     const suffix = Date.now();

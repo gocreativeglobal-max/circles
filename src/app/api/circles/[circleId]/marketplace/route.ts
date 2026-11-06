@@ -23,13 +23,10 @@ export async function GET(
     const { searchParams } = new URL(req.url);
     const listingTypeParam = searchParams.get('listingType') ?? searchParams.get('type');
     const listingType =
-      listingTypeParam === 'product' ||
-      listingTypeParam === 'service' ||
-      listingTypeParam === 'rental' ||
-      listingTypeParam === 'housing' ||
-      listingTypeParam === 'directory'
-        ? listingTypeParam
-        : undefined;
+      listingTypeParam && listingTypeParam !== 'all' ? listingTypeParam : undefined;
+    const transactionType = searchParams.get('transactionType') || undefined;
+    const actionType = searchParams.get('actionType') || undefined;
+    const tag = searchParams.get('tag') || undefined;
     const category = searchParams.get('category') || undefined;
     const search = searchParams.get('search') || undefined;
     const sortByParam = searchParams.get('sortBy');
@@ -38,6 +35,9 @@ export async function GET(
 
     const listings = await listMarketplaceListings(user?.id ?? null, params.circleId, {
       listingType,
+      transactionType,
+      actionType,
+      tag,
       category,
       search,
       sortBy,

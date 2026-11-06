@@ -5,11 +5,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   AlertCircle,
+  BarChart2,
   Bookmark,
   Flag,
   Heart,
   MessageSquare,
   Pin,
+  Plus,
   Trash2,
   Send,
   X,
@@ -22,6 +24,7 @@ import {
 import { Circle, CircleSpace, PostItem, CommentItem } from '@/types/domain';
 import { DynamicIcon } from '@/components/ui/icon-map';
 import { Button } from '@/components/ui/button';
+import { InlinePollCard } from '@/components/circles/inline-poll-card';
 
 interface DiscussionsClientProps {
   circle: Circle;
@@ -78,6 +81,15 @@ export function DiscussionsClient({
   const [showTitleInput, setShowTitleInput] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Inline Poll Creator State (WhatsApp/Telegram style)
+  const [showPollCreator, setShowPollCreator] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
+  const [pollAllowMultiple, setPollAllowMultiple] = useState(false);
+  const [pollResultsVisibility, setPollResultsVisibility] = useState<
+    'always' | 'after_vote' | 'after_close'
+  >('always');
 
   // Thread Drawer State
   const [activeThreadPost, setActiveThreadPost] = useState<PostItem | null>(null);
@@ -163,16 +175,35 @@ export function DiscussionsClient({
   // Send message in the active space
   async function handleSendMessage(e?: React.FormEvent) {
     if (e) e.preventDefault();
-    const cleanBody = messageText.trim();
-    if (!cleanBody || submitting) return;
+    const rawBody = messageText.trim();
+    if (showPollCreator) {
+      if (!pollQuestion.trim()) {
+        setError('Please enter a poll question.');
+        return;
+      }
+      const validOptions = pollOptions.map((o) => o.trim()).filter(Boolean);
+      if (validOptions.length < 2) {
+        setError('Polls require at least 2 distinct options.');
+        return;
+      }
+      const unique = new Set(validOptions.map((o) => o.toLowerCase()));
+      if (unique.size !== validOptions.length) {
+        setError('Poll options must be distinct.');
+        return;
+      }
+    } else {
+      if (!rawBody || submitting) return;
+    }
+
+    if (submitting) return;
 
     setError(null);
     setSubmitting(true);
 
-    // Auto-generate title if not manually provided
+    const cleanBody = rawBody || pollQuestion.trim() || 'Discussion Poll';
     const cleanTitle =
       postTitle.trim() ||
-      cleanBody.slice(0, 60).split('\n')[0] ||
+      (showPollCreator ? pollQuestion.trim() : cleanBody.slice(0, 60).split('\n')[0]) ||
       'Discussion Message';
 
     // Optimistic post insertion
@@ -214,14 +245,25 @@ export function DiscussionsClient({
     setShowTitleInput(false);
 
     try {
+      const payload: Record<string, unknown> = {
+        title: cleanTitle,
+        body: cleanBody,
+        spaceId: selectedSpaceId || null,
+      };
+
+      if (showPollCreator) {
+        payload.poll = {
+          question: pollQuestion.trim(),
+          options: pollOptions.map((o) => o.trim()).filter(Boolean),
+          allowMultiple: pollAllowMultiple,
+          resultsVisibility: pollResultsVisibility,
+        };
+      }
+
       const res = await fetch(`/api/circles/${circle.id}/posts`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: cleanTitle,
-          body: cleanBody,
-          spaceId: selectedSpaceId || null,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -233,11 +275,20 @@ export function DiscussionsClient({
       setPosts((prev) =>
         prev.map((p) => (p.id === optimisticId ? data.post || p : p))
       );
+
+      // Reset poll creator state
+      if (showPollCreator) {
+        setShowPollCreator(false);
+        setPollQuestion('');
+        setPollOptions(['', '']);
+        setPollAllowMultiple(false);
+        setPollResultsVisibility('always');
+      }
     } catch (err) {
       // Revert optimistic insert
       setPosts((prev) => prev.filter((p) => p.id !== optimisticId));
       setError(err instanceof Error ? err.message : 'Error sending message.');
-      setMessageText(cleanBody);
+      setMessageText(rawBody);
     } finally {
       setSubmitting(false);
     }
@@ -690,6 +741,29 @@ export function DiscussionsClient({
                           {post.body}
                         </div>
 
+                        {/* Inline Poll Card (WhatsApp / Telegram style) */}
+                        {post.poll && (
+                          <div className="max-w-md">
+                            <InlinePollCard
+                              poll={post.poll}
+                              circleId={circle.id}
+                              isMember={isActiveMember}
+                              onPollUpdated={(updatedPoll) => {
+                                setPosts((prev) =>
+                                  prev.map((p) =>
+                                    p.id === post.id ? { ...p, poll: updatedPoll } : p
+                                  )
+                                );
+                                if (activeThreadPost?.id === post.id) {
+                                  setActiveThreadPost((prev) =>
+                                    prev ? { ...prev, poll: updatedPoll } : prev
+                                  );
+                                }
+                              }}
+                            />
+                          </div>
+                        )}
+
                         {/* Thread Replies Button */}
                         {(post.comment_count > 0 || activeThreadPost?.id === post.id) && (
                           <button
@@ -827,6 +901,112 @@ export function DiscussionsClient({
                   </div>
                 )}
 
+                {/* WhatsApp/Telegram Style Poll Builder */}
+                {showPollCreator && (
+                  <div className="rounded-2xl border border-emerald-600/30 bg-emerald-50/40 p-3.5 space-y-3 shadow-xs animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-emerald-900">
+                        <BarChart2 className="h-4 w-4 text-emerald-700" />
+                        <span>Create a Community Poll</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowPollCreator(false)}
+                        className="rounded-lg p-1 text-stone-400 hover:bg-stone-200/50 hover:text-stone-700"
+                        title="Cancel Poll"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+
+                    {/* Poll Question */}
+                    <div>
+                      <input
+                        type="text"
+                        value={pollQuestion}
+                        onChange={(e) => setPollQuestion(e.target.value)}
+                        placeholder="Ask a question..."
+                        className="w-full rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-900 placeholder:text-stone-400 focus:border-emerald-600 focus:outline-none focus:ring-1 focus:ring-emerald-600"
+                      />
+                    </div>
+
+                    {/* Poll Options */}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-mono font-bold uppercase tracking-wider text-stone-500">
+                        Options ({pollOptions.length}/12)
+                      </label>
+                      {pollOptions.map((opt, idx) => (
+                        <div key={idx} className="flex items-center gap-1.5">
+                          <input
+                            type="text"
+                            value={opt}
+                            onChange={(e) => {
+                              const next = [...pollOptions];
+                              next[idx] = e.target.value;
+                              setPollOptions(next);
+                            }}
+                            placeholder={`Option ${idx + 1}`}
+                            className="flex-1 rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-xs text-stone-800 placeholder:text-stone-400 focus:border-emerald-600 focus:outline-none"
+                          />
+                          {pollOptions.length > 2 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPollOptions((prev) => prev.filter((_, i) => i !== idx));
+                              }}
+                              className="rounded p-1 text-stone-400 hover:bg-stone-200/50 hover:text-rose-600"
+                              title="Remove option"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      ))}
+
+                      {pollOptions.length < 12 && (
+                        <button
+                          type="button"
+                          onClick={() => setPollOptions((prev) => [...prev, ''])}
+                          className="mt-1 inline-flex items-center gap-1 rounded-lg border border-dashed border-stone-300 bg-white/60 px-2.5 py-1 text-[11px] font-medium text-stone-600 hover:border-emerald-500 hover:text-emerald-800 transition-colors"
+                        >
+                          <Plus className="h-3 w-3" />
+                          <span>Add Option</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Poll Settings */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-emerald-600/10 text-xs">
+                      <label className="inline-flex items-center gap-2 font-medium text-stone-700 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={pollAllowMultiple}
+                          onChange={(e) => setPollAllowMultiple(e.target.checked)}
+                          className="rounded border-stone-300 text-emerald-600 focus:ring-emerald-500"
+                        />
+                        <span className="text-[11px]">Allow multiple answers</span>
+                      </label>
+
+                      <div className="flex items-center gap-1.5 text-[11px] text-stone-500">
+                        <span>Results:</span>
+                        <select
+                          value={pollResultsVisibility}
+                          onChange={(e) =>
+                            setPollResultsVisibility(
+                              e.target.value as 'always' | 'after_vote' | 'after_close'
+                            )
+                          }
+                          className="rounded-lg border border-stone-200 bg-white px-2 py-0.5 text-[11px] text-stone-700 focus:outline-none"
+                        >
+                          <option value="always">Always visible</option>
+                          <option value="after_vote">After voting</option>
+                          <option value="after_close">After closing</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center gap-2 rounded-2xl border border-stone-200 bg-stone-50/60 p-1.5 focus-within:border-stone-900 focus-within:bg-white transition-all shadow-2xs">
                   <textarea
                     ref={textareaRef}
@@ -839,12 +1019,34 @@ export function DiscussionsClient({
                         handleSendMessage();
                       }
                     }}
-                    placeholder={`Message #${activeSpace ? activeSpace.name : 'all-discussions'}...`}
+                    placeholder={
+                      showPollCreator
+                        ? 'Add a caption to your poll (optional)...'
+                        : `Message #${activeSpace ? activeSpace.name : 'all-discussions'}...`
+                    }
                     className="flex-1 max-h-32 min-h-[36px] resize-none bg-transparent px-3 py-2 text-xs text-stone-900 leading-relaxed placeholder:text-stone-400 focus:outline-hidden font-sans"
                   />
 
                   {/* Actions */}
                   <div className="flex items-center gap-1 pr-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowPollCreator((v) => !v);
+                        if (!showPollCreator && !pollQuestion && messageText.trim()) {
+                          setPollQuestion(messageText.trim());
+                        }
+                      }}
+                      title={showPollCreator ? 'Cancel Poll' : 'Add Poll (WhatsApp/Telegram style)'}
+                      className={`p-1.5 rounded-lg transition-colors ${
+                        showPollCreator
+                          ? 'bg-emerald-100 text-emerald-800'
+                          : 'text-stone-400 hover:bg-stone-100 hover:text-stone-700'
+                      }`}
+                    >
+                      <BarChart2 className="h-4 w-4" />
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => setShowTitleInput((v) => !v)}
@@ -860,7 +1062,12 @@ export function DiscussionsClient({
 
                     <Button
                       type="submit"
-                      disabled={!messageText.trim() || submitting}
+                      disabled={
+                        submitting ||
+                        (showPollCreator
+                          ? !pollQuestion.trim() || pollOptions.filter((o) => o.trim()).length < 2
+                          : !messageText.trim())
+                      }
                       className="h-8 w-8 rounded-xl p-0 bg-stone-900 text-white hover:bg-black disabled:opacity-30 transition-all shadow-xs"
                       aria-label="Send message"
                     >
@@ -934,6 +1141,25 @@ export function DiscussionsClient({
                 <p className="text-xs text-stone-700 whitespace-pre-wrap leading-relaxed">
                   {activeThreadPost.body}
                 </p>
+
+                {/* Inline Poll Card inside thread view */}
+                {activeThreadPost.poll && (
+                  <InlinePollCard
+                    poll={activeThreadPost.poll}
+                    circleId={circle.id}
+                    isMember={isActiveMember}
+                    onPollUpdated={(updatedPoll) => {
+                      setActiveThreadPost((prev) =>
+                        prev ? { ...prev, poll: updatedPoll } : prev
+                      );
+                      setPosts((prev) =>
+                        prev.map((p) =>
+                          p.id === activeThreadPost.id ? { ...p, poll: updatedPoll } : p
+                        )
+                      );
+                    }}
+                  />
+                )}
               </div>
 
               {/* Replies Divider */}

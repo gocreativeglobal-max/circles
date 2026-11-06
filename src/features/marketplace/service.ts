@@ -38,22 +38,35 @@ export const availabilityScheduleSchema = z.object({
 
 export const createListingSchema = z.object({
   circleId: z.string().uuid(),
-  listingType: z.enum(['product', 'service', 'rental', 'housing', 'directory']).default('product'),
+  listingType: z.string().trim().min(1).max(40).default('product'),
   category: z.string().trim().min(1).max(60).default('general'),
   title: z.string().trim().min(3).max(160),
-  description: z.string().trim().max(8000).default(''),
+  description: z.string().trim().max(10000).default(''),
   priceAmount: z.number().min(0).max(100000000).nullable().optional(),
   priceCurrency: z.string().trim().length(3).default('USD'),
   pricingUnit: z
     .enum(['fixed', 'hourly', 'daily', 'monthly', 'free', 'negotiable'])
     .default('fixed'),
+  transactionType: z
+    .enum(['free', 'fixed', 'rate', 'range', 'negotiable'])
+    .default('fixed'),
+  rateInterval: z
+    .enum(['hourly', 'daily', 'weekly', 'monthly', 'annually'])
+    .nullable()
+    .optional(),
+  priceMin: z.number().min(0).max(100000000).nullable().optional(),
+  priceMax: z.number().min(0).max(100000000).nullable().optional(),
+  actionType: z.enum(['inquiry', 'booking', 'application', 'link']).default('inquiry'),
+  actionUrl: z.string().trim().max(2048).nullable().optional(),
+  customFields: z.record(z.unknown()).default({}),
+  tags: z.array(z.string().trim().max(40)).default([]),
   condition: z
     .enum(['new', 'like_new', 'good', 'fair', 'not_applicable'])
     .nullable()
     .optional(),
   location: z.string().trim().max(200).nullable().optional(),
   contactPreference: z.enum(['in_app_inquiry', 'email', 'both']).default('in_app_inquiry'),
-  imageUrls: z.array(z.string().trim().min(1).max(1000)).max(8).default([]),
+  imageUrls: z.array(z.string().trim().min(1).max(1000)).max(12).default([]),
   serviceDurationMinutes: z.number().int().min(15).max(1440).nullable().optional(),
   availableFrom: z.string().datetime().nullable().optional(),
   availableUntil: z.string().datetime().nullable().optional(),
@@ -64,13 +77,23 @@ export const createListingSchema = z.object({
 
 export const updateListingSchema = z.object({
   title: z.string().trim().min(3).max(160).optional(),
-  description: z.string().trim().max(8000).optional(),
+  description: z.string().trim().max(10000).optional(),
   category: z.string().trim().min(1).max(60).optional(),
+  listingType: z.string().trim().min(1).max(40).optional(),
   priceAmount: z.number().min(0).max(100000000).nullable().optional(),
+  priceCurrency: z.string().trim().length(3).optional(),
   pricingUnit: z.enum(['fixed', 'hourly', 'daily', 'monthly', 'free', 'negotiable']).optional(),
+  transactionType: z.enum(['free', 'fixed', 'rate', 'range', 'negotiable']).optional(),
+  rateInterval: z.enum(['hourly', 'daily', 'weekly', 'monthly', 'annually']).nullable().optional(),
+  priceMin: z.number().min(0).max(100000000).nullable().optional(),
+  priceMax: z.number().min(0).max(100000000).nullable().optional(),
+  actionType: z.enum(['inquiry', 'booking', 'application', 'link']).optional(),
+  actionUrl: z.string().trim().max(2048).nullable().optional(),
+  customFields: z.record(z.unknown()).optional(),
+  tags: z.array(z.string().trim().max(40)).optional(),
   condition: z.enum(['new', 'like_new', 'good', 'fair', 'not_applicable']).nullable().optional(),
   location: z.string().trim().max(200).nullable().optional(),
-  imageUrls: z.array(z.string().trim().min(1).max(1000)).max(8).optional(),
+  imageUrls: z.array(z.string().trim().min(1).max(1000)).max(12).optional(),
   availabilitySchedule: availabilityScheduleSchema.optional().nullable(),
   isInstantBookable: z.boolean().optional(),
   status: z.enum(['draft', 'published', 'reserved', 'sold', 'archived', 'removed']).optional(),
@@ -162,6 +185,14 @@ function normalizeListingRow(
     price_amount: row.price_amount !== null && row.price_amount !== undefined ? Number(row.price_amount) : null,
     price_currency: row.price_currency,
     pricing_unit: row.pricing_unit,
+    transaction_type: row.transaction_type ?? 'fixed',
+    rate_interval: row.rate_interval ?? null,
+    price_min: row.price_min !== null && row.price_min !== undefined ? Number(row.price_min) : null,
+    price_max: row.price_max !== null && row.price_max !== undefined ? Number(row.price_max) : null,
+    action_type: row.action_type ?? 'inquiry',
+    action_url: row.action_url ?? null,
+    custom_fields: typeof row.custom_fields === 'object' && row.custom_fields !== null ? row.custom_fields : {},
+    tags: Array.isArray(row.tags) ? (row.tags as string[]) : [],
     condition: row.condition ?? null,
     location: row.location ?? null,
     contact_preference: row.contact_preference,
@@ -204,12 +235,14 @@ export async function createMarketplaceListing(
          id, circle_id, seller_id, listing_type, category, title, description,
          price_amount, price_currency, pricing_unit, condition, location,
          contact_preference, image_urls, service_duration_minutes,
-         available_from, available_until, availability_schedule, is_instant_bookable, status
+         available_from, available_until, availability_schedule, is_instant_bookable, status,
+         transaction_type, rate_interval, price_min, price_max, action_type, action_url, custom_fields, tags
        ) VALUES (
          $1, $2, $3, $4, $5, $6, $7,
          $8, $9, $10, $11, $12,
          $13, $14::jsonb, $15,
-         $16, $17, $18::jsonb, $19::boolean, $20
+         $16, $17, $18::jsonb, $19::boolean, $20,
+         $21, $22, $23, $24, $25, $26, $27::jsonb, $28::jsonb
        ) RETURNING *;`,
       [
         listingId,
@@ -240,6 +273,14 @@ export async function createMarketplaceListing(
             }),
         Boolean(parsed.isInstantBookable),
         parsed.status,
+        parsed.transactionType,
+        parsed.rateInterval ?? null,
+        parsed.priceMin ?? null,
+        parsed.priceMax ?? null,
+        parsed.actionType,
+        parsed.actionUrl ?? null,
+        JSON.stringify(parsed.customFields || {}),
+        JSON.stringify(parsed.tags || []),
       ]
     );
 
@@ -251,8 +292,11 @@ export async function listMarketplaceListings(
   actorUserId: string | null,
   circleId: string,
   options?: {
-    listingType?: 'product' | 'service' | 'rental' | 'housing' | 'directory';
+    listingType?: string;
     category?: string;
+    transactionType?: string;
+    actionType?: string;
+    tag?: string;
     search?: string;
     status?: string;
     minPrice?: number;
@@ -299,8 +343,18 @@ export async function listMarketplaceListings(
 
     let items = res.rows.map(normalizeListingRow);
 
-    if (options?.listingType) {
+    if (options?.listingType && options.listingType !== 'all') {
       items = items.filter((item) => item.listing_type === options.listingType);
+    }
+    if (options?.transactionType) {
+      items = items.filter((item) => item.transaction_type === options.transactionType);
+    }
+    if (options?.actionType) {
+      items = items.filter((item) => item.action_type === options.actionType);
+    }
+    if (options?.tag) {
+      const targetTag = options.tag.toLowerCase();
+      items = items.filter((item) => item.tags?.some((t) => t.toLowerCase() === targetTag));
     }
     if (options?.category) {
       items = items.filter(
@@ -317,7 +371,9 @@ export async function listMarketplaceListings(
           item.title.toLowerCase().includes(q) ||
           item.description.toLowerCase().includes(q) ||
           item.category.toLowerCase().includes(q) ||
-          (item.location ?? '').toLowerCase().includes(q)
+          (item.location ?? '').toLowerCase().includes(q) ||
+          item.tags?.some((t) => t.toLowerCase().includes(q)) ||
+          JSON.stringify(item.custom_fields || {}).toLowerCase().includes(q)
       );
     }
     if (options?.minPrice !== undefined) {
@@ -430,8 +486,17 @@ export async function updateMarketplaceListing(
            image_urls = CASE WHEN $9::text IS NOT NULL THEN $9::jsonb ELSE image_urls END,
            availability_schedule = CASE WHEN $10::text IS NOT NULL THEN $10::jsonb ELSE availability_schedule END,
            is_instant_bookable = CASE WHEN $11::boolean IS NOT NULL THEN $11::boolean ELSE is_instant_bookable END,
+           listing_type = COALESCE($12, listing_type),
+           transaction_type = COALESCE($13, transaction_type),
+           rate_interval = CASE WHEN $14::boolean THEN $15 ELSE rate_interval END,
+           price_min = CASE WHEN $16::boolean THEN $17::numeric ELSE price_min END,
+           price_max = CASE WHEN $18::boolean THEN $19::numeric ELSE price_max END,
+           action_type = COALESCE($20, action_type),
+           action_url = CASE WHEN $21::boolean THEN $22 ELSE action_url END,
+           custom_fields = CASE WHEN $23::text IS NOT NULL THEN $23::jsonb ELSE custom_fields END,
+           tags = CASE WHEN $24::text IS NOT NULL THEN $24::jsonb ELSE tags END,
            updated_at = NOW()
-       WHERE id = $12 AND circle_id = $13;`,
+       WHERE id = $25 AND circle_id = $26;`,
       [
         parsed.title ?? existing.title,
         parsed.description ?? existing.description,
@@ -448,6 +513,19 @@ export async function updateMarketplaceListing(
             : null
           : null,
         parsed.isInstantBookable !== undefined ? parsed.isInstantBookable : null,
+        parsed.listingType ?? null,
+        parsed.transactionType ?? null,
+        parsed.rateInterval !== undefined,
+        parsed.rateInterval ?? null,
+        parsed.priceMin !== undefined,
+        parsed.priceMin ?? null,
+        parsed.priceMax !== undefined,
+        parsed.priceMax ?? null,
+        parsed.actionType ?? null,
+        parsed.actionUrl !== undefined,
+        parsed.actionUrl ?? null,
+        parsed.customFields ? JSON.stringify(parsed.customFields) : null,
+        parsed.tags ? JSON.stringify(parsed.tags) : null,
         listingId,
         circleId,
       ]

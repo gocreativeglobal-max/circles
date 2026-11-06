@@ -14,20 +14,26 @@ import {
   ExternalLink,
   Eye,
   Inbox,
+  Layers,
   MapPin,
   MessageSquare,
   Plus,
   Search,
   Send,
   ShoppingBag,
+  Sparkles,
   Tag,
+  Trash2,
   User,
   X,
   Zap,
 } from 'lucide-react';
 import {
   CircleRole,
+  ListingActionType,
   ListingInquiryItem,
+  ListingRateInterval,
+  ListingTransactionType,
   MarketplaceListingItem,
   ServiceBookingItem,
 } from '@/types/domain';
@@ -38,14 +44,19 @@ import {
   generateAvailableSlots,
   generateBookingIcs,
 } from '@/features/marketplace/calendar-utils';
+import {
+  formatListingPrice,
+  LISTING_PRESETS,
+} from '@/features/marketplace/listing-helpers';
 
 // Predefined Popular Categories by Type
 const POPULAR_CATEGORIES: Record<string, string[]> = {
-  all: ['Electronics', 'Books & Media', 'Home & Furniture', 'Services', 'Tools & Gear', 'Clothing', 'Housing', 'Vehicles', 'General'],
+  all: ['Electronics', 'Books & Media', 'Home & Furniture', 'Services', 'Tools & Gear', 'Clothing', 'Housing', 'Jobs & Gigs', 'Vehicles', 'General'],
   product: ['Electronics', 'Books & Media', 'Home & Furniture', 'Clothing', 'Sports & Outdoors', 'General'],
   service: ['Tutoring & Lessons', 'Tech & Design', 'Home & Repair', 'Health & Fitness', 'Consulting', 'General'],
   rental: ['Power Tools', 'Gardening Gear', 'Camping & Outdoors', 'AV & Photography', 'Party Supplies', 'General'],
   housing: ['Apartment Sublet', 'Private Room', 'Shared Room', 'Parking Spot', 'Storage Space', 'General'],
+  job: ['Software & Tech', 'Design & Creative', 'Tutoring', 'Community & Events', 'Campus Gig', 'General'],
   directory: ['Local Business', 'Freelancer', 'Contractor', 'Emergency Service', 'General'],
 };
 
@@ -86,17 +97,24 @@ export function MarketplaceBoard({
   const [formModalOpen, setFormModalOpen] = useState(false);
   const [editingListingId, setEditingListingId] = useState<string | null>(null);
 
-  // Form Fields
-  const [listingType, setListingType] = useState<
-    'product' | 'service' | 'rental' | 'housing' | 'directory'
-  >('product');
+  // Form Fields (Universal Customizable Listing)
+  const [listingType, setListingType] = useState<string>('product');
   const [title, setTitle] = useState('');
   const [category, setCategory] = useState('general');
+  const [transactionType, setTransactionType] = useState<ListingTransactionType>('fixed');
+  const [rateInterval, setRateInterval] = useState<ListingRateInterval>('monthly');
   const [priceAmount, setPriceAmount] = useState('');
+  const [priceMin, setPriceMin] = useState('');
+  const [priceMax, setPriceMax] = useState('');
   const [priceCurrency, setPriceCurrency] = useState('USD');
-  const [pricingUnit, setPricingUnit] = useState<
+  const [_pricingUnit, setPricingUnit] = useState<
     'fixed' | 'hourly' | 'daily' | 'monthly' | 'free' | 'negotiable'
   >('fixed');
+  const [actionType, setActionType] = useState<ListingActionType>('inquiry');
+  const [actionUrl, setActionUrl] = useState('');
+  const [customFields, setCustomFields] = useState<Array<{ key: string; value: string }>>([]);
+  const [tags, setTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState('');
   const [condition, setCondition] = useState<
     'new' | 'like_new' | 'good' | 'fair' | 'not_applicable'
   >('good');
@@ -162,6 +180,48 @@ export function MarketplaceBoard({
     return Array.from(combined);
   }, [filterType, existingCategories]);
 
+  // Apply a template preset to the creation form
+  function handleApplyPreset(presetKey: string) {
+    const preset = LISTING_PRESETS[presetKey];
+    if (!preset) return;
+    setListingType(presetKey);
+    setTransactionType(preset.defaultTransaction);
+    setActionType(preset.defaultAction);
+    const newFields = Object.entries(preset.fields).map(([key, value]) => ({ key, value }));
+    setCustomFields(newFields);
+  }
+
+  // Add custom specification field
+  function handleAddCustomField() {
+    setCustomFields((prev) => [...prev, { key: '', value: '' }]);
+  }
+
+  function handleUpdateCustomField(index: number, key: string, value: string) {
+    setCustomFields((prev) => {
+      const next = [...prev];
+      next[index] = { key, value };
+      return next;
+    });
+  }
+
+  function handleRemoveCustomField(index: number) {
+    setCustomFields((prev) => prev.filter((_, i) => i !== index));
+  }
+
+  // Tag helpers
+  function handleAddTag(tagToAdd?: string) {
+    const raw = (tagToAdd || tagInput).trim().replace(/^#/, '');
+    if (!raw) return;
+    if (!tags.includes(raw)) {
+      setTags((prev) => [...prev, raw]);
+    }
+    setTagInput('');
+  }
+
+  function handleRemoveTag(tagToRemove: string) {
+    setTags((prev) => prev.filter((t) => t !== tagToRemove));
+  }
+
   // Open Create Modal
   function handleOpenCreate() {
     setEditingListingId(null);
@@ -169,9 +229,18 @@ export function MarketplaceBoard({
     setDescription('');
     setCategory('general');
     setListingType('product');
+    setTransactionType('fixed');
+    setRateInterval('monthly');
     setPriceAmount('');
+    setPriceMin('');
+    setPriceMax('');
     setPriceCurrency('USD');
     setPricingUnit('fixed');
+    setActionType('inquiry');
+    setActionUrl('');
+    setCustomFields([]);
+    setTags([]);
+    setTagInput('');
     setCondition('good');
     setLocation('');
     setImageUrls([]);
@@ -192,9 +261,54 @@ export function MarketplaceBoard({
     setDescription(item.description || '');
     setCategory(item.category);
     setListingType(item.listing_type);
-    setPriceAmount(item.price_amount !== null ? String(item.price_amount) : '');
+
+    const transType: ListingTransactionType =
+      item.transaction_type ||
+      (item.pricing_unit === 'free'
+        ? 'free'
+        : item.pricing_unit === 'negotiable'
+        ? 'negotiable'
+        : item.pricing_unit && ['hourly', 'daily', 'monthly'].includes(item.pricing_unit)
+        ? 'rate'
+        : 'fixed');
+    setTransactionType(transType);
+
+    setRateInterval(
+      item.rate_interval ||
+        (item.pricing_unit === 'hourly'
+          ? 'hourly'
+          : item.pricing_unit === 'daily'
+          ? 'daily'
+          : item.pricing_unit === 'monthly'
+          ? 'monthly'
+          : 'monthly')
+    );
+
+    setPriceAmount(item.price_amount !== null && item.price_amount !== undefined ? String(item.price_amount) : '');
+    setPriceMin(item.price_min !== null && item.price_min !== undefined ? String(item.price_min) : '');
+    setPriceMax(item.price_max !== null && item.price_max !== undefined ? String(item.price_max) : '');
     setPriceCurrency(item.price_currency || 'USD');
     setPricingUnit(item.pricing_unit);
+
+    setActionType(
+      item.action_type ||
+        (item.listing_type === 'service' || item.listing_type === 'rental' ? 'booking' : 'inquiry')
+    );
+    setActionUrl(item.action_url || '');
+
+    if (item.custom_fields && typeof item.custom_fields === 'object') {
+      const parsed = Object.entries(item.custom_fields).map(([k, v]) => ({
+        key: k,
+        value: String(v ?? ''),
+      }));
+      setCustomFields(parsed);
+    } else {
+      setCustomFields([]);
+    }
+
+    setTags(Array.isArray(item.tags) ? item.tags : []);
+    setTagInput('');
+
     setCondition((item.condition as typeof condition) || 'not_applicable');
     setLocation(item.location || '');
     setImageUrls(item.image_urls || []);
@@ -232,15 +346,50 @@ export function MarketplaceBoard({
         .map((u) => u.trim())
         .filter((u) => u.startsWith('http://') || u.startsWith('https://') || u.startsWith('/'));
 
+      // Convert custom fields array to record object
+      const fieldsObj: Record<string, string> = {};
+      customFields.forEach(({ key, value }) => {
+        if (key.trim()) {
+          fieldsObj[key.trim()] = value.trim();
+        }
+      });
+
+      // Compute pricing unit for backward compatibility
+      const legacyPricingUnit: 'fixed' | 'hourly' | 'daily' | 'monthly' | 'free' | 'negotiable' =
+        transactionType === 'free'
+          ? 'free'
+          : transactionType === 'negotiable'
+          ? 'negotiable'
+          : transactionType === 'rate'
+          ? rateInterval === 'hourly'
+            ? 'hourly'
+            : rateInterval === 'daily'
+            ? 'daily'
+            : rateInterval === 'monthly'
+            ? 'monthly'
+            : 'monthly'
+          : 'fixed';
+
       const payload = {
         ...(isEdit ? { listingId: editingListingId } : {}),
-        listingType,
-        category,
-        title,
-        description,
-        priceAmount: priceAmount ? Number(priceAmount) : null,
+        listingType: listingType.trim() || 'product',
+        category: category.trim() || 'general',
+        title: title.trim(),
+        description: description.trim(),
+        transactionType,
+        rateInterval: transactionType === 'rate' ? rateInterval : null,
+        priceAmount:
+          (transactionType === 'fixed' || transactionType === 'rate' || transactionType === 'negotiable') && priceAmount
+            ? Number(priceAmount)
+            : null,
+        priceMin: transactionType === 'range' && priceMin ? Number(priceMin) : null,
+        priceMax: transactionType === 'range' && priceMax ? Number(priceMax) : null,
         priceCurrency: priceCurrency.toUpperCase(),
-        pricingUnit,
+        pricingUnit: legacyPricingUnit,
+        actionType,
+        actionUrl: actionType === 'link' && actionUrl.trim() ? actionUrl.trim() : null,
+        customFields: fieldsObj,
+        tags: tags.map((t) => t.trim()).filter(Boolean),
         condition: listingType === 'product' || listingType === 'rental' ? condition : null,
         location: location.trim() ? location.trim() : null,
         imageUrls: parsedImages,
@@ -588,7 +737,13 @@ export function MarketplaceBoard({
           l.title.toLowerCase().includes(q) ||
           l.description.toLowerCase().includes(q) ||
           l.category.toLowerCase().includes(q) ||
-          (l.location || '').toLowerCase().includes(q)
+          (l.location || '').toLowerCase().includes(q) ||
+          (Array.isArray(l.tags) && l.tags.some((t) => t.toLowerCase().includes(q))) ||
+          (l.custom_fields &&
+            typeof l.custom_fields === 'object' &&
+            Object.entries(l.custom_fields).some(
+              ([k, v]) => k.toLowerCase().includes(q) || String(v).toLowerCase().includes(q)
+            ))
       );
     }
 
@@ -777,9 +932,10 @@ export function MarketplaceBoard({
               {[
                 { key: 'all', label: 'All Listings' },
                 { key: 'product', label: 'Products & Goods' },
-                { key: 'service', label: 'Services & Tutoring' },
-                { key: 'rental', label: 'Tool & Equipment Lending' },
+                { key: 'service', label: 'Services & Lessons' },
+                { key: 'rental', label: 'Tool & Gear Lending' },
                 { key: 'housing', label: 'Housing & Sublets' },
+                { key: 'job', label: 'Jobs & Gigs' },
                 { key: 'directory', label: 'Directory' },
               ].map((tab) => {
                 const active = filterType === tab.key;
@@ -955,19 +1111,7 @@ export function MarketplaceBoard({
                             {item.title}
                           </Link>
                           <span className="text-sm font-black text-stone-900 font-mono shrink-0">
-                            {item.pricing_unit === 'free'
-                              ? 'FREE'
-                              : item.price_amount !== null
-                              ? `${item.price_currency} ${item.price_amount.toFixed(2)}${
-                                  item.pricing_unit === 'hourly'
-                                    ? '/hr'
-                                    : item.pricing_unit === 'daily'
-                                    ? '/day'
-                                    : item.pricing_unit === 'monthly'
-                                    ? '/mo'
-                                    : ''
-                                }`
-                              : item.pricing_unit}
+                            {formatListingPrice(item)}
                           </span>
                         </div>
 
@@ -975,6 +1119,36 @@ export function MarketplaceBoard({
                           <p className="text-xs text-stone-600 line-clamp-2 leading-relaxed font-normal">
                             {item.description}
                           </p>
+                        )}
+
+                        {/* Tags & Key Custom Attribute Badges */}
+                        {((Array.isArray(item.tags) && item.tags.length > 0) ||
+                          (item.custom_fields &&
+                            typeof item.custom_fields === 'object' &&
+                            Object.keys(item.custom_fields).length > 0)) && (
+                          <div className="flex flex-wrap items-center gap-1.5 pt-1.5">
+                            {Array.isArray(item.tags) &&
+                              item.tags.slice(0, 3).map((t, idx) => (
+                                <span
+                                  key={idx}
+                                  className="rounded-md bg-stone-100 px-1.5 py-0.5 text-[10px] font-mono text-stone-600 border border-stone-200/60"
+                                >
+                                  #{t}
+                                </span>
+                              ))}
+                            {item.custom_fields &&
+                              typeof item.custom_fields === 'object' &&
+                              Object.entries(item.custom_fields)
+                                .slice(0, 2)
+                                .map(([k, v], idx) => (
+                                  <span
+                                    key={`cf-${idx}`}
+                                    className="rounded-md bg-emerald-50/70 px-1.5 py-0.5 text-[10px] font-mono text-emerald-800 border border-emerald-200/50"
+                                  >
+                                    <strong className="font-semibold">{k}:</strong> {String(v)}
+                                  </span>
+                                ))}
+                          </div>
                         )}
                       </div>
                     </div>
@@ -1044,20 +1218,36 @@ export function MarketplaceBoard({
 
                           {!isSeller && isMember && item.status === 'published' && (
                             <>
-                              <Button
-                                size="xs"
-                                variant="outline"
-                                onClick={() => handleOpenInquiry(item)}
-                              >
-                                <MessageSquare className="h-3 w-3 mr-1" />
-                                <span>Inquire</span>
-                              </Button>
-
-                              {(item.listing_type === 'service' ||
-                                item.listing_type === 'rental') && (
+                              {item.action_type === 'link' && item.action_url ? (
+                                <a
+                                  href={item.action_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 rounded-lg border border-stone-300 bg-white px-2 py-1 text-xs font-semibold text-stone-800 shadow-2xs hover:bg-stone-50 hover:text-stone-900 transition-colors"
+                                >
+                                  <span>Link</span>
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                              ) : item.action_type === 'booking' ||
+                                item.listing_type === 'service' ||
+                                item.listing_type === 'rental' ? (
                                 <Button size="xs" onClick={() => handleOpenBooking(item)}>
                                   <Calendar className="h-3 w-3 mr-1" />
                                   <span>{item.listing_type === 'rental' ? 'Borrow' : 'Book'}</span>
+                                </Button>
+                              ) : item.action_type === 'application' ? (
+                                <Button size="xs" onClick={() => handleOpenInquiry(item)}>
+                                  <Send className="h-3 w-3 mr-1" />
+                                  <span>Apply</span>
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="xs"
+                                  variant="outline"
+                                  onClick={() => handleOpenInquiry(item)}
+                                >
+                                  <MessageSquare className="h-3 w-3 mr-1" />
+                                  <span>Inquire</span>
                                 </Button>
                               )}
                             </>
@@ -1351,14 +1541,14 @@ export function MarketplaceBoard({
       {/* MODAL 1: CREATE / EDIT LISTING */}
       {formModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-          <div className="w-full max-w-2xl rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="w-full max-w-3xl rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-stone-100 pb-3">
               <div>
                 <h3 className="text-base font-bold text-stone-900">
-                  {editingListingId ? 'Edit Listing Details' : 'Create Community Listing'}
+                  {editingListingId ? 'Edit Listing Details' : 'Create Customizable Listing'}
                 </h3>
                 <p className="text-xs text-stone-500">
-                  Publish goods for sale, tool library loans, service appointments, or housing.
+                  Universal listing engine for housing, jobs & gigs, tool lending, services, or goods.
                 </p>
               </div>
               <button
@@ -1370,161 +1560,121 @@ export function MarketplaceBoard({
               </button>
             </div>
 
+            {/* Quick Template Presets (Create Mode Only) */}
+            {!editingListingId && (
+              <div className="rounded-xl border border-stone-200/90 bg-stone-50/60 p-3 space-y-2">
+                <div className="flex items-center gap-1.5 text-[11px] font-mono font-bold uppercase tracking-wider text-stone-600">
+                  <Sparkles className="h-3.5 w-3.5 text-emerald-700" />
+                  <span>Quick Template Presets:</span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { key: 'housing', label: '🏠 Housing & Sublets' },
+                    { key: 'job', label: '💼 Jobs & Gigs' },
+                    { key: 'rental', label: '🛠️ Tool Lending' },
+                    { key: 'service', label: '⚡ Services & Lessons' },
+                    { key: 'product', label: '📦 Goods for Sale' },
+                  ].map((p) => (
+                    <button
+                      key={p.key}
+                      type="button"
+                      onClick={() => handleApplyPreset(p.key)}
+                      className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-all ${
+                        listingType === p.key
+                          ? 'bg-stone-900 text-white font-semibold shadow-xs'
+                          : 'bg-white border border-stone-200 text-stone-700 hover:bg-stone-100'
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <form onSubmit={handleSaveListing} className="space-y-4">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                {/* Listing Type */}
                 <div>
                   <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-600">
                     Listing Type
                   </label>
                   <select
-                    value={listingType}
-                    onChange={(e) =>
-                      setListingType(
-                        e.target.value as
-                          | 'product'
-                          | 'service'
-                          | 'rental'
-                          | 'housing'
-                          | 'directory'
+                    value={
+                      ['product', 'service', 'rental', 'housing', 'job', 'directory'].includes(
+                        listingType
                       )
+                        ? listingType
+                        : 'custom'
                     }
+                    onChange={(e) => {
+                      if (e.target.value !== 'custom') {
+                        setListingType(e.target.value);
+                      }
+                    }}
                     className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/60 px-3 py-2 text-xs sm:text-sm text-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900"
                   >
-                    <option value="product">Product for Sale / Trade</option>
-                    <option value="service">Service & Tutoring</option>
-                    <option value="rental">Tool / Equipment Lending</option>
-                    <option value="housing">Housing / Roommate</option>
-                    <option value="directory">Directory Recommendation</option>
+                    <option value="product">Product / Goods</option>
+                    <option value="service">Service & Lessons</option>
+                    <option value="rental">Tool / Gear Lending</option>
+                    <option value="housing">Housing & Sublets</option>
+                    <option value="job">Job & Gig</option>
+                    <option value="directory">Directory</option>
+                    <option value="custom">Custom Type...</option>
                   </select>
+                  {!['product', 'service', 'rental', 'housing', 'job', 'directory'].includes(
+                    listingType
+                  ) && (
+                    <input
+                      required
+                      value={listingType}
+                      onChange={(e) => setListingType(e.target.value)}
+                      placeholder="e.g. Carpool or Lost & Found"
+                      className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/60 px-3 py-1.5 text-xs text-stone-900"
+                    />
+                  )}
                 </div>
 
+                {/* Category */}
                 <div>
                   <div className="flex items-center justify-between">
                     <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-600">
                       Category *
                     </label>
-                    <span className="text-[10px] text-stone-400">or type custom</span>
+                    <span className="text-[10px] text-stone-400">or custom</span>
                   </div>
-                  <div className="mt-1.5 space-y-1.5">
-                    <div className="flex gap-1.5">
-                      <select
-                        value={
-                          POPULAR_CATEGORIES[listingType]?.includes(category)
-                            ? category
-                            : 'custom'
-                        }
-                        onChange={(e) => {
-                          if (e.target.value !== 'custom') {
-                            setCategory(e.target.value);
-                          }
-                        }}
-                        className="w-1/2 rounded-xl border border-stone-200 bg-stone-50/60 px-2 py-2 text-xs sm:text-sm text-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900"
-                      >
-                        <option value="custom">-- Preset --</option>
-                        {(POPULAR_CATEGORIES[listingType] || POPULAR_CATEGORIES.product).map((c) => (
-                          <option key={c} value={c}>
-                            {c}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        required
-                        value={category}
-                        onChange={(e) => setCategory(e.target.value)}
-                        placeholder="e.g. Textbooks"
-                        className="w-1/2 rounded-xl border border-stone-200 bg-stone-50/60 px-3 py-2 text-xs sm:text-sm text-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-600">
-                    Price & Pricing Unit
-                  </label>
                   <div className="mt-1.5 flex gap-1.5">
-                    <input
-                      type="number"
-                      min={0}
-                      step="0.01"
-                      value={priceAmount}
-                      onChange={(e) => setPriceAmount(e.target.value)}
-                      placeholder="0.00"
-                      className="w-1/2 rounded-xl border border-stone-200 bg-stone-50/60 px-2.5 py-2 text-xs sm:text-sm text-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900"
-                    />
                     <select
-                      value={pricingUnit}
-                      onChange={(e) =>
-                        setPricingUnit(
-                          e.target.value as
-                            | 'fixed'
-                            | 'hourly'
-                            | 'daily'
-                            | 'monthly'
-                            | 'free'
-                            | 'negotiable'
-                        )
+                      value={
+                        POPULAR_CATEGORIES[listingType]?.includes(category)
+                          ? category
+                          : 'custom'
                       }
+                      onChange={(e) => {
+                        if (e.target.value !== 'custom') {
+                          setCategory(e.target.value);
+                        }
+                      }}
                       className="w-1/2 rounded-xl border border-stone-200 bg-stone-50/60 px-2 py-2 text-xs sm:text-sm text-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900"
                     >
-                      <option value="fixed">Fixed</option>
-                      <option value="hourly">/ Hour</option>
-                      <option value="daily">/ Day</option>
-                      <option value="monthly">/ Month</option>
-                      <option value="free">Free</option>
-                      <option value="negotiable">Negotiable</option>
+                      <option value="custom">-- Preset --</option>
+                      {(POPULAR_CATEGORIES[listingType] || POPULAR_CATEGORIES.product).map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
                     </select>
+                    <input
+                      required
+                      value={category}
+                      onChange={(e) => setCategory(e.target.value)}
+                      placeholder="e.g. Textbooks"
+                      className="w-1/2 rounded-xl border border-stone-200 bg-stone-50/60 px-3 py-2 text-xs sm:text-sm text-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900"
+                    />
                   </div>
                 </div>
 
-                <div className="sm:col-span-2">
-                  <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-600">
-                    Title *
-                  </label>
-                  <input
-                    required
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="e.g. DeWalt Cordless Drill Kit (Tool Library)"
-                    className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/60 px-3.5 py-2 text-xs sm:text-sm text-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900"
-                  />
-                </div>
-
-                {(listingType === 'product' || listingType === 'rental') && (
-                  <div>
-                    <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-600">
-                      Condition
-                    </label>
-                    <select
-                      value={condition}
-                      onChange={(e) =>
-                        setCondition(
-                          e.target.value as 'new' | 'like_new' | 'good' | 'fair' | 'not_applicable'
-                        )
-                      }
-                      className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/60 px-3 py-2 text-xs sm:text-sm text-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900"
-                    >
-                      <option value="new">Brand New</option>
-                      <option value="like_new">Like New</option>
-                      <option value="good">Good Condition</option>
-                      <option value="fair">Fair / Functional</option>
-                      <option value="not_applicable">N/A</option>
-                    </select>
-                  </div>
-                )}
-
-                <div className="sm:col-span-2">
-                  <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-600">
-                    Meetup Location / Pickup Spot
-                  </label>
-                  <input
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    placeholder="e.g. Science Library Room 102 or Student Union"
-                    className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/60 px-3.5 py-2 text-xs sm:text-sm text-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900"
-                  />
-                </div>
-
+                {/* Status */}
                 <div>
                   <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-600">
                     Listing Status
@@ -1532,9 +1682,7 @@ export function MarketplaceBoard({
                   <select
                     value={status}
                     onChange={(e) =>
-                      setStatus(
-                        e.target.value as 'published' | 'draft' | 'reserved' | 'sold'
-                      )
+                      setStatus(e.target.value as 'published' | 'draft' | 'reserved' | 'sold')
                     }
                     className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/60 px-3 py-2 text-xs sm:text-sm text-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900"
                   >
@@ -1545,6 +1693,342 @@ export function MarketplaceBoard({
                   </select>
                 </div>
 
+                {/* Title */}
+                <div className="sm:col-span-3">
+                  <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-600">
+                    Listing Title *
+                  </label>
+                  <input
+                    required
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="e.g. 2-Bedroom Summer Sublet near Campus or Part-Time React Developer"
+                    className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/60 px-3.5 py-2 text-xs sm:text-sm text-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900"
+                  />
+                </div>
+
+                {/* Transaction & Pricing Model */}
+                <div className="sm:col-span-3 rounded-xl border border-stone-200/90 bg-stone-50/60 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-700">
+                      Pricing & Transaction Model
+                    </label>
+                    <span className="text-[10px] text-stone-400 font-mono">
+                      Flexible for any transaction
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+                    {[
+                      { id: 'fixed', label: 'Fixed Price' },
+                      { id: 'rate', label: 'Recurring Rate' },
+                      { id: 'range', label: 'Price Range' },
+                      { id: 'free', label: 'Free' },
+                      { id: 'negotiable', label: 'Negotiable' },
+                    ].map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setTransactionType(m.id as ListingTransactionType)}
+                        className={`rounded-lg px-2 py-1.5 text-xs font-semibold transition-all ${
+                          transactionType === m.id
+                            ? 'bg-stone-900 text-white shadow-xs'
+                            : 'bg-white border border-stone-200 text-stone-600 hover:bg-stone-100'
+                        }`}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Transaction Inputs */}
+                  <div className="pt-1">
+                    {transactionType === 'fixed' && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-stone-600">{priceCurrency}</span>
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={priceAmount}
+                          onChange={(e) => setPriceAmount(e.target.value)}
+                          placeholder="0.00"
+                          className="w-40 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs sm:text-sm text-stone-900"
+                        />
+                      </div>
+                    )}
+
+                    {transactionType === 'rate' && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-bold text-stone-600">{priceCurrency}</span>
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={priceAmount}
+                          onChange={(e) => setPriceAmount(e.target.value)}
+                          placeholder="Amount"
+                          className="w-36 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs sm:text-sm text-stone-900"
+                        />
+                        <span className="text-xs text-stone-500 font-mono">per</span>
+                        <select
+                          value={rateInterval}
+                          onChange={(e) =>
+                            setRateInterval(e.target.value as ListingRateInterval)
+                          }
+                          className="rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs sm:text-sm text-stone-900"
+                        >
+                          <option value="hourly">Hour</option>
+                          <option value="daily">Day</option>
+                          <option value="weekly">Week</option>
+                          <option value="monthly">Month</option>
+                          <option value="annually">Year</option>
+                        </select>
+                      </div>
+                    )}
+
+                    {transactionType === 'range' && (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs font-bold text-stone-600">{priceCurrency}</span>
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={priceMin}
+                          onChange={(e) => setPriceMin(e.target.value)}
+                          placeholder="Min (e.g. 500)"
+                          className="w-32 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs sm:text-sm text-stone-900"
+                        />
+                        <span className="text-xs text-stone-400 font-mono">to</span>
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={priceMax}
+                          onChange={(e) => setPriceMax(e.target.value)}
+                          placeholder="Max (e.g. 800)"
+                          className="w-32 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs sm:text-sm text-stone-900"
+                        />
+                      </div>
+                    )}
+
+                    {transactionType === 'free' && (
+                      <div className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800 border border-emerald-200 inline-block">
+                        ✓ Free community listing — no payment required
+                      </div>
+                    )}
+
+                    {transactionType === 'negotiable' && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-stone-600">{priceCurrency}</span>
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={priceAmount}
+                          onChange={(e) => setPriceAmount(e.target.value)}
+                          placeholder="Target / Starting Price (Optional)"
+                          className="w-64 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs sm:text-sm text-stone-900"
+                        />
+                        <span className="text-xs text-stone-500 font-mono">(Open to offers)</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Primary Action / CTA Configuration */}
+                <div className="sm:col-span-3 rounded-xl border border-stone-200/90 bg-stone-50/60 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-700">
+                      Primary Action / Call to Action
+                    </label>
+                    <span className="text-[10px] text-stone-400">
+                      How community members respond
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                    {[
+                      { id: 'inquiry', label: '💬 Direct Message' },
+                      { id: 'booking', label: '📅 Booking Calendar' },
+                      { id: 'application', label: '📝 Application Pitch' },
+                      { id: 'link', label: '🔗 External Link' },
+                    ].map((a) => (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => setActionType(a.id as ListingActionType)}
+                        className={`rounded-lg px-2 py-1.5 text-xs font-semibold transition-all ${
+                          actionType === a.id
+                            ? 'bg-stone-900 text-white shadow-xs'
+                            : 'bg-white border border-stone-200 text-stone-600 hover:bg-stone-100'
+                        }`}
+                      >
+                        {a.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {actionType === 'link' && (
+                    <div className="pt-1">
+                      <label className="block text-[10px] font-mono font-bold uppercase tracking-wider text-stone-500 mb-1">
+                        External Website or Application URL *
+                      </label>
+                      <input
+                        required
+                        type="url"
+                        value={actionUrl}
+                        onChange={(e) => setActionUrl(e.target.value)}
+                        placeholder="https://example.com/apply or https://airbnb.com/..."
+                        className="w-full rounded-xl border border-stone-200 bg-white px-3.5 py-1.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Custom Specifications & Attributes */}
+                <div className="sm:col-span-3 rounded-xl border border-stone-200/90 bg-stone-50/60 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Layers className="h-4 w-4 text-emerald-800" />
+                      <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-700">
+                        Custom Specifications & Attributes
+                      </label>
+                    </div>
+                    <Button
+                      type="button"
+                      size="xs"
+                      variant="outline"
+                      onClick={handleAddCustomField}
+                    >
+                      <Plus className="h-3 w-3 mr-1" />
+                      <span>Add Attribute</span>
+                    </Button>
+                  </div>
+
+                  {customFields.length === 0 ? (
+                    <p className="text-xs text-stone-400 italic">
+                      No custom attributes added yet. Add custom fields like Bedrooms, Deposit,
+                      Workplace, Brand, or Experience.
+                    </p>
+                  ) : (
+                    <div className="space-y-2">
+                      {customFields.map((f, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <input
+                            value={f.key}
+                            onChange={(e) =>
+                              handleUpdateCustomField(idx, e.target.value, f.value)
+                            }
+                            placeholder="Attribute Name (e.g. Bedrooms)"
+                            className="w-1/3 rounded-xl border border-stone-200 bg-white px-2.5 py-1.5 text-xs text-stone-900 font-mono"
+                          />
+                          <input
+                            value={f.value}
+                            onChange={(e) =>
+                              handleUpdateCustomField(idx, f.key, e.target.value)
+                            }
+                            placeholder="Value (e.g. 2 Bed, Remote, 8GB)"
+                            className="w-1/2 rounded-xl border border-stone-200 bg-white px-2.5 py-1.5 text-xs text-stone-900"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveCustomField(idx)}
+                            className="rounded-lg p-1.5 text-stone-400 hover:text-rose-600 transition-colors"
+                            title="Remove field"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Tags (Searchable Keywords) */}
+                <div className="sm:col-span-3 rounded-xl border border-stone-200/90 bg-stone-50/60 p-4 space-y-2.5">
+                  <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-700">
+                    Search Tags & Keywords
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddTag();
+                        }
+                      }}
+                      placeholder="Add tag (e.g. Sublet, PetFriendly, Remote, Urgent) and press Enter"
+                      className="flex-1 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-900"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleAddTag()}
+                    >
+                      Add Tag
+                    </Button>
+                  </div>
+                  {tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {tags.map((t) => (
+                        <span
+                          key={t}
+                          className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-0.5 text-xs font-mono text-stone-700 border border-stone-200 shadow-2xs"
+                        >
+                          #{t}
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveTag(t)}
+                            className="text-stone-400 hover:text-stone-800"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Meetup / Location */}
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-600">
+                    Meetup Location / Pickup Spot / Address
+                  </label>
+                  <input
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    placeholder="e.g. Science Library Room 102 or Elm Street Sublet"
+                    className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/60 px-3.5 py-2 text-xs sm:text-sm text-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900"
+                  />
+                </div>
+
+                {/* Condition (if applicable) */}
+                <div>
+                  <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-600">
+                    Condition (Optional)
+                  </label>
+                  <select
+                    value={condition}
+                    onChange={(e) =>
+                      setCondition(
+                        e.target.value as 'new' | 'like_new' | 'good' | 'fair' | 'not_applicable'
+                      )
+                    }
+                    className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/60 px-3 py-2 text-xs sm:text-sm text-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900"
+                  >
+                    <option value="not_applicable">Not Applicable</option>
+                    <option value="new">Brand New</option>
+                    <option value="like_new">Like New</option>
+                    <option value="good">Good Condition</option>
+                    <option value="fair">Fair / Functional</option>
+                  </select>
+                </div>
+
+                {/* Photos */}
                 <div className="sm:col-span-3">
                   <ImageUploader
                     circleId={circleId}
@@ -1557,6 +2041,7 @@ export function MarketplaceBoard({
                   />
                 </div>
 
+                {/* Description */}
                 <div className="sm:col-span-3">
                   <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-600">
                     Description, Terms & Return Conditions
@@ -1570,7 +2055,10 @@ export function MarketplaceBoard({
                   />
                 </div>
 
-                {(listingType === 'service' || listingType === 'rental') && (
+                {/* Booking Availability (if booking action or service/rental) */}
+                {(actionType === 'booking' ||
+                  listingType === 'service' ||
+                  listingType === 'rental') && (
                   <div className="sm:col-span-3 rounded-xl border border-stone-200/90 bg-stone-50/70 p-4 space-y-3">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-200/60 pb-2.5">
                       <div className="flex items-center gap-1.5">
@@ -1752,11 +2240,7 @@ export function MarketplaceBoard({
               <div className="flex items-baseline justify-between gap-4">
                 <h3 className="text-xl font-bold text-stone-900">{selectedListing.title}</h3>
                 <span className="text-lg font-black text-stone-900 font-mono shrink-0">
-                  {selectedListing.pricing_unit === 'free'
-                    ? 'FREE'
-                    : selectedListing.price_amount !== null
-                    ? `${selectedListing.price_currency} ${selectedListing.price_amount.toFixed(2)} (${selectedListing.pricing_unit})`
-                    : selectedListing.pricing_unit}
+                  {formatListingPrice(selectedListing)}
                 </span>
               </div>
 
@@ -1766,7 +2250,42 @@ export function MarketplaceBoard({
                   <span>{selectedListing.location}</span>
                 </div>
               )}
+
+              {/* Tags */}
+              {Array.isArray(selectedListing.tags) && selectedListing.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-2">
+                  {selectedListing.tags.map((t, idx) => (
+                    <span
+                      key={idx}
+                      className="rounded-md bg-stone-100 px-2 py-0.5 text-[11px] font-mono text-stone-600 border border-stone-200/60"
+                    >
+                      #{t}
+                    </span>
+                  ))}
+                </div>
+              )}
             </div>
+
+            {/* Structured Specifications & Attributes */}
+            {selectedListing.custom_fields &&
+              typeof selectedListing.custom_fields === 'object' &&
+              Object.keys(selectedListing.custom_fields).length > 0 && (
+                <div className="rounded-xl border border-stone-200/80 bg-stone-50/60 p-3 space-y-2">
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-stone-500 block">
+                    Specifications & Attributes
+                  </span>
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    {Object.entries(selectedListing.custom_fields).map(([k, v], idx) => (
+                      <div key={idx} className="rounded-lg bg-white p-2 border border-stone-200/60">
+                        <span className="text-[10px] font-mono text-stone-400 block">{k}</span>
+                        <span className="font-semibold text-stone-800 block mt-0.5">
+                          {String(v)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
             {selectedListing.description && (
               <div className="rounded-xl bg-stone-50 p-4 border border-stone-200/80 text-xs text-stone-700 leading-relaxed whitespace-pre-line">
@@ -1867,21 +2386,19 @@ export function MarketplaceBoard({
 
                 {currentUserId !== selectedListing.seller_id && isMember && (
                   <>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => {
-                        const item = selectedListing;
-                        setSelectedListing(null);
-                        handleOpenInquiry(item);
-                      }}
-                    >
-                      <MessageSquare className="h-3.5 w-3.5 mr-1" />
-                      <span>Inquire</span>
-                    </Button>
-
-                    {(selectedListing.listing_type === 'service' ||
-                      selectedListing.listing_type === 'rental') && (
+                    {selectedListing.action_type === 'link' && selectedListing.action_url ? (
+                      <a
+                        href={selectedListing.action_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-emerald-900 transition-colors"
+                      >
+                        <span>Open Link</span>
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </a>
+                    ) : selectedListing.action_type === 'booking' ||
+                      selectedListing.listing_type === 'service' ||
+                      selectedListing.listing_type === 'rental' ? (
                       <Button
                         size="sm"
                         onClick={() => {
@@ -1896,6 +2413,31 @@ export function MarketplaceBoard({
                             ? 'Request Rental'
                             : 'Book Appointment'}
                         </span>
+                      </Button>
+                    ) : selectedListing.action_type === 'application' ? (
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          const item = selectedListing;
+                          setSelectedListing(null);
+                          handleOpenInquiry(item);
+                        }}
+                      >
+                        <Send className="h-3.5 w-3.5 mr-1" />
+                        <span>Apply</span>
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          const item = selectedListing;
+                          setSelectedListing(null);
+                          handleOpenInquiry(item);
+                        }}
+                      >
+                        <MessageSquare className="h-3.5 w-3.5 mr-1" />
+                        <span>Inquire</span>
                       </Button>
                     )}
                   </>

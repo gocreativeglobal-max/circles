@@ -12,6 +12,7 @@ import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { assertCirclePermission, canModifyUserContent } from '@/lib/authorization/permissions';
 import { requireEnabledCapability } from '@/features/capabilities/service';
 import { createNotification } from '@/features/notifications/service';
+import { fetchEnrichedPolls } from '@/features/polls/service';
 
 export interface ListPostsOptions {
   spaceId?: string | null;
@@ -69,36 +70,50 @@ export async function listCirclePosts(
       [circleId, actorUserId, spaceId, limit, offset]
     );
 
-    return res.rows.map((r) => ({
-      id: r.id,
-      circle_id: r.circle_id,
-      space_id: r.space_id,
-      author_id: r.author_id,
-      title: r.title,
-      body: r.body,
-      status: r.status,
-      is_pinned: r.is_pinned,
-      comment_count: r.comment_count,
-      reaction_count: r.reaction_count,
-      created_at: r.created_at,
-      updated_at: r.updated_at,
-      author: {
-        id: r.author_id,
-        username: r.author_username,
-        display_name: r.author_display_name,
-        avatar_url: r.author_avatar_url,
-      },
-      space: r.space_id
-        ? {
-            id: r.space_id,
-            name: r.space_name ?? 'Space',
-            slug: r.space_slug ?? 'general',
-            icon: r.space_icon ?? 'message-square',
-          }
-        : null,
-      viewer_has_liked: Boolean(r.viewer_has_liked),
-      viewer_has_saved: Boolean(r.viewer_has_saved),
-    }));
+    const pollIds = res.rows
+      .map((r) => (r as unknown as { poll_id?: string | null }).poll_id)
+      .filter((id): id is string => Boolean(id));
+
+    const pollMap =
+      pollIds.length > 0
+        ? await fetchEnrichedPolls(tx, circleId, actorUserId, pollIds)
+        : new Map();
+
+    return res.rows.map((r) => {
+      const pollId = (r as unknown as { poll_id?: string | null }).poll_id ?? null;
+      return {
+        id: r.id,
+        circle_id: r.circle_id,
+        space_id: r.space_id,
+        author_id: r.author_id,
+        title: r.title,
+        body: r.body,
+        status: r.status,
+        is_pinned: r.is_pinned,
+        comment_count: r.comment_count,
+        reaction_count: r.reaction_count,
+        created_at: r.created_at,
+        updated_at: r.updated_at,
+        author: {
+          id: r.author_id,
+          username: r.author_username,
+          display_name: r.author_display_name,
+          avatar_url: r.author_avatar_url,
+        },
+        space: r.space_id
+          ? {
+              id: r.space_id,
+              name: r.space_name ?? 'Space',
+              slug: r.space_slug ?? 'general',
+              icon: r.space_icon ?? 'message-square',
+            }
+          : null,
+        viewer_has_liked: Boolean(r.viewer_has_liked),
+        viewer_has_saved: Boolean(r.viewer_has_saved),
+        poll_id: pollId,
+        poll: pollId ? pollMap.get(pollId) ?? null : null,
+      };
+    });
   });
 }
 
@@ -168,6 +183,11 @@ export async function getPostWithComments(
       [postId, circleId]
     );
 
+    const pollId = (row as unknown as { poll_id?: string | null }).poll_id ?? null;
+    const pollMap = pollId
+      ? await fetchEnrichedPolls(tx, circleId, actorUserId, [pollId])
+      : new Map();
+
     const post: PostItem = {
       id: row.id,
       circle_id: row.circle_id,
@@ -197,6 +217,8 @@ export async function getPostWithComments(
         : null,
       viewer_has_liked: Boolean(row.viewer_has_liked),
       viewer_has_saved: Boolean(row.viewer_has_saved),
+      poll_id: pollId,
+      poll: pollId ? pollMap.get(pollId) ?? null : null,
     };
 
     const comments: CommentItem[] = commentsRes.rows.map((c) => ({
@@ -226,8 +248,11 @@ export async function createPost(actorUserId: string, input: unknown): Promise<P
     throw new ValidationError(parsed.error.issues[0]?.message ?? 'Invalid post content.');
   }
 
-  const { circleId, spaceId, title, body } = parsed.data;
+  const { circleId, spaceId, title, body, poll: pollInput } = parsed.data;
   await requireEnabledCapability(actorUserId, circleId, 'discussions');
+  if (pollInput) {
+    await requireEnabledCapability(actorUserId, circleId, 'polls_decisions');
+  }
 
   return withRlsTransaction(actorUserId, async (tx) => {
     const circleRes = await tx.query<{ visibility: CircleVisibility }>(
@@ -300,17 +325,67 @@ export async function createPost(actorUserId: string, input: unknown): Promise<P
     }
 
     const postId = crypto.randomUUID();
+    let pollId: string | null = null;
+
+    if (pollInput) {
+      const uniqueLabels = new Set(pollInput.options.map((o) => o.toLowerCase()));
+      if (uniqueLabels.size !== pollInput.options.length) {
+        throw new ValidationError('Poll options must be distinct.');
+      }
+    }
+
     const inserted = await tx.query<PostItem>(
-      `INSERT INTO public.posts (id, circle_id, space_id, author_id, title, body, status)
-       VALUES ($1, $2, $3, $4, $5, $6, 'published')
+      `INSERT INTO public.posts (id, circle_id, space_id, author_id, title, body, status, poll_id)
+       VALUES ($1, $2, $3, $4, $5, $6, 'published', NULL)
        RETURNING *;`,
       [postId, circleId, spaceId ?? null, actorUserId, title, body]
     );
 
-    const post = inserted.rows[0];
+    let post = inserted.rows[0];
     if (!post) {
       throw new ForbiddenError('Unable to create post.');
     }
+
+    if (pollInput) {
+      pollId = crypto.randomUUID();
+      await tx.query(
+        `INSERT INTO public.circle_polls (
+           id, circle_id, space_id, post_id, creator_id, question, description,
+           allow_multiple, results_visibility, closes_at, status
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'open');`,
+        [
+          pollId,
+          circleId,
+          spaceId ?? null,
+          postId,
+          actorUserId,
+          pollInput.question,
+          pollInput.description ?? '',
+          pollInput.allowMultiple ?? false,
+          pollInput.resultsVisibility ?? 'always',
+          pollInput.closesAt ?? null,
+        ]
+      );
+
+      for (let idx = 0; idx < pollInput.options.length; idx++) {
+        const optId = crypto.randomUUID();
+        await tx.query(
+          `INSERT INTO public.poll_options (id, poll_id, circle_id, label, sort_order)
+           VALUES ($1, $2, $3, $4, $5);`,
+          [optId, pollId, circleId, pollInput.options[idx], idx]
+        );
+      }
+
+      const updatedPostRes = await tx.query<PostItem>(
+        `UPDATE public.posts SET poll_id = $1 WHERE id = $2 RETURNING *;`,
+        [pollId, postId]
+      );
+      post = updatedPostRes.rows[0] ?? post;
+
+      const enrichedPolls = await fetchEnrichedPolls(tx, circleId, actorUserId, [pollId]);
+      post.poll = enrichedPolls.get(pollId) ?? null;
+    }
+
     return post;
   });
 }

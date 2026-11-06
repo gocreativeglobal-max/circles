@@ -98,7 +98,17 @@ export const createPostSchema = z.object({
   circleId: z.string().uuid(),
   spaceId: z.string().uuid().nullable().optional(),
   title: z.string().trim().min(2, 'Post title must be at least 2 characters.').max(200),
-  body: z.string().trim().min(2, 'Post content cannot be empty.').max(10000),
+  body: z.string().trim().min(1, 'Post content cannot be empty.').max(10000),
+  poll: z
+    .object({
+      question: z.string().trim().min(3).max(240),
+      description: z.string().trim().max(4000).optional().default(''),
+      options: z.array(z.string().trim().min(1).max(160)).min(2).max(12),
+      allowMultiple: z.boolean().default(false),
+      resultsVisibility: z.enum(['always', 'after_vote', 'after_close']).default('always'),
+      closesAt: z.string().datetime().nullable().optional(),
+    })
+    .optional(),
 });
 
 export const updatePostSchema = z.object({
