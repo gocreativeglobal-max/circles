@@ -3,24 +3,17 @@
 import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
 import {
-  ArrowUpDown,
   Bookmark,
   Calendar,
   Check,
-  CheckCircle2,
-  Clock,
   Download,
   Edit3,
   ExternalLink,
-  Eye,
-  Inbox,
   MapPin,
   MessageSquare,
   Plus,
   Search,
   Send,
-  ShoppingBag,
-  Tag,
   User,
   X,
   Zap,
@@ -31,7 +24,6 @@ import {
   MarketplaceListingItem,
   ServiceBookingItem,
 } from '@/types/domain';
-import { Button } from '@/components/ui/button';
 import { DirectMessageDrawer } from '@/components/messages/direct-message-drawer';
 import {
   generateAvailableSlots,
@@ -39,17 +31,6 @@ import {
 } from '@/features/marketplace/calendar-utils';
 import { formatListingPrice } from '@/features/marketplace/listing-helpers';
 import { UniversalListingWizardModal } from '@/components/circles/universal-listing-wizard-modal';
-
-// Predefined Popular Categories by Type
-const POPULAR_CATEGORIES: Record<string, string[]> = {
-  all: ['Electronics', 'Books & Media', 'Home & Furniture', 'Services', 'Tools & Gear', 'Clothing', 'Housing', 'Jobs & Gigs', 'Vehicles', 'General'],
-  product: ['Electronics', 'Books & Media', 'Home & Furniture', 'Clothing', 'Sports & Outdoors', 'General'],
-  service: ['Tutoring & Lessons', 'Tech & Design', 'Home & Repair', 'Health & Fitness', 'Consulting', 'General'],
-  rental: ['Power Tools', 'Gardening Gear', 'Camping & Outdoors', 'AV & Photography', 'Party Supplies', 'General'],
-  housing: ['Apartment Sublet', 'Private Room', 'Shared Room', 'Parking Spot', 'Storage Space', 'General'],
-  job: ['Software & Tech', 'Design & Creative', 'Tutoring', 'Community & Events', 'Campus Gig', 'General'],
-  directory: ['Local Business', 'Freelancer', 'Contractor', 'Emergency Service', 'General'],
-};
 
 export interface MarketplaceBoardProps {
   circleId: string;
@@ -61,6 +42,15 @@ export interface MarketplaceBoardProps {
   currentUserId?: string | null;
   currentUserRole?: CircleRole | null;
 }
+
+const TYPE_FILTERS = [
+  { key: 'all', label: 'All' },
+  { key: 'product', label: 'Goods' },
+  { key: 'service', label: 'Services' },
+  { key: 'rental', label: 'Rentals' },
+  { key: 'housing', label: 'Housing' },
+  { key: 'job', label: 'Jobs' },
+];
 
 export function MarketplaceBoard({
   circleId,
@@ -76,27 +66,19 @@ export function MarketplaceBoard({
   const [inquiries, setInquiries] = useState<ListingInquiryItem[]>(initialInquiries);
   const [bookings, setBookings] = useState<ServiceBookingItem[]>(initialBookings);
 
-  // Navigation & Filtering
   const [activeTab, setActiveTab] = useState<'browse' | 'saved' | 'activity'>('browse');
   const [filterType, setFilterType] = useState<string>('all');
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'price_asc' | 'price_desc'>('newest');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'published' | 'reserved' | 'sold'>('all');
 
-  // Modals
   const [wizardModalOpen, setWizardModalOpen] = useState(false);
   const [editingListingItem, setEditingListingItem] = useState<MarketplaceListingItem | null>(null);
-
-  // Detail Modal
   const [selectedListing, setSelectedListing] = useState<MarketplaceListingItem | null>(null);
 
-  // Inquiry Modal
   const [inquiryListing, setInquiryListing] = useState<MarketplaceListingItem | null>(null);
   const [inquiryMessage, setInquiryMessage] = useState('');
   const [sendingInquiry, setSendingInquiry] = useState(false);
 
-  // Booking Modal
   const [bookingListing, setBookingListing] = useState<MarketplaceListingItem | null>(null);
   const [bookingType, setBookingType] = useState<'service' | 'rental'>('service');
   const [bookingStartsAt, setBookingStartsAt] = useState('');
@@ -106,43 +88,20 @@ export function MarketplaceBoard({
   const [selectedBookingDate, setSelectedBookingDate] = useState('');
   const [manualTimeOverride, setManualTimeOverride] = useState(false);
 
-  // Activity Drawer / Tab Filter
   const [activityRoleFilter, setActivityRoleFilter] = useState<'all' | 'received' | 'sent'>('all');
   const [inquiryReplyText, setInquiryReplyText] = useState<Record<string, string>>({});
 
-  // Direct Message Drawer State
   const [dmDrawerOpen, setDmDrawerOpen] = useState(false);
   const [activeDmConvoId, setActiveDmConvoId] = useState<string | null>(null);
-
   const [error, setError] = useState<string | null>(null);
 
   const isStaff = currentUserRole ? ['owner', 'admin', 'moderator'].includes(currentUserRole) : false;
 
-  // Extract all existing unique categories from actual listings
-  const existingCategories = useMemo(() => {
-    const set = new Set<string>();
-    listings.forEach((l) => {
-      if (l.category && l.category.trim()) {
-        set.add(l.category.trim());
-      }
-    });
-    return Array.from(set).sort((a, b) => a.localeCompare(b));
-  }, [listings]);
-
-  // Combined categories for active type
-  const availableCategories = useMemo(() => {
-    const standard = POPULAR_CATEGORIES[filterType] || POPULAR_CATEGORIES.all;
-    const combined = new Set([...standard, ...existingCategories]);
-    return Array.from(combined);
-  }, [filterType, existingCategories]);
-
-  // Open Create Wizard (Circle.so style)
   function handleOpenCreate() {
     setEditingListingItem(null);
     setWizardModalOpen(true);
   }
 
-  // Open Edit Wizard (Circle.so style)
   function handleOpenEdit(item: MarketplaceListingItem) {
     setEditingListingItem(item);
     setWizardModalOpen(true);
@@ -151,15 +110,12 @@ export function MarketplaceBoard({
   function handleListingSaved(savedListing: MarketplaceListingItem, isEdit: boolean) {
     if (isEdit) {
       setListings((prev) => prev.map((l) => (l.id === savedListing.id ? savedListing : l)));
-      if (selectedListing?.id === savedListing.id) {
-        setSelectedListing(savedListing);
-      }
+      if (selectedListing?.id === savedListing.id) setSelectedListing(savedListing);
     } else {
       setListings((prev) => [savedListing, ...prev]);
     }
   }
 
-  // Quick Status Update (e.g. Mark Reserved, Mark Sold)
   async function handleQuickStatusUpdate(
     listingId: string,
     newStatus: 'published' | 'reserved' | 'sold' | 'archived'
@@ -173,15 +129,12 @@ export function MarketplaceBoard({
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to update status.');
       setListings((prev) => prev.map((l) => (l.id === listingId ? data.listing : l)));
-      if (selectedListing?.id === listingId) {
-        setSelectedListing(data.listing);
-      }
+      if (selectedListing?.id === listingId) setSelectedListing(data.listing);
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to update listing status.');
+      setError(err instanceof Error ? err.message : 'Failed to update status.');
     }
   }
 
-  // Toggle Save / Bookmark
   async function handleToggleSave(listingId: string) {
     try {
       const res = await fetch(`/api/circles/${circleId}/marketplace`, {
@@ -195,9 +148,7 @@ export function MarketplaceBoard({
           prev.map((l) => (l.id === listingId ? { ...l, viewer_has_saved: data.saved } : l))
         );
         if (selectedListing?.id === listingId) {
-          setSelectedListing((prev) =>
-            prev ? { ...prev, viewer_has_saved: data.saved } : null
-          );
+          setSelectedListing((prev) => (prev ? { ...prev, viewer_has_saved: data.saved } : null));
         }
       }
     } catch {
@@ -205,18 +156,13 @@ export function MarketplaceBoard({
     }
   }
 
-  // Open Inquiry Modal or Direct Message Conversation
   async function handleOpenInquiry(item: MarketplaceListingItem) {
-    // If the seller is another active member, bridge directly to a Direct Message thread!
     if (item.seller_id && item.seller_id !== currentUserId) {
       try {
         const res = await fetch(`/api/circles/${circleId}/messages/conversations`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            targetUserId: item.seller_id,
-            listingId: item.id,
-          }),
+          body: JSON.stringify({ targetUserId: item.seller_id, listingId: item.id }),
         });
         if (res.ok) {
           const data = await res.json();
@@ -224,16 +170,14 @@ export function MarketplaceBoard({
           setDmDrawerOpen(true);
           return;
         }
-      } catch (err) {
-        console.error('Failed to bridge DM, falling back to inquiry modal:', err);
+      } catch {
+        // Fall back to inquiry modal
       }
     }
-
     setInquiryListing(item);
     setInquiryMessage('');
   }
 
-  // Send Inquiry
   async function handleSendInquiry(e: React.FormEvent) {
     e.preventDefault();
     if (!inquiryListing || !inquiryMessage.trim()) return;
@@ -253,9 +197,8 @@ export function MarketplaceBoard({
       setInquiries((prev) => [data.inquiry, ...prev]);
       setInquiryListing(null);
       setInquiryMessage('');
-      alert('Your inquiry was sent to the seller.');
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to send inquiry.');
+      setError(err instanceof Error ? err.message : 'Failed to send inquiry.');
     } finally {
       setSendingInquiry(false);
     }
@@ -263,13 +206,15 @@ export function MarketplaceBoard({
 
   const availableBookingDates = useMemo(() => {
     if (!bookingListing) return [];
-    const dates: { dateStr: string; label: string; weekday: string; isOperating: boolean }[] = [];
     const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const opDays = bookingListing.availability_schedule?.days && bookingListing.availability_schedule.days.length > 0
-      ? bookingListing.availability_schedule.days
-      : [1, 2, 3, 4, 5];
+    const opDays =
+      bookingListing.availability_schedule?.days &&
+      bookingListing.availability_schedule.days.length > 0
+        ? bookingListing.availability_schedule.days
+        : [1, 2, 3, 4, 5];
 
+    const dates: { dateStr: string; label: string; weekday: string; isOperating: boolean }[] = [];
     for (let i = 1; i <= 14; i++) {
       const d = new Date(Date.now() + i * 86400_000);
       const dateStr = d.toISOString().slice(0, 10);
@@ -300,7 +245,7 @@ export function MarketplaceBoard({
   function handleDownloadIcs(booking: ServiceBookingItem) {
     const icsContent = generateBookingIcs(
       booking,
-      booking.listing_title || 'Service Booking',
+      booking.listing_title || 'Booking',
       circleSlug || 'Circle'
     );
     const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
@@ -314,7 +259,6 @@ export function MarketplaceBoard({
     URL.revokeObjectURL(url);
   }
 
-  // Open Booking Modal
   function handleOpenBooking(item: MarketplaceListingItem) {
     setBookingListing(item);
     setBookingType(item.listing_type === 'rental' ? 'rental' : 'service');
@@ -344,7 +288,6 @@ export function MarketplaceBoard({
     setBookingNotes('');
   }
 
-  // Submit Booking Request
   async function handleSendBooking(e: React.FormEvent) {
     e.preventDefault();
     if (!bookingListing) return;
@@ -363,22 +306,16 @@ export function MarketplaceBoard({
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to submit booking request.');
+      if (!res.ok) throw new Error(data.error || 'Failed to submit booking.');
       setBookings((prev) => [data.booking, ...prev]);
       setBookingListing(null);
-      if (data.booking.status === 'approved') {
-        alert('⚡ Instant Confirmation! Your appointment has been booked immediately.');
-      } else {
-        alert('Booking request submitted. The provider will review your reservation.');
-      }
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to schedule booking.');
+      setError(err instanceof Error ? err.message : 'Failed to schedule booking.');
     } finally {
       setSubmittingBooking(false);
     }
   }
 
-  // Respond to Inquiry (Seller)
   async function handleRespondInquiry(
     inquiryId: string,
     nextStatus: 'responded' | 'accepted' | 'declined' | 'closed'
@@ -404,11 +341,10 @@ export function MarketplaceBoard({
         return next;
       });
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Failed to respond to inquiry.');
+      setError(err instanceof Error ? err.message : 'Failed to respond.');
     }
   }
 
-  // Update Booking Status (Provider)
   async function handleUpdateBookingStatus(
     bookingId: string,
     nextStatus: 'approved' | 'rejected' | 'cancelled' | 'completed' | 'returned',
@@ -426,38 +362,18 @@ export function MarketplaceBoard({
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to update booking status.');
+      if (!res.ok) throw new Error(data.error || 'Failed to update booking.');
       setBookings((prev) => prev.map((b) => (b.id === bookingId ? data.booking : b)));
     } catch (err) {
-      alert(err instanceof Error ? err.message : 'Booking update failed.');
+      setError(err instanceof Error ? err.message : 'Update failed.');
     }
   }
 
-  // Filter & Sort Listings
   const visibleListings = useMemo(() => {
     let list = [...listings];
+    if (activeTab === 'saved') list = list.filter((l) => l.viewer_has_saved);
+    if (filterType !== 'all') list = list.filter((l) => l.listing_type === filterType);
 
-    // Saved tab filter
-    if (activeTab === 'saved') {
-      list = list.filter((l) => l.viewer_has_saved);
-    }
-
-    // Type filter
-    if (filterType !== 'all') {
-      list = list.filter((l) => l.listing_type === filterType);
-    }
-
-    // Category filter
-    if (selectedCategory !== 'all') {
-      list = list.filter((l) => l.category.toLowerCase() === selectedCategory.toLowerCase());
-    }
-
-    // Status filter
-    if (statusFilter !== 'all') {
-      list = list.filter((l) => l.status === statusFilter);
-    }
-
-    // Search query
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       list = list.filter(
@@ -466,16 +382,10 @@ export function MarketplaceBoard({
           l.description.toLowerCase().includes(q) ||
           l.category.toLowerCase().includes(q) ||
           (l.location || '').toLowerCase().includes(q) ||
-          (Array.isArray(l.tags) && l.tags.some((t) => t.toLowerCase().includes(q))) ||
-          (l.custom_fields &&
-            typeof l.custom_fields === 'object' &&
-            Object.entries(l.custom_fields).some(
-              ([k, v]) => k.toLowerCase().includes(q) || String(v).toLowerCase().includes(q)
-            ))
+          (Array.isArray(l.tags) && l.tags.some((t) => t.toLowerCase().includes(q)))
       );
     }
 
-    // Sorting
     if (sortBy === 'price_asc') {
       list.sort((a, b) => (a.price_amount ?? 0) - (b.price_amount ?? 0));
     } else if (sortBy === 'price_desc') {
@@ -483,129 +393,70 @@ export function MarketplaceBoard({
     } else {
       list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     }
-
     return list;
-  }, [listings, activeTab, filterType, selectedCategory, statusFilter, searchQuery, sortBy]);
+  }, [listings, activeTab, filterType, searchQuery, sortBy]);
 
-  // Activity Filtered List
   const filteredInquiries = useMemo(() => {
-    if (activityRoleFilter === 'received') {
-      return inquiries.filter((inq) => inq.seller_id === currentUserId);
-    }
-    if (activityRoleFilter === 'sent') {
-      return inquiries.filter((inq) => inq.buyer_id === currentUserId);
-    }
+    if (activityRoleFilter === 'received') return inquiries.filter((i) => i.seller_id === currentUserId);
+    if (activityRoleFilter === 'sent') return inquiries.filter((i) => i.buyer_id === currentUserId);
     return inquiries;
   }, [inquiries, activityRoleFilter, currentUserId]);
 
   const filteredBookings = useMemo(() => {
-    if (activityRoleFilter === 'received') {
-      return bookings.filter((b) => b.provider_id === currentUserId);
-    }
-    if (activityRoleFilter === 'sent') {
-      return bookings.filter((b) => b.requester_id === currentUserId);
-    }
+    if (activityRoleFilter === 'received') return bookings.filter((b) => b.provider_id === currentUserId);
+    if (activityRoleFilter === 'sent') return bookings.filter((b) => b.requester_id === currentUserId);
     return bookings;
   }, [bookings, activityRoleFilter, currentUserId]);
 
   const totalActivityCount = inquiries.length + bookings.length;
 
+  const primaryBtn =
+    'inline-flex items-center gap-1.5 rounded-lg bg-[#1B4332] px-3.5 py-2 text-sm font-medium text-white hover:bg-[#2D6A4F] disabled:opacity-50';
+  const ghostBtn =
+    'inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50';
+
   return (
-    <div className="space-y-6">
-      {/* Platform Header */}
-      <div className="flex flex-col justify-between gap-4 rounded-2xl border border-stone-200/90 bg-white p-6 shadow-xs sm:flex-row sm:items-center">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <h2 className="text-xl font-bold tracking-tight text-stone-900">
-              Listings & Marketplace
-            </h2>
-            <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-mono font-semibold text-emerald-800 border border-emerald-200">
-              {listings.length} LISTINGS
-            </span>
-          </div>
-          <p className="mt-1 text-xs text-stone-500 font-normal">
-            Peer-to-peer commerce, tool & equipment rentals, appointments, and vetted housing.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {isMember && (
-            <Button
-              size="sm"
-              variant="secondary"
-              onClick={() => {
-                setActiveDmConvoId(null);
-                setDmDrawerOpen(true);
-              }}
-            >
-              <MessageSquare className="h-3.5 w-3.5 mr-1 text-emerald-800" />
-              <span>Messages</span>
-            </Button>
-          )}
-          {isMember && (
-            <Button size="sm" onClick={handleOpenCreate}>
-              <Plus className="h-3.5 w-3.5 mr-1" />
-              <span>New Listing</span>
-            </Button>
-          )}
-        </div>
-      </div>
-
-      {error && (
-        <div className="rounded-2xl border border-red-200 bg-red-50/80 px-4 py-3 text-xs font-medium text-red-800 flex items-center justify-between">
-          <span>{error}</span>
-          <button
-            type="button"
-            onClick={() => setError(null)}
-            className="text-red-500 hover:text-red-800"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-      )}
-
-      {/* Primary Navigation Tabs */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 pb-3">
-        <div className="flex items-center gap-1.5">
+    <div className="space-y-5">
+      {/* Top bar: tabs + actions */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200">
+        <div className="-mb-px flex items-center gap-5">
           <button
             type="button"
             onClick={() => setActiveTab('browse')}
-            className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+            className={`border-b-2 pb-2.5 text-sm transition-colors ${
               activeTab === 'browse'
-                ? 'bg-stone-900 text-white'
-                : 'bg-stone-100 text-stone-600 hover:bg-stone-200/80'
+                ? 'border-[#1B4332] font-medium text-stone-900'
+                : 'border-transparent text-stone-500 hover:text-stone-800'
             }`}
           >
-            Browse Listings
+            All listings
           </button>
           {isMember && (
             <button
               type="button"
               onClick={() => setActiveTab('saved')}
-              className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all flex items-center gap-1.5 ${
+              className={`border-b-2 pb-2.5 text-sm transition-colors ${
                 activeTab === 'saved'
-                  ? 'bg-stone-900 text-white'
-                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200/80'
+                  ? 'border-[#1B4332] font-medium text-stone-900'
+                  : 'border-transparent text-stone-500 hover:text-stone-800'
               }`}
             >
-              <Bookmark className="h-3 w-3" />
-              <span>Saved Items</span>
+              Saved
             </button>
           )}
           {isMember && (
             <button
               type="button"
               onClick={() => setActiveTab('activity')}
-              className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all flex items-center gap-1.5 ${
+              className={`inline-flex items-center gap-1.5 border-b-2 pb-2.5 text-sm transition-colors ${
                 activeTab === 'activity'
-                  ? 'bg-stone-900 text-white'
-                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200/80'
+                  ? 'border-[#1B4332] font-medium text-stone-900'
+                  : 'border-transparent text-stone-500 hover:text-stone-800'
               }`}
             >
-              <Inbox className="h-3 w-3" />
-              <span>My Requests & Inquiries</span>
+              <span>Requests</span>
               {totalActivityCount > 0 && (
-                <span className="rounded-full bg-emerald-700 px-1.5 py-0.2 text-[10px] font-mono text-white">
+                <span className="rounded-full bg-stone-200 px-1.5 py-0.2 text-[11px] font-medium text-stone-700">
                   {totalActivityCount}
                 </span>
               )}
@@ -613,164 +464,92 @@ export function MarketplaceBoard({
           )}
         </div>
 
-        {/* Search Bar & Sorter (Only when in browse / saved mode) */}
-        {activeTab !== 'activity' && (
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="mb-2 flex items-center gap-2">
+          {isMember && (
+            <button
+              type="button"
+              onClick={() => {
+                setActiveDmConvoId(null);
+                setDmDrawerOpen(true);
+              }}
+              className={ghostBtn}
+            >
+              <MessageSquare className="h-3.5 w-3.5" />
+              Messages
+            </button>
+          )}
+          {isMember && (
+            <button type="button" onClick={handleOpenCreate} className={primaryBtn}>
+              <Plus className="h-4 w-4" />
+              New listing
+            </button>
+          )}
+        </div>
+      </div>
+
+      {error && (
+        <div className="flex items-center justify-between rounded-xl border border-red-200 bg-red-50 px-3.5 py-2 text-xs text-red-700">
+          <span>{error}</span>
+          <button type="button" onClick={() => setError(null)}>
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Filter row */}
+      {activeTab !== 'activity' && (
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-1">
+            {TYPE_FILTERS.map((t) => {
+              const active = filterType === t.key;
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => setFilterType(t.key)}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                    active
+                      ? 'bg-[#1B4332] text-white'
+                      : 'text-stone-600 hover:bg-stone-200/60 hover:text-stone-900'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center gap-2">
             <div className="relative">
               <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-stone-400" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search listings, categories, locations..."
-                className="w-48 sm:w-64 rounded-xl border border-stone-200 bg-white pl-8 pr-3 py-1 text-xs text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-1 focus:ring-stone-900"
+                placeholder="Search..."
+                className="w-44 rounded-lg border border-stone-200 bg-white py-1 pl-8 pr-3 text-xs text-stone-800 placeholder-stone-400 focus:border-[#2D6A4F] focus:outline-none sm:w-56"
               />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-2 top-2 text-stone-400 hover:text-stone-700"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
             </div>
 
-            <div className="flex items-center gap-1">
-              <ArrowUpDown className="h-3.5 w-3.5 text-stone-400 ml-1" />
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                className="rounded-xl border border-stone-200 bg-white px-2.5 py-1 text-xs text-stone-700 font-medium focus:outline-none focus:ring-1 focus:ring-stone-900"
-              >
-                <option value="newest">Newest First</option>
-                <option value="price_asc">Price: Low to High</option>
-                <option value="price_desc">Price: High to Low</option>
-              </select>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Format Filter Pills (When browsing) */}
-      {activeTab !== 'activity' && (
-        <div className="space-y-2.5">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex flex-wrap items-center gap-1.5">
-              {[
-                { key: 'all', label: 'All Listings' },
-                { key: 'product', label: 'Products & Goods' },
-                { key: 'service', label: 'Services & Lessons' },
-                { key: 'rental', label: 'Tool & Gear Lending' },
-                { key: 'housing', label: 'Housing & Sublets' },
-                { key: 'job', label: 'Jobs & Gigs' },
-                { key: 'directory', label: 'Directory' },
-              ].map((tab) => {
-                const active = filterType === tab.key;
-                return (
-                  <button
-                    key={tab.key}
-                    type="button"
-                    onClick={() => {
-                      setFilterType(tab.key);
-                      setSelectedCategory('all');
-                    }}
-                    className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-all ${
-                      active
-                        ? 'bg-stone-900 text-white font-bold'
-                        : 'bg-stone-100 text-stone-600 hover:bg-stone-200/80 hover:text-stone-900'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="flex items-center gap-1.5 text-xs text-stone-500">
-              <span>Status:</span>
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
-                className="rounded-lg border border-stone-200 bg-white px-2 py-0.5 text-xs text-stone-700 font-medium focus:outline-none focus:ring-1 focus:ring-stone-900"
-              >
-                <option value="all">All Statuses</option>
-                <option value="published">Available Only</option>
-                <option value="reserved">Reserved</option>
-                <option value="sold">Sold / Completed</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Subcategory Filter Pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5 text-xs no-scrollbar">
-            <span className="text-[11px] font-mono uppercase tracking-wider text-stone-400 shrink-0 mr-1 flex items-center gap-1">
-              <Tag className="h-3 w-3" />
-              Category:
-            </span>
-            <button
-              type="button"
-              onClick={() => setSelectedCategory('all')}
-              className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium shrink-0 transition-all ${
-                selectedCategory === 'all'
-                  ? 'bg-stone-800 text-white font-semibold'
-                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200/80'
-              }`}
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+              className="rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-xs text-stone-700 focus:outline-none"
             >
-              All Categories
-            </button>
-            {availableCategories.map((cat) => {
-              const count = listings.filter((l) => {
-                const matchesType = filterType === 'all' || l.listing_type === filterType;
-                return matchesType && l.category.toLowerCase() === cat.toLowerCase();
-              }).length;
-              const active = selectedCategory.toLowerCase() === cat.toLowerCase();
-              return (
-                <button
-                  key={cat}
-                  type="button"
-                  onClick={() => setSelectedCategory(active ? 'all' : cat)}
-                  className={`rounded-full px-2.5 py-0.5 text-[11px] font-medium shrink-0 transition-all flex items-center gap-1.5 ${
-                    active
-                      ? 'bg-emerald-800 text-white font-semibold shadow-xs'
-                      : 'bg-stone-100/90 text-stone-600 hover:bg-stone-200/70 hover:text-stone-900 border border-stone-200/60'
-                  }`}
-                >
-                  <span>{cat}</span>
-                  {count > 0 && (
-                    <span
-                      className={`text-[9px] font-mono px-1 py-0.2 rounded-full ${
-                        active ? 'bg-emerald-950 text-emerald-200' : 'bg-stone-200 text-stone-600'
-                      }`}
-                    >
-                      {count}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
+              <option value="newest">Newest</option>
+              <option value="price_asc">Price: low</option>
+              <option value="price_desc">Price: high</option>
+            </select>
           </div>
         </div>
       )}
 
-      {/* TAB 1 & 2: LISTINGS GRID */}
+      {/* Listings grid */}
       {activeTab !== 'activity' && (
         <>
           {visibleListings.length === 0 ? (
-            <div className="rounded-2xl border border-stone-200 bg-white p-12 text-center shadow-xs">
-              <ShoppingBag className="mx-auto h-8 w-8 text-stone-400" />
-              <h3 className="mt-3 text-base font-bold text-stone-900">No Listings Found</h3>
-              <p className="mt-1 text-xs text-stone-500">
-                {activeTab === 'saved'
-                  ? 'You have not saved any marketplace listings yet.'
-                  : 'There are no active listings matching your filters.'}
-              </p>
-              {isMember && activeTab === 'browse' && (
-                <Button size="sm" onClick={handleOpenCreate} className="mt-4">
-                  <Plus className="h-3.5 w-3.5 mr-1" />
-                  Publish the First Listing
-                </Button>
-              )}
+            <div className="rounded-xl border border-dashed border-stone-200 bg-white py-16 text-center text-sm text-stone-500">
+              {activeTab === 'saved' ? 'No saved listings.' : 'No listings yet.'}
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -778,223 +557,161 @@ export function MarketplaceBoard({
                 const isSeller = currentUserId === item.seller_id;
                 const canManage = isSeller || isStaff;
                 const hasImage = item.image_urls && item.image_urls.length > 0;
+                const specEntries =
+                  item.custom_fields && typeof item.custom_fields === 'object'
+                    ? Object.entries(item.custom_fields).slice(0, 2)
+                    : [];
 
                 return (
-                  <div
+                  <article
                     key={item.id}
-                    className="group flex flex-col justify-between rounded-2xl border border-stone-200/80 bg-white p-5 shadow-xs hover:border-stone-400 hover:shadow-premium-hover transition-all duration-200 space-y-4"
+                    className="flex flex-col justify-between overflow-hidden rounded-xl border border-stone-200 bg-white transition-colors hover:border-stone-300"
                   >
-                    <div className="space-y-3">
-                      {/* Image Thumbnail Preview (if present) */}
+                    <div>
                       {hasImage && (
-                        <div
+                        <button
+                          type="button"
                           onClick={() => setSelectedListing(item)}
-                          className="relative h-44 w-full cursor-pointer overflow-hidden rounded-xl bg-stone-100 border border-stone-200/80 group/img"
+                          className="block h-44 w-full overflow-hidden bg-stone-100 text-left"
                         >
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
                             src={item.image_urls[0]}
                             alt={item.title}
-                            className="h-full w-full object-cover group-hover/img:scale-103 transition-transform duration-300"
+                            className="h-full w-full object-cover"
                           />
-                          <div className="absolute inset-0 bg-stone-900/0 hover:bg-stone-900/20 transition-colors flex items-center justify-center opacity-0 group-hover/img:opacity-100">
-                            <span className="rounded-lg bg-stone-900/80 px-2.5 py-1 text-xs font-semibold text-white backdrop-blur-xs flex items-center gap-1 shadow-xs">
-                              <Eye className="h-3.5 w-3.5" /> View Details
-                            </span>
-                          </div>
-                          {item.image_urls.length > 1 && (
-                            <span className="absolute bottom-2 right-2 rounded-md bg-black/70 px-1.5 py-0.5 text-[10px] font-mono font-medium text-white backdrop-blur-xs">
-                              +{item.image_urls.length - 1} photos
-                            </span>
-                          )}
-                        </div>
+                        </button>
                       )}
 
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-1.5">
-                          <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-900 border border-emerald-200">
-                            {item.listing_type}
-                          </span>
-                          <span className="inline-flex items-center gap-1 text-[11px] text-stone-500 font-mono">
-                            <Tag className="h-3 w-3" />
-                            {item.category}
-                          </span>
-                        </div>
-
-                        {item.condition && item.condition !== 'not_applicable' && (
-                          <span className="rounded-md bg-stone-100 px-1.5 py-0.5 text-[10px] font-mono text-stone-600 border border-stone-200/60 uppercase">
-                            {item.condition.replace('_', ' ')}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Title & Price */}
-                      <div className="space-y-1">
+                      <div className="space-y-2 p-4">
                         <div className="flex items-baseline justify-between gap-2">
                           <Link
                             href={`/circles/${circleSlug}/marketplace/${item.id}`}
-                            className="text-base font-bold text-stone-900 hover:text-emerald-900 hover:underline transition-colors truncate"
-                            title={item.title}
+                            className="truncate text-sm font-semibold text-stone-900 hover:underline"
                           >
                             {item.title}
                           </Link>
-                          <span className="text-sm font-black text-stone-900 font-mono shrink-0">
+                          <span className="shrink-0 text-sm font-semibold text-[#1B4332]">
                             {formatListingPrice(item)}
                           </span>
                         </div>
 
                         {item.description && (
-                          <p className="text-xs text-stone-600 line-clamp-2 leading-relaxed font-normal">
+                          <p className="line-clamp-2 text-xs leading-relaxed text-stone-600">
                             {item.description}
                           </p>
                         )}
 
-                        {/* Tags & Key Custom Attribute Badges */}
-                        {((Array.isArray(item.tags) && item.tags.length > 0) ||
-                          (item.custom_fields &&
-                            typeof item.custom_fields === 'object' &&
-                            Object.keys(item.custom_fields).length > 0)) && (
-                          <div className="flex flex-wrap items-center gap-1.5 pt-1.5">
-                            {Array.isArray(item.tags) &&
-                              item.tags.slice(0, 3).map((t, idx) => (
-                                <span
-                                  key={idx}
-                                  className="rounded-md bg-stone-100 px-1.5 py-0.5 text-[10px] font-mono text-stone-600 border border-stone-200/60"
-                                >
-                                  #{t}
-                                </span>
-                              ))}
-                            {item.custom_fields &&
-                              typeof item.custom_fields === 'object' &&
-                              Object.entries(item.custom_fields)
-                                .slice(0, 2)
-                                .map(([k, v], idx) => (
-                                  <span
-                                    key={`cf-${idx}`}
-                                    className="rounded-md bg-emerald-50/70 px-1.5 py-0.5 text-[10px] font-mono text-emerald-800 border border-emerald-200/50"
-                                  >
-                                    <strong className="font-semibold">{k}:</strong> {String(v)}
-                                  </span>
-                                ))}
+                        {(specEntries.length > 0 || item.location) && (
+                          <div className="flex flex-wrap items-center gap-2 pt-0.5 text-xs text-stone-500">
+                            {specEntries.map(([k, v]) => (
+                              <span key={k} className="rounded bg-stone-100 px-1.5 py-0.5 text-[11px]">
+                                {k}: {String(v)}
+                              </span>
+                            ))}
+                            {item.location && (
+                              <span className="inline-flex items-center gap-1 text-[11px] text-stone-400">
+                                <MapPin className="h-3 w-3" />
+                                <span className="max-w-[120px] truncate">{item.location}</span>
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>
                     </div>
 
-                    {/* Footer & Actions */}
-                    <div className="space-y-3 border-t border-stone-100 pt-3">
-                      <div className="flex items-center justify-between text-xs text-stone-500">
-                        <div className="flex items-center gap-1.5 truncate">
-                          {item.seller?.avatar_url ? (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img
-                              src={item.seller.avatar_url}
-                              alt=""
-                              className="h-4 w-4 rounded-full object-cover"
-                            />
-                          ) : (
-                            <User className="h-3.5 w-3.5 text-stone-400" />
-                          )}
-                          <span className="truncate">{item.seller?.display_name || 'Member'}</span>
-                        </div>
+                    <div className="flex items-center justify-between border-t border-stone-100 px-4 py-2.5">
+                      <div className="flex min-w-0 items-center gap-2 text-xs text-stone-500">
+                        {item.seller?.avatar_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={item.seller.avatar_url}
+                            alt=""
+                            className="h-5 w-5 rounded-full object-cover"
+                          />
+                        ) : (
+                          <User className="h-3.5 w-3.5 text-stone-400" />
+                        )}
+                        <span className="truncate">{item.seller?.display_name || 'Member'}</span>
+                      </div>
 
-                        {item.location && (
-                          <span className="inline-flex items-center gap-1 text-[11px] text-stone-400 shrink-0">
-                            <MapPin className="h-3 w-3" />
-                            <span className="truncate max-w-[110px]">{item.location}</span>
+                      <div className="flex items-center gap-1.5">
+                        {item.status !== 'published' && (
+                          <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-stone-600">
+                            {item.status}
                           </span>
                         )}
-                      </div>
 
-                      <div className="flex items-center justify-between gap-2 pt-1">
-                        {/* Status badge and View Details Link */}
-                        <div className="flex items-center gap-1.5">
-                          {item.status === 'reserved' && (
-                            <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-mono font-bold text-amber-800 border border-amber-200">
-                              RESERVED
-                            </span>
-                          )}
-                          {item.status === 'sold' && (
-                            <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-mono font-bold text-stone-600 border border-stone-200">
-                              SOLD
-                            </span>
-                          )}
-                          <Link
-                            href={`/circles/${circleSlug}/marketplace/${item.id}`}
-                            className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-xs font-semibold text-stone-700 shadow-2xs hover:bg-stone-50 hover:text-stone-900 transition-colors"
-                            title="View full listing details"
+                        {isMember && (
+                          <button
+                            type="button"
+                            onClick={() => handleToggleSave(item.id)}
+                            className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-800"
+                            aria-label="Save"
                           >
-                            <Eye className="h-3 w-3 text-stone-500" />
-                            <span>Details</span>
-                          </Link>
-                        </div>
+                            <Bookmark
+                              className={`h-3.5 w-3.5 ${
+                                item.viewer_has_saved ? 'fill-current text-[#1B4332]' : ''
+                              }`}
+                            />
+                          </button>
+                        )}
 
-                        {/* Action buttons */}
-                        <div className="flex items-center gap-1.5">
-                          {isMember && (
-                            <Button
-                              size="xs"
-                              variant={item.viewer_has_saved ? 'secondary' : 'outline'}
-                              onClick={() => handleToggleSave(item.id)}
-                              title={item.viewer_has_saved ? 'Remove bookmark' : 'Bookmark listing'}
-                            >
-                              <Bookmark
-                                className={`h-3 w-3 ${item.viewer_has_saved ? 'fill-current' : ''}`}
-                              />
-                            </Button>
-                          )}
+                        {!isSeller && isMember && item.status === 'published' && (
+                          <>
+                            {item.action_type === 'link' && item.action_url ? (
+                              <a
+                                href={item.action_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={ghostBtn}
+                              >
+                                Open
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            ) : item.action_type === 'booking' ||
+                              item.listing_type === 'service' ||
+                              item.listing_type === 'rental' ? (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenBooking(item)}
+                                className={ghostBtn}
+                              >
+                                {item.listing_type === 'rental' ? 'Borrow' : 'Book'}
+                              </button>
+                            ) : item.action_type === 'application' ? (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenInquiry(item)}
+                                className={ghostBtn}
+                              >
+                                Apply
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenInquiry(item)}
+                                className={ghostBtn}
+                              >
+                                Message
+                              </button>
+                            )}
+                          </>
+                        )}
 
-                          {!isSeller && isMember && item.status === 'published' && (
-                            <>
-                              {item.action_type === 'link' && item.action_url ? (
-                                <a
-                                  href={item.action_url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-1 rounded-lg border border-stone-300 bg-white px-2 py-1 text-xs font-semibold text-stone-800 shadow-2xs hover:bg-stone-50 hover:text-stone-900 transition-colors"
-                                >
-                                  <span>Link</span>
-                                  <ExternalLink className="h-3 w-3" />
-                                </a>
-                              ) : item.action_type === 'booking' ||
-                                item.listing_type === 'service' ||
-                                item.listing_type === 'rental' ? (
-                                <Button size="xs" onClick={() => handleOpenBooking(item)}>
-                                  <Calendar className="h-3 w-3 mr-1" />
-                                  <span>{item.listing_type === 'rental' ? 'Borrow' : 'Book'}</span>
-                                </Button>
-                              ) : item.action_type === 'application' ? (
-                                <Button size="xs" onClick={() => handleOpenInquiry(item)}>
-                                  <Send className="h-3 w-3 mr-1" />
-                                  <span>Apply</span>
-                                </Button>
-                              ) : (
-                                <Button
-                                  size="xs"
-                                  variant="outline"
-                                  onClick={() => handleOpenInquiry(item)}
-                                >
-                                  <MessageSquare className="h-3 w-3 mr-1" />
-                                  <span>Inquire</span>
-                                </Button>
-                              )}
-                            </>
-                          )}
-
-                          {canManage && (
-                            <Button
-                              size="xs"
-                              variant="ghost"
-                              onClick={() => handleOpenEdit(item)}
-                              title="Edit Listing"
-                            >
-                              <Edit3 className="h-3 w-3" />
-                            </Button>
-                          )}
-                        </div>
+                        {canManage && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenEdit(item)}
+                            className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-800"
+                            aria-label="Edit"
+                          >
+                            <Edit3 className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                       </div>
                     </div>
-                  </div>
+                  </article>
                 );
               })}
             </div>
@@ -1002,99 +719,56 @@ export function MarketplaceBoard({
         </>
       )}
 
-      {/* TAB 3: ACTIVITY DASHBOARD (INQUIRIES & BOOKINGS) */}
+      {/* Activity tab */}
       {activeTab === 'activity' && (
-        <div className="space-y-6">
-          {/* Subfilter */}
-          <div className="flex items-center justify-between border-b border-stone-200 pb-3">
-            <h3 className="text-sm font-bold text-stone-900 uppercase font-mono tracking-wider">
-              Messages & Reservation Requests
-            </h3>
-            <div className="flex items-center gap-1 rounded-lg bg-stone-100 p-0.5 text-xs">
-              {(['all', 'received', 'sent'] as const).map((mode) => (
-                <button
-                  key={mode}
-                  type="button"
-                  onClick={() => setActivityRoleFilter(mode)}
-                  className={`rounded px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider transition-all ${
-                    activityRoleFilter === mode
-                      ? 'bg-white text-stone-950 shadow-xs'
-                      : 'text-stone-500 hover:text-stone-900'
-                  }`}
-                >
-                  {mode === 'all'
-                    ? 'All Requests'
-                    : mode === 'received'
-                    ? 'As Seller/Provider'
-                    : 'Sent by Me'}
-                </button>
-              ))}
-            </div>
+        <div className="space-y-4">
+          <div className="flex items-center gap-1">
+            {(['all', 'received', 'sent'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setActivityRoleFilter(mode)}
+                className={`rounded-lg px-2.5 py-1 text-xs font-medium capitalize ${
+                  activityRoleFilter === mode
+                    ? 'bg-[#1B4332] text-white'
+                    : 'text-stone-600 hover:bg-stone-100'
+                }`}
+              >
+                {mode}
+              </button>
+            ))}
           </div>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-            {/* Column 1: Inquiries & Messages */}
-            <div className="rounded-2xl border border-stone-200/90 bg-white p-5 shadow-xs space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <MessageSquare className="h-4 w-4 text-emerald-800" />
-                  <h4 className="text-sm font-bold text-stone-900">
-                    Listing Inquiries ({filteredInquiries.length})
-                  </h4>
-                </div>
-              </div>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {/* Inquiries */}
+            <div className="space-y-3 rounded-xl border border-stone-200 bg-white p-4">
+              <h4 className="text-sm font-semibold text-stone-900">
+                Inquiries ({filteredInquiries.length})
+              </h4>
 
               {filteredInquiries.length === 0 ? (
-                <p className="text-xs text-stone-400 py-6 text-center">No inquiries found.</p>
+                <p className="py-6 text-center text-xs text-stone-400">None yet.</p>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   {filteredInquiries.map((inq) => {
                     const isSeller = inq.seller_id === currentUserId;
                     const canReply = isSeller && inq.status === 'open';
-
                     return (
-                      <div
-                        key={inq.id}
-                        className="rounded-xl border border-stone-200/80 bg-stone-50/50 p-4 space-y-3"
-                      >
+                      <div key={inq.id} className="space-y-2 rounded-lg border border-stone-200 p-3">
                         <div className="flex items-center justify-between text-xs">
-                          <span className="font-bold text-stone-900 truncate">
-                            {inq.listing_title || 'Marketplace Item'}
+                          <span className="truncate font-medium text-stone-900">
+                            {inq.listing_title || 'Listing'}
                           </span>
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-mono font-semibold uppercase ${
-                              inq.status === 'open'
-                                ? 'bg-amber-100 text-amber-900'
-                                : inq.status === 'accepted'
-                                ? 'bg-emerald-100 text-emerald-900'
-                                : inq.status === 'declined'
-                                ? 'bg-red-100 text-red-900'
-                                : 'bg-stone-200 text-stone-800'
-                            }`}
-                          >
-                            {inq.status}
-                          </span>
+                          <span className="text-stone-400">{inq.status}</span>
                         </div>
-
-                        <div className="text-xs text-stone-700 bg-white rounded-lg p-2.5 border border-stone-200/60">
-                          <div className="text-[10px] text-stone-400 mb-1 font-mono">
-                            From @{inq.buyer?.username || 'member'} ·{' '}
-                            {new Date(inq.created_at).toLocaleDateString()}
-                          </div>
-                          <p className="leading-relaxed">{inq.message}</p>
-                        </div>
-
+                        <p className="text-xs text-stone-700">{inq.message}</p>
                         {inq.seller_response && (
-                          <div className="text-xs text-emerald-950 bg-emerald-50 rounded-lg p-2.5 border border-emerald-200/80">
-                            <div className="text-[10px] text-emerald-700 mb-1 font-mono">
-                              Seller Reply:
-                            </div>
-                            <p className="leading-relaxed">{inq.seller_response}</p>
-                          </div>
+                          <p className="rounded bg-[#F4F3EE] p-2 text-xs text-[#1B4332]">
+                            {inq.seller_response}
+                          </p>
                         )}
-
                         {canReply && (
-                          <div className="space-y-2 pt-1 border-t border-stone-200/60">
+                          <div className="space-y-2 pt-1">
                             <textarea
                               rows={2}
                               value={inquiryReplyText[inq.id] || ''}
@@ -1104,24 +778,24 @@ export function MarketplaceBoard({
                                   [inq.id]: e.target.value,
                                 }))
                               }
-                              placeholder="Type response to buyer (meeting spot, answer)..."
-                              className="w-full rounded-lg border border-stone-200 bg-white p-2 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900"
+                              placeholder="Reply..."
+                              className="w-full rounded-lg border border-stone-200 p-2 text-xs"
                             />
                             <div className="flex justify-end gap-1.5">
-                              <Button
-                                size="xs"
-                                variant="outline"
+                              <button
+                                type="button"
                                 onClick={() => handleRespondInquiry(inq.id, 'declined')}
+                                className={ghostBtn}
                               >
                                 Decline
-                              </Button>
-                              <Button
-                                size="xs"
+                              </button>
+                              <button
+                                type="button"
                                 onClick={() => handleRespondInquiry(inq.id, 'accepted')}
+                                className="rounded-lg bg-[#1B4332] px-3 py-1.5 text-xs font-medium text-white"
                               >
-                                <Send className="h-3 w-3 mr-1" />
-                                Reply & Accept
-                              </Button>
+                                Accept
+                              </button>
                             </div>
                           </div>
                         )}
@@ -1132,127 +806,79 @@ export function MarketplaceBoard({
               )}
             </div>
 
-            {/* Column 2: Bookings & Tool Rentals */}
-            <div className="rounded-2xl border border-stone-200/90 bg-white p-5 shadow-xs space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-emerald-800" />
-                  <h4 className="text-sm font-bold text-stone-900">
-                    Appointments & Rentals ({filteredBookings.length})
-                  </h4>
-                </div>
-              </div>
+            {/* Bookings */}
+            <div className="space-y-3 rounded-xl border border-stone-200 bg-white p-4">
+              <h4 className="text-sm font-semibold text-stone-900">
+                Bookings ({filteredBookings.length})
+              </h4>
 
               {filteredBookings.length === 0 ? (
-                <p className="text-xs text-stone-400 py-6 text-center">
-                  No booking or rental requests found.
-                </p>
+                <p className="py-6 text-center text-xs text-stone-400">None yet.</p>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   {filteredBookings.map((b) => {
                     const isProvider = b.provider_id === currentUserId;
                     const canReview = isProvider && b.status === 'pending';
-                    const isApprovedRental = isProvider && b.status === 'approved' && b.booking_type === 'rental';
+                    const isApprovedRental =
+                      isProvider && b.status === 'approved' && b.booking_type === 'rental';
 
                     return (
-                      <div
-                        key={b.id}
-                        className="rounded-xl border border-stone-200/80 bg-stone-50/50 p-4 space-y-3"
-                      >
+                      <div key={b.id} className="space-y-2 rounded-lg border border-stone-200 p-3">
                         <div className="flex items-center justify-between text-xs">
-                          <div className="flex items-center gap-2">
-                            <span className="rounded-md bg-stone-200/80 px-1.5 py-0.5 text-[10px] font-mono font-bold uppercase text-stone-800">
-                              {b.booking_type}
-                            </span>
-                            <span className="font-bold text-stone-900 truncate">
-                              {b.listing_title || 'Listing'}
-                            </span>
-                          </div>
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-[10px] font-mono font-semibold uppercase ${
-                              b.status === 'pending'
-                                ? 'bg-amber-100 text-amber-900'
-                                : b.status === 'approved'
-                                ? 'bg-emerald-100 text-emerald-900'
-                                : b.status === 'returned' || b.status === 'completed'
-                                ? 'bg-stone-200 text-stone-800'
-                                : 'bg-red-100 text-red-900'
-                            }`}
-                          >
-                            {b.status}
+                          <span className="truncate font-medium text-stone-900">
+                            {b.listing_title || 'Listing'}
                           </span>
+                          <span className="text-stone-400">{b.status}</span>
                         </div>
+                        <p className="text-xs text-stone-500">
+                          {new Date(b.starts_at).toLocaleString([], {
+                            dateStyle: 'short',
+                            timeStyle: 'short',
+                          })}
+                        </p>
+                        {b.notes && <p className="text-xs text-stone-600">{b.notes}</p>}
 
-                        <div className="text-xs text-stone-700 bg-white rounded-lg p-2.5 border border-stone-200/60 space-y-1">
-                          <div className="flex items-center gap-1.5 font-medium text-stone-800">
-                            <Clock className="h-3.5 w-3.5 text-stone-400" />
-                            <span>
-                              {new Date(b.starts_at).toLocaleString([], {
-                                dateStyle: 'short',
-                                timeStyle: 'short',
-                              })}{' '}
-                              –{' '}
-                              {new Date(b.ends_at).toLocaleString([], {
-                                dateStyle: 'short',
-                                timeStyle: 'short',
-                              })}
-                            </span>
-                          </div>
-                          <div className="text-[10px] text-stone-400 font-mono">
-                            Requester: @{b.requester?.username || 'member'}
-                          </div>
-                          {b.notes && (
-                            <p className="text-xs text-stone-600 pt-1 font-normal italic">
-                              &ldquo;{b.notes}&rdquo;
-                            </p>
-                          )}
-                        </div>
-
-                        <div className="flex items-center justify-between gap-2 pt-1 border-t border-stone-200/60">
+                        <div className="flex items-center justify-between pt-1">
                           {b.status === 'approved' || b.status === 'completed' ? (
-                            <Button
+                            <button
                               type="button"
-                              variant="outline"
-                              size="xs"
                               onClick={() => handleDownloadIcs(b)}
-                              className="text-stone-700 hover:text-black flex items-center gap-1 text-[11px] h-7"
-                              title="Download .ics event file to add to Google, Apple, or Outlook Calendar"
+                              className="inline-flex items-center gap-1 text-xs text-stone-600 hover:text-stone-900"
                             >
-                              <Download className="h-3 w-3 text-stone-500" />
-                              <span>Add to Calendar (.ics)</span>
-                            </Button>
+                              <Download className="h-3 w-3" />
+                              .ics
+                            </button>
                           ) : (
-                            <div />
+                            <span />
                           )}
-
                           <div className="flex items-center gap-1.5">
                             {canReview && (
                               <>
-                                <Button
-                                  size="xs"
-                                  variant="outline"
+                                <button
+                                  type="button"
                                   onClick={() => handleUpdateBookingStatus(b.id, 'rejected')}
+                                  className={ghostBtn}
                                 >
                                   Decline
-                                </Button>
-                                <Button
-                                  size="xs"
+                                </button>
+                                <button
+                                  type="button"
                                   onClick={() => handleUpdateBookingStatus(b.id, 'approved')}
+                                  className="inline-flex items-center gap-1 rounded-lg bg-[#1B4332] px-3 py-1.5 text-xs font-medium text-white"
                                 >
-                                  <Check className="h-3 w-3 mr-1" />
-                                  Approve Request
-                                </Button>
+                                  <Check className="h-3 w-3" />
+                                  Approve
+                                </button>
                               </>
                             )}
                             {isApprovedRental && (
-                              <Button
-                                size="xs"
-                                variant="secondary"
+                              <button
+                                type="button"
                                 onClick={() => handleUpdateBookingStatus(b.id, 'returned')}
+                                className={ghostBtn}
                               >
-                                <CheckCircle2 className="h-3 w-3 mr-1 text-emerald-700" />
-                                Mark Returned
-                              </Button>
+                                Returned
+                              </button>
                             )}
                           </div>
                         </div>
@@ -1266,7 +892,7 @@ export function MarketplaceBoard({
         </div>
       )}
 
-      {/* UNIVERSAL LISTING WIZARD MODAL (CIRCLE.SO STYLE) */}
+      {/* Wizard modal */}
       <UniversalListingWizardModal
         isOpen={wizardModalOpen}
         onClose={() => {
@@ -1279,547 +905,306 @@ export function MarketplaceBoard({
         onSaved={handleListingSaved}
       />
 
-      {/* MODAL 2: DETAILED VIEW MODAL */}
+      {/* Quick detail modal */}
       {selectedListing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-          <div className="w-full max-w-xl rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-              <div className="flex items-center gap-2">
-                <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-900 border border-emerald-200">
-                  {selectedListing.listing_type}
-                </span>
-                <span className="text-xs font-mono text-stone-500">
-                  #{selectedListing.category}
-                </span>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/50 p-4 backdrop-blur-xs">
+          <div className="max-h-[90vh] w-full max-w-lg space-y-4 overflow-y-auto rounded-2xl border border-stone-200 bg-white p-5 shadow-xl">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-base font-semibold text-stone-900">{selectedListing.title}</h3>
+                <p className="text-sm font-semibold text-[#1B4332]">
+                  {formatListingPrice(selectedListing)}
+                </p>
               </div>
               <button
                 type="button"
                 onClick={() => setSelectedListing(null)}
-                className="rounded-lg p-1.5 text-stone-400 hover:text-stone-700"
+                className="rounded-lg p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            {/* Photos Carousel/Gallery */}
             {selectedListing.image_urls && selectedListing.image_urls.length > 0 && (
-              <div className="flex gap-2 overflow-x-auto pb-1">
+              <div className="flex gap-2 overflow-x-auto">
                 {selectedListing.image_urls.map((imgUrl, idx) => (
                   <div
                     key={idx}
-                    className="h-48 w-full shrink-0 overflow-hidden rounded-xl border border-stone-200 bg-stone-100"
+                    className="h-48 w-full shrink-0 overflow-hidden rounded-xl bg-stone-100"
                   >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={imgUrl}
-                      alt={selectedListing.title}
-                      className="h-full w-full object-cover"
-                    />
+                    <img src={imgUrl} alt="" className="h-full w-full object-cover" />
                   </div>
                 ))}
               </div>
             )}
 
-            <div>
-              <div className="flex items-baseline justify-between gap-4">
-                <h3 className="text-xl font-bold text-stone-900">{selectedListing.title}</h3>
-                <span className="text-lg font-black text-stone-900 font-mono shrink-0">
-                  {formatListingPrice(selectedListing)}
-                </span>
-              </div>
+            {selectedListing.description && (
+              <p className="whitespace-pre-line text-sm leading-relaxed text-stone-600">
+                {selectedListing.description}
+              </p>
+            )}
 
-              {selectedListing.location && (
-                <div className="flex items-center gap-1.5 text-xs text-stone-500 mt-1">
-                  <MapPin className="h-3.5 w-3.5 text-stone-400" />
-                  <span>{selectedListing.location}</span>
-                </div>
-              )}
-
-              {/* Tags */}
-              {Array.isArray(selectedListing.tags) && selectedListing.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mt-2">
-                  {selectedListing.tags.map((t, idx) => (
-                    <span
-                      key={idx}
-                      className="rounded-md bg-stone-100 px-2 py-0.5 text-[11px] font-mono text-stone-600 border border-stone-200/60"
-                    >
-                      #{t}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Structured Specifications & Attributes */}
             {selectedListing.custom_fields &&
               typeof selectedListing.custom_fields === 'object' &&
               Object.keys(selectedListing.custom_fields).length > 0 && (
-                <div className="rounded-xl border border-stone-200/80 bg-stone-50/60 p-3 space-y-2">
-                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-stone-500 block">
-                    Specifications & Attributes
-                  </span>
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    {Object.entries(selectedListing.custom_fields).map(([k, v], idx) => (
-                      <div key={idx} className="rounded-lg bg-white p-2 border border-stone-200/60">
-                        <span className="text-[10px] font-mono text-stone-400 block">{k}</span>
-                        <span className="font-semibold text-stone-800 block mt-0.5">
-                          {String(v)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                <div className="grid grid-cols-2 gap-2 rounded-xl bg-stone-50 p-3 text-xs">
+                  {Object.entries(selectedListing.custom_fields).map(([k, v]) => (
+                    <div key={k}>
+                      <span className="text-stone-400">{k}: </span>
+                      <span className="font-medium text-stone-800">{String(v)}</span>
+                    </div>
+                  ))}
                 </div>
               )}
 
-            {selectedListing.description && (
-              <div className="rounded-xl bg-stone-50 p-4 border border-stone-200/80 text-xs text-stone-700 leading-relaxed whitespace-pre-line">
-                {selectedListing.description}
-              </div>
-            )}
-
-            {/* Seller profile card */}
-            <div className="flex items-center justify-between rounded-xl border border-stone-200/80 p-3 bg-stone-50/50">
-              <div className="flex items-center gap-2.5">
-                {selectedListing.seller?.avatar_url ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={selectedListing.seller.avatar_url}
-                    alt=""
-                    className="h-9 w-9 rounded-full object-cover border border-stone-200"
-                  />
-                ) : (
-                  <div className="h-9 w-9 rounded-full bg-emerald-100 text-emerald-900 font-bold text-xs flex items-center justify-center border border-emerald-200">
-                    {(selectedListing.seller?.display_name || 'M')[0].toUpperCase()}
-                  </div>
-                )}
-                <div>
-                  <div className="text-xs font-bold text-stone-900">
-                    {selectedListing.seller?.display_name || 'Member'}
-                  </div>
-                  <div className="text-[10px] text-stone-400">
-                    @{selectedListing.seller?.username || 'member'} · Listing Author
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                {isMember && (
-                  <Button
-                    size="sm"
-                    variant={selectedListing.viewer_has_saved ? 'secondary' : 'outline'}
-                    onClick={() => handleToggleSave(selectedListing.id)}
-                  >
-                    <Bookmark
-                      className={`h-3.5 w-3.5 mr-1 ${
-                        selectedListing.viewer_has_saved ? 'fill-current' : ''
-                      }`}
-                    />
-                    <span>{selectedListing.viewer_has_saved ? 'Saved' : 'Save'}</span>
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            {/* Bottom Actions */}
-            <div className="flex items-center justify-between pt-3 border-t border-stone-100">
+            <div className="flex items-center justify-between border-t border-stone-100 pt-3">
               {currentUserId === selectedListing.seller_id || isStaff ? (
                 <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
+                  <button
+                    type="button"
                     onClick={() => {
                       const item = selectedListing;
                       setSelectedListing(null);
                       handleOpenEdit(item);
                     }}
+                    className={ghostBtn}
                   >
-                    <Edit3 className="h-3.5 w-3.5 mr-1" />
-                    <span>Edit</span>
-                  </Button>
+                    Edit
+                  </button>
                   {selectedListing.status === 'published' && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
+                    <button
+                      type="button"
                       onClick={() => handleQuickStatusUpdate(selectedListing.id, 'reserved')}
+                      className={ghostBtn}
                     >
-                      Mark Reserved
-                    </Button>
+                      Mark reserved
+                    </button>
                   )}
                   {selectedListing.status === 'reserved' && (
-                    <Button
-                      size="sm"
-                      variant="ghost"
+                    <button
+                      type="button"
                       onClick={() => handleQuickStatusUpdate(selectedListing.id, 'sold')}
+                      className={ghostBtn}
                     >
-                      Mark Sold
-                    </Button>
+                      Mark sold
+                    </button>
                   )}
                 </div>
               ) : (
-                <div />
+                <span />
               )}
 
-              <div className="flex items-center gap-2">
-                <Link
-                  href={`/circles/${circleSlug}/marketplace/${selectedListing.id}`}
-                  className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 shadow-2xs hover:bg-stone-50 hover:text-stone-900 transition-colors"
-                >
-                  <span>Open Full Page</span>
-                  <ExternalLink className="h-3.5 w-3.5 text-stone-500" />
-                </Link>
-
-                {currentUserId !== selectedListing.seller_id && isMember && (
-                  <>
-                    {selectedListing.action_type === 'link' && selectedListing.action_url ? (
-                      <a
-                        href={selectedListing.action_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-800 px-3 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-emerald-900 transition-colors"
-                      >
-                        <span>Open Link</span>
-                        <ExternalLink className="h-3.5 w-3.5" />
-                      </a>
-                    ) : selectedListing.action_type === 'booking' ||
-                      selectedListing.listing_type === 'service' ||
-                      selectedListing.listing_type === 'rental' ? (
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          const item = selectedListing;
-                          setSelectedListing(null);
-                          handleOpenBooking(item);
-                        }}
-                      >
-                        <Calendar className="h-3.5 w-3.5 mr-1" />
-                        <span>
-                          {selectedListing.listing_type === 'rental'
-                            ? 'Request Rental'
-                            : 'Book Appointment'}
-                        </span>
-                      </Button>
-                    ) : selectedListing.action_type === 'application' ? (
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          const item = selectedListing;
-                          setSelectedListing(null);
-                          handleOpenInquiry(item);
-                        }}
-                      >
-                        <Send className="h-3.5 w-3.5 mr-1" />
-                        <span>Apply</span>
-                      </Button>
-                    ) : (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          const item = selectedListing;
-                          setSelectedListing(null);
-                          handleOpenInquiry(item);
-                        }}
-                      >
-                        <MessageSquare className="h-3.5 w-3.5 mr-1" />
-                        <span>Inquire</span>
-                      </Button>
-                    )}
-                  </>
-                )}
-              </div>
+              <Link
+                href={`/circles/${circleSlug}/marketplace/${selectedListing.id}`}
+                className={ghostBtn}
+              >
+                Open page
+                <ExternalLink className="h-3 w-3" />
+              </Link>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL 3: INQUIRY MODAL */}
+      {/* Inquiry modal */}
       {inquiryListing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-          <div className="w-full max-w-lg rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-              <div>
-                <h3 className="text-base font-bold text-stone-900">Contact Seller</h3>
-                <p className="text-xs text-stone-500">
-                  Inquiry on &ldquo;{inquiryListing.title}&rdquo;
-                </p>
-              </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/50 p-4 backdrop-blur-xs">
+          <form
+            onSubmit={handleSendInquiry}
+            className="w-full max-w-md space-y-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-xl"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-stone-900">{inquiryListing.title}</h3>
               <button
                 type="button"
                 onClick={() => setInquiryListing(null)}
-                className="rounded-lg p-1.5 text-stone-400 hover:text-stone-700"
+                className="rounded-lg p-1 text-stone-400 hover:bg-stone-100"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
-
-            <form onSubmit={handleSendInquiry} className="space-y-4">
-              <div>
-                <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-600">
-                  Your Message to {inquiryListing.seller?.display_name || 'Seller'} *
-                </label>
-                <textarea
-                  required
-                  rows={4}
-                  value={inquiryMessage}
-                  onChange={(e) => setInquiryMessage(e.target.value)}
-                  placeholder="Hi! Is this still available? Can we arrange pickup on campus this week?"
-                  className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/60 p-3 text-xs sm:text-sm text-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900"
-                />
-                <span className="text-[11px] text-stone-500 mt-1 block">
-                  The seller will receive a notification and can reply to your inquiry.
-                </span>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-stone-100">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setInquiryListing(null)}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" size="sm" disabled={sendingInquiry}>
-                  <Send className="h-3.5 w-3.5 mr-1" />
-                  {sendingInquiry ? 'Sending...' : 'Send Inquiry'}
-                </Button>
-              </div>
-            </form>
-          </div>
+            <textarea
+              required
+              rows={3}
+              value={inquiryMessage}
+              onChange={(e) => setInquiryMessage(e.target.value)}
+              placeholder="Write a message..."
+              className="w-full rounded-xl border border-stone-200 p-3 text-sm focus:border-[#2D6A4F] focus:outline-none"
+            />
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setInquiryListing(null)}
+                className="rounded-lg px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-100"
+              >
+                Cancel
+              </button>
+              <button type="submit" disabled={sendingInquiry} className={primaryBtn}>
+                <Send className="h-3.5 w-3.5" />
+                {sendingInquiry ? 'Sending…' : 'Send'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 
-      {/* MODAL 4: BOOKING / RENTAL MODAL */}
+      {/* Booking modal */}
       {bookingListing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-          <div className="w-full max-w-lg rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-              <div>
-                <h3 className="text-base font-bold text-stone-900">
-                  Schedule {bookingType === 'rental' ? 'Equipment Lending' : 'Appointment'}
-                </h3>
-                <p className="text-xs text-stone-500">&ldquo;{bookingListing.title}&rdquo;</p>
-              </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/50 p-4 backdrop-blur-xs">
+          <form
+            onSubmit={handleSendBooking}
+            className="w-full max-w-md space-y-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-xl"
+          >
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-stone-900">{bookingListing.title}</h3>
               <button
                 type="button"
                 onClick={() => setBookingListing(null)}
-                className="rounded-lg p-1.5 text-stone-400 hover:text-stone-700"
+                className="rounded-lg p-1 text-stone-400 hover:bg-stone-100"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSendBooking} className="space-y-4">
-              {bookingListing.is_instant_bookable ? (
-                <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50/80 p-2.5 text-xs text-amber-900">
-                  <Zap className="h-4 w-4 text-amber-600 fill-amber-500 shrink-0" />
-                  <span>
-                    <strong>Instant Booking:</strong> This reservation will be automatically approved immediately upon submission.
-                  </span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50/80 p-2.5 text-xs text-stone-600">
-                  <Clock className="h-4 w-4 text-stone-500 shrink-0" />
-                  <span>
-                    The provider will review your reservation request and you will be notified upon confirmation.
-                  </span>
-                </div>
-              )}
-
-              {/* Day Selection Strip */}
-              <div>
-                <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-600 mb-1.5">
-                  1. Select Date
-                </label>
-                <div className="flex gap-2 overflow-x-auto pb-1.5 scrollbar-thin">
-                  {availableBookingDates.map((item) => {
-                    const isSelected = selectedBookingDate === item.dateStr;
-                    return (
-                      <button
-                        key={item.dateStr}
-                        type="button"
-                        onClick={() => {
-                          setSelectedBookingDate(item.dateStr);
-                          // Auto select first slot for that day if available
-                          const sched = bookingListing.availability_schedule || {
-                            days: [1, 2, 3, 4, 5],
-                            startTime: '09:00',
-                            endTime: '17:00',
-                            slotDurationMinutes: bookingListing.service_duration_minutes || 60,
-                            bufferMinutes: 0,
-                          };
-                          const listingBookings = bookings.filter((b) => b.listing_id === bookingListing.id);
-                          const slots = generateAvailableSlots(sched, item.dateStr, listingBookings);
-                          const firstAvail = slots.find((s) => s.available);
-                          if (firstAvail) {
-                            setBookingStartsAt(firstAvail.startsAt.slice(0, 16));
-                            setBookingEndsAt(firstAvail.endsAt.slice(0, 16));
-                          }
-                        }}
-                        className={`flex flex-col items-center justify-center min-w-[70px] rounded-xl p-2 text-center transition-all ${
-                          isSelected
-                            ? 'bg-stone-900 text-white shadow-sm ring-2 ring-stone-900 ring-offset-1'
-                            : item.isOperating
-                            ? 'border border-stone-200 bg-white text-stone-800 hover:border-stone-400 hover:bg-stone-50'
-                            : 'border border-stone-100 bg-stone-50 text-stone-400'
-                        }`}
-                      >
-                        <span className="text-[10px] font-mono uppercase tracking-wider">
-                          {item.weekday}
-                        </span>
-                        <span className="text-xs font-bold">{item.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Slot Selection Grid */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-600">
-                    2. Select Time Slot
-                  </label>
+            <div className="flex gap-1.5 overflow-x-auto pb-1">
+              {availableBookingDates.map((item) => {
+                const selected = selectedBookingDate === item.dateStr;
+                return (
                   <button
+                    key={item.dateStr}
                     type="button"
-                    onClick={() => setManualTimeOverride((prev) => !prev)}
-                    className="text-[11px] text-stone-500 hover:text-stone-900 underline underline-offset-2"
+                    onClick={() => {
+                      setSelectedBookingDate(item.dateStr);
+                      const sched = bookingListing.availability_schedule || {
+                        days: [1, 2, 3, 4, 5],
+                        startTime: '09:00',
+                        endTime: '17:00',
+                        slotDurationMinutes: bookingListing.service_duration_minutes || 60,
+                        bufferMinutes: 0,
+                      };
+                      const listingBookings = bookings.filter(
+                        (b) => b.listing_id === bookingListing.id
+                      );
+                      const slots = generateAvailableSlots(sched, item.dateStr, listingBookings);
+                      const firstAvail = slots.find((s) => s.available);
+                      if (firstAvail) {
+                        setBookingStartsAt(firstAvail.startsAt.slice(0, 16));
+                        setBookingEndsAt(firstAvail.endsAt.slice(0, 16));
+                      }
+                    }}
+                    className={`flex min-w-[60px] flex-col items-center rounded-xl border p-2 text-xs ${
+                      selected
+                        ? 'border-[#1B4332] bg-[#1B4332] text-white'
+                        : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-50'
+                    }`}
                   >
-                    {manualTimeOverride ? 'Use slot picker' : 'Custom time...'}
+                    <span className="text-[10px] opacity-75">{item.weekday}</span>
+                    <span className="font-semibold">{item.label}</span>
                   </button>
-                </div>
+                );
+              })}
+            </div>
 
-                {!manualTimeOverride ? (
-                  computedBookingSlots.length > 0 ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-40 overflow-y-auto p-1">
-                      {computedBookingSlots.map((slot, idx) => {
-                        const isSelected =
-                          bookingStartsAt === slot.startsAt.slice(0, 16) &&
-                          bookingEndsAt === slot.endsAt.slice(0, 16);
-                        return (
-                          <button
-                            key={idx}
-                            type="button"
-                            disabled={!slot.available}
-                            onClick={() => {
-                              setBookingStartsAt(slot.startsAt.slice(0, 16));
-                              setBookingEndsAt(slot.endsAt.slice(0, 16));
-                            }}
-                            className={`flex items-center justify-center gap-1.5 rounded-xl border p-2 text-xs font-medium transition-all ${
-                              isSelected
-                                ? 'border-emerald-700 bg-emerald-900 text-white font-bold shadow-xs'
-                                : slot.available
-                                ? 'border-stone-200 bg-white text-stone-900 hover:border-stone-900 hover:bg-stone-50'
-                                : 'border-stone-100 bg-stone-100/60 text-stone-400 cursor-not-allowed line-through'
-                            }`}
-                          >
-                            <Clock className={`h-3 w-3 ${isSelected ? 'text-white' : 'text-stone-400'}`} />
-                            <span>{slot.label}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="rounded-xl border border-dashed border-stone-200 bg-stone-50 p-4 text-center text-xs text-stone-500">
-                      No operating slots on this date. Please choose another weekday or use custom hours.
-                    </p>
-                  )
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 rounded-xl border border-stone-200 bg-stone-50/50 p-3">
-                    <div>
-                      <label className="block text-[10px] font-mono font-bold uppercase tracking-wider text-stone-600">
-                        Starts At *
-                      </label>
-                      <input
-                        type="datetime-local"
-                        required
-                        value={bookingStartsAt}
-                        onChange={(e) => setBookingStartsAt(e.target.value)}
-                        className="mt-1 w-full rounded-lg border border-stone-200 bg-white p-2 text-xs text-stone-900"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] font-mono font-bold uppercase tracking-wider text-stone-600">
-                        Ends At *
-                      </label>
-                      <input
-                        type="datetime-local"
-                        required
-                        value={bookingEndsAt}
-                        onChange={(e) => setBookingEndsAt(e.target.value)}
-                        className="mt-1 w-full rounded-lg border border-stone-200 bg-white p-2 text-xs text-stone-900"
-                      />
-                    </div>
-                  </div>
-                )}
+            <div>
+              <div className="mb-1.5 flex items-center justify-between text-xs">
+                <span className="text-stone-500">Time</span>
+                <button
+                  type="button"
+                  onClick={() => setManualTimeOverride((v) => !v)}
+                  className="text-stone-500 underline"
+                >
+                  {manualTimeOverride ? 'Slots' : 'Custom'}
+                </button>
               </div>
 
-              {/* Selected Window Summary */}
-              {bookingStartsAt && bookingEndsAt && (
-                <div className="rounded-xl bg-stone-100/80 px-3 py-2 text-xs text-stone-700 flex items-center justify-between">
-                  <span className="font-mono text-[11px] text-stone-500 uppercase">Selected Window:</span>
-                  <span className="font-semibold text-stone-900">
-                    {new Date(bookingStartsAt).toLocaleString([], {
-                      weekday: 'short',
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}{' '}
-                    –{' '}
-                    {new Date(bookingEndsAt).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
+              {!manualTimeOverride ? (
+                computedBookingSlots.length > 0 ? (
+                  <div className="grid max-h-36 grid-cols-3 gap-1.5 overflow-y-auto">
+                    {computedBookingSlots.map((slot, idx) => {
+                      const selected =
+                        bookingStartsAt === slot.startsAt.slice(0, 16) &&
+                        bookingEndsAt === slot.endsAt.slice(0, 16);
+                      return (
+                        <button
+                          key={idx}
+                          type="button"
+                          disabled={!slot.available}
+                          onClick={() => {
+                            setBookingStartsAt(slot.startsAt.slice(0, 16));
+                            setBookingEndsAt(slot.endsAt.slice(0, 16));
+                          }}
+                          className={`rounded-lg border p-2 text-xs ${
+                            selected
+                              ? 'border-[#1B4332] bg-[#F4F3EE] font-medium text-[#1B4332]'
+                              : slot.available
+                              ? 'border-stone-200 text-stone-800 hover:bg-stone-50'
+                              : 'border-stone-100 bg-stone-50 text-stone-300 line-through'
+                          }`}
+                        >
+                          {slot.label}
+                        </button>
+                      );
                     })}
-                  </span>
+                  </div>
+                ) : (
+                  <p className="rounded-lg bg-stone-50 p-3 text-center text-xs text-stone-500">
+                    No slots on this date.
+                  </p>
+                )
+              ) : (
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    type="datetime-local"
+                    required
+                    value={bookingStartsAt}
+                    onChange={(e) => setBookingStartsAt(e.target.value)}
+                    className="rounded-lg border border-stone-200 p-2 text-xs"
+                  />
+                  <input
+                    type="datetime-local"
+                    required
+                    value={bookingEndsAt}
+                    onChange={(e) => setBookingEndsAt(e.target.value)}
+                    className="rounded-lg border border-stone-200 p-2 text-xs"
+                  />
                 </div>
               )}
+            </div>
 
-              <div>
-                <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-600">
-                  Reservation Notes & Details
-                </label>
-                <textarea
-                  rows={2}
-                  value={bookingNotes}
-                  onChange={(e) => setBookingNotes(e.target.value)}
-                  placeholder="e.g. Need this for project research. Will pick up outside the science hall."
-                  className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/60 p-2.5 text-xs sm:text-sm text-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900"
-                />
-                <span className="text-[11px] text-stone-500 mt-1 block">
-                  Time conflicts are prevented at the database level.
-                </span>
-              </div>
+            <textarea
+              rows={2}
+              value={bookingNotes}
+              onChange={(e) => setBookingNotes(e.target.value)}
+              placeholder="Note (optional)"
+              className="w-full rounded-xl border border-stone-200 p-2.5 text-xs focus:border-[#2D6A4F] focus:outline-none"
+            />
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-stone-100">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setBookingListing(null)}
-                >
-                  Cancel
-                </Button>
-                <Button type="submit" size="sm" disabled={submittingBooking || !bookingStartsAt}>
-                  {bookingListing.is_instant_bookable ? (
-                    <>
-                      <Zap className="h-3.5 w-3.5 mr-1 text-amber-400 fill-amber-400" />
-                      {submittingBooking ? 'Confirming...' : 'Confirm Instant Booking'}
-                    </>
-                  ) : (
-                    <>
-                      <Calendar className="h-3.5 w-3.5 mr-1" />
-                      {submittingBooking ? 'Submitting...' : 'Submit Request'}
-                    </>
-                  )}
-                </Button>
-              </div>
-            </form>
-          </div>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setBookingListing(null)}
+                className="rounded-lg px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-100"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={submittingBooking || !bookingStartsAt}
+                className={primaryBtn}
+              >
+                {bookingListing.is_instant_bookable ? (
+                  <Zap className="h-3.5 w-3.5" />
+                ) : (
+                  <Calendar className="h-3.5 w-3.5" />
+                )}
+                {submittingBooking ? 'Booking…' : 'Confirm'}
+              </button>
+            </div>
+          </form>
         </div>
       )}
 
-      {/* Direct Messaging Slide-Over Drawer */}
       <DirectMessageDrawer
         circleId={circleId}
         isOpen={dmDrawerOpen}

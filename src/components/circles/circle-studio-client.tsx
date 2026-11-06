@@ -57,7 +57,6 @@ export function CircleStudioClient({
     'general' | 'capabilities' | 'spaces' | 'members' | 'audit' | 'finances'
   >('general');
 
-  // General Settings State (with explicit unsaved changes tracking)
   const [name, setName] = useState(initialCircle.name);
   const [description, setDescription] = useState(initialCircle.description);
   const [category, setCategory] = useState<CircleCategory>(initialCircle.category);
@@ -93,7 +92,9 @@ export function CircleStudioClient({
   const [newSpaceName, setNewSpaceName] = useState('');
   const [newSpaceDescription, setNewSpaceDescription] = useState('');
   const [newSpaceCapability, setNewSpaceCapability] = useState('discussions');
-  const [newSpacePolicy, setNewSpacePolicy] = useState<'members' | 'moderators' | 'admins'>('members');
+  const [newSpacePolicy, setNewSpacePolicy] = useState<'members' | 'moderators' | 'admins'>(
+    'members'
+  );
 
   // Invitation Form
   const [inviteEmail, setInviteEmail] = useState('');
@@ -123,7 +124,7 @@ export function CircleStudioClient({
   function showConfirmedSave(msg: string) {
     setError(null);
     setSavedBanner(msg);
-    setTimeout(() => setSavedBanner(null), 4000);
+    setTimeout(() => setSavedBanner(null), 3500);
   }
 
   async function handleSaveGeneralSettings(e: React.FormEvent) {
@@ -147,7 +148,7 @@ export function CircleStudioClient({
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || 'Failed to save Circle settings.');
+        setError(data.error || 'Failed to save settings.');
         return;
       }
 
@@ -162,10 +163,10 @@ export function CircleStudioClient({
         visibility: updated.visibility,
         membershipPolicy: updated.membership_policy,
       });
-      showConfirmedSave('Circle settings saved successfully.');
+      showConfirmedSave('Saved');
       router.refresh();
     } catch {
-      setError('Network error while saving settings.');
+      setError('Network error.');
     } finally {
       setBusy(false);
     }
@@ -186,7 +187,7 @@ export function CircleStudioClient({
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || 'Could not update capability.');
+        setError(data.error || 'Could not update feature.');
         return;
       }
       setCapabilities((prev) =>
@@ -200,14 +201,10 @@ export function CircleStudioClient({
             : c
         )
       );
-      showConfirmedSave(
-        nextSettings
-          ? `Updated settings for "${capabilityKey}".`
-          : `Capability "${capabilityKey}" ${nextEnabled ? 'enabled' : 'disabled (existing data preserved)'}.`
-      );
+      showConfirmedSave('Updated');
       router.refresh();
     } catch {
-      setError('Network error updating capability.');
+      setError('Network error.');
     } finally {
       setBusy(false);
     }
@@ -236,7 +233,7 @@ export function CircleStudioClient({
         setError(data.error || 'Could not reorder spaces.');
         return;
       }
-      showConfirmedSave('Space navigation order updated.');
+      showConfirmedSave('Order updated');
       router.refresh();
     } finally {
       setBusy(false);
@@ -244,13 +241,7 @@ export function CircleStudioClient({
   }
 
   async function handleTransferOwnership(newOwnerUserId: string, displayName: string) {
-    if (
-      !confirm(
-        `Transfer primary Circle ownership to ${displayName}? Your role will become Administrator.`
-      )
-    ) {
-      return;
-    }
+    if (!confirm(`Transfer ownership to ${displayName}?`)) return;
     setBusy(true);
     setError(null);
     try {
@@ -264,7 +255,7 @@ export function CircleStudioClient({
         setError(data.error || 'Unable to transfer ownership.');
         return;
       }
-      showConfirmedSave(`Ownership transferred to ${displayName}.`);
+      showConfirmedSave(`Ownership transferred to ${displayName}`);
       router.refresh();
     } finally {
       setBusy(false);
@@ -283,15 +274,12 @@ export function CircleStudioClient({
           circleId: initialCircle.id,
           actionType: action,
           targetId: targetUserId,
-          reason:
-            action === 'suspend_member'
-              ? 'Suspended from Circle Studio'
-              : 'Restored from Circle Studio',
+          reason: action === 'suspend_member' ? 'Suspended' : 'Restored',
         }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || 'Could not update member status.');
+        setError(data.error || 'Could not update member.');
         return;
       }
       setMembers((prev) =>
@@ -301,9 +289,7 @@ export function CircleStudioClient({
             : m
         )
       );
-      showConfirmedSave(
-        action === 'suspend_member' ? 'Member suspended.' : 'Member restored to active.'
-      );
+      showConfirmedSave(action === 'suspend_member' ? 'Suspended' : 'Restored');
       router.refresh();
     } finally {
       setBusy(false);
@@ -333,10 +319,10 @@ export function CircleStudioClient({
       setSpaces((prev) => [...prev, data.space]);
       setNewSpaceName('');
       setNewSpaceDescription('');
-      showConfirmedSave(`Space "${data.space.name}" created.`);
+      showConfirmedSave(`Created #${data.space.name}`);
       router.refresh();
     } catch {
-      setError('Network error creating space.');
+      setError('Network error.');
     } finally {
       setBusy(false);
     }
@@ -353,18 +339,21 @@ export function CircleStudioClient({
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || 'Could not update space state.');
+        setError(data.error || 'Could not update space.');
         return;
       }
       setSpaces((prev) => prev.map((s) => (s.id === spaceId ? data.space : s)));
-      showConfirmedSave(archived ? 'Space archived.' : 'Space restored.');
+      showConfirmedSave(archived ? 'Archived' : 'Restored');
       router.refresh();
     } finally {
       setBusy(false);
     }
   }
 
-  async function handleReviewJoinRequest(requestId: string, decision: 'approve_request' | 'reject_request') {
+  async function handleReviewJoinRequest(
+    requestId: string,
+    decision: 'approve_request' | 'reject_request'
+  ) {
     setBusy(true);
     setError(null);
     try {
@@ -375,7 +364,7 @@ export function CircleStudioClient({
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || 'Could not process join request.');
+        setError(data.error || 'Could not process request.');
         return;
       }
       setJoinRequests((prev) =>
@@ -385,11 +374,7 @@ export function CircleStudioClient({
             : jr
         )
       );
-      showConfirmedSave(
-        decision === 'approve_request'
-          ? 'Join request approved and member added.'
-          : 'Join request rejected.'
-      );
+      showConfirmedSave(decision === 'approve_request' ? 'Approved' : 'Rejected');
       router.refresh();
     } finally {
       setBusy(false);
@@ -407,13 +392,11 @@ export function CircleStudioClient({
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || 'Unable to change member role.');
+        setError(data.error || 'Unable to change role.');
         return;
       }
-      setMembers((prev) =>
-        prev.map((m) => (m.user_id === targetUserId ? { ...m, role } : m))
-      );
-      showConfirmedSave(`Updated member role to ${role}.`);
+      setMembers((prev) => prev.map((m) => (m.user_id === targetUserId ? { ...m, role } : m)));
+      showConfirmedSave('Role updated');
       router.refresh();
     } finally {
       setBusy(false);
@@ -443,7 +426,7 @@ export function CircleStudioClient({
       setInvitations((prev) => [data.invitation, ...prev]);
       setLastIssuedToken(data.rawToken);
       setInviteEmail('');
-      showConfirmedSave(`Invitation created for ${data.invitation.invited_email}.`);
+      showConfirmedSave('Invitation sent');
     } finally {
       setBusy(false);
     }
@@ -452,69 +435,54 @@ export function CircleStudioClient({
   const pendingJoinCount = joinRequests.filter((jr) => jr.status === 'pending').length;
 
   return (
-    <div className="space-y-6">
-      {/* Studio Header */}
-      <div className="flex flex-col justify-between gap-4 rounded-2xl border border-stone-200 bg-white p-6 shadow-sm sm:flex-row sm:items-center">
-        <div>
-          <span className="text-xs font-semibold uppercase tracking-wider text-stone-900">
-            Circle Studio Control Center
+    <div className="space-y-5">
+      {/* Minimal Underlined Tabs */}
+      <div className="flex items-center justify-between border-b border-stone-200">
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+          {[
+            { id: 'general', label: 'General', icon: Settings },
+            { id: 'capabilities', label: 'Features', icon: Sliders },
+            { id: 'spaces', label: 'Spaces', icon: LayoutGrid },
+            {
+              id: 'members',
+              label: `Members${pendingJoinCount > 0 ? ` (${pendingJoinCount})` : ''}`,
+              icon: Users,
+            },
+            { id: 'finances', label: 'Finances', icon: CreditCard },
+            { id: 'audit', label: 'Audit', icon: History },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                className={`relative inline-flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-medium transition-colors whitespace-nowrap ${
+                  active ? 'text-[#1B4332] font-semibold' : 'text-stone-500 hover:text-stone-900'
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                <span>{tab.label}</span>
+                {active && (
+                  <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[#1B4332]" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {hasUnsavedChanges && (
+          <span className="hidden sm:inline-flex rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-medium text-amber-900">
+            Unsaved
           </span>
-          <h2 className="mt-0.5 text-2xl font-bold text-stone-900">
-            Configure {initialCircle.name}
-          </h2>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {hasUnsavedChanges ? (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-900">
-              Unsaved changes
-            </span>
-          ) : (
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-600">
-              All changes synced
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Studio Tabs */}
-      <div className="flex flex-wrap gap-2 border-b border-stone-200 pb-3">
-        {[
-          { id: 'general', label: 'Identity & Policy', icon: Settings },
-          { id: 'capabilities', label: 'Capabilities Registry', icon: Sliders },
-          { id: 'spaces', label: 'Spaces & Navigation', icon: LayoutGrid },
-          {
-            id: 'members',
-            label: `Members & Requests${pendingJoinCount > 0 ? ` (${pendingJoinCount})` : ''}`,
-            icon: Users,
-          },
-          { id: 'finances', label: 'Finances & Dues', icon: CreditCard },
-          { id: 'audit', label: 'Audit Log', icon: History },
-        ].map((tab) => {
-          const Icon = tab.icon;
-          const active = activeTab === tab.id;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setActiveTab(tab.id as typeof activeTab)}
-              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-colors ${
-                active
-                  ? 'bg-black text-white shadow-sm'
-                  : 'bg-white text-stone-700 border border-stone-200 hover:bg-stone-100'
-              }`}
-            >
-              <Icon className="h-3.5 w-3.5" />
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
+        )}
       </div>
 
       {error && (
         <div
           role="alert"
-          className="flex items-center gap-2.5 rounded-xl border border-red-200 bg-red-50 p-4 text-xs font-medium text-red-800"
+          className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-xs text-red-800"
         >
           <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
           <span>{error}</span>
@@ -524,9 +492,9 @@ export function CircleStudioClient({
       {savedBanner && (
         <div
           role="status"
-          className="flex items-center gap-2.5 rounded-xl border border-zinc-200 bg-zinc-100 p-4 text-xs font-semibold text-zinc-900"
+          className="flex items-center gap-2 rounded-xl border border-stone-200 bg-[#F4F3EE] px-4 py-2.5 text-xs font-medium text-[#1B4332]"
         >
-          <CheckCircle2 className="h-4 w-4 shrink-0 text-zinc-900" />
+          <CheckCircle2 className="h-4 w-4 shrink-0 text-[#1B4332]" />
           <span>{savedBanner}</span>
         </div>
       )}
@@ -535,12 +503,12 @@ export function CircleStudioClient({
       {activeTab === 'general' && (
         <form
           onSubmit={handleSaveGeneralSettings}
-          className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm space-y-5"
+          className="rounded-2xl border border-stone-200/80 bg-white p-6 space-y-4"
         >
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
-              <label htmlFor="studio-name" className="block text-xs font-semibold uppercase tracking-wider text-stone-700">
-                Circle Name
+              <label htmlFor="studio-name" className="block text-xs font-medium text-stone-700">
+                Name
               </label>
               <input
                 id="studio-name"
@@ -548,12 +516,12 @@ export function CircleStudioClient({
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2.5 text-sm text-stone-900"
+                className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-sm text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
               />
             </div>
 
             <div>
-              <label htmlFor="studio-location" className="block text-xs font-semibold uppercase tracking-wider text-stone-700">
+              <label htmlFor="studio-location" className="block text-xs font-medium text-stone-700">
                 Location
               </label>
               <input
@@ -562,50 +530,50 @@ export function CircleStudioClient({
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder="City, Campus, or Remote"
-                className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2.5 text-sm text-stone-900"
+                className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-sm text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
               />
             </div>
           </div>
 
           <div>
-            <label htmlFor="studio-description" className="block text-xs font-semibold uppercase tracking-wider text-stone-700">
-              Circle Description
+            <label htmlFor="studio-description" className="block text-xs font-medium text-stone-700">
+              Description
             </label>
             <textarea
               id="studio-description"
               rows={3}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2.5 text-sm text-stone-900"
+              className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-sm text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
             />
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div>
-              <label htmlFor="studio-category" className="block text-xs font-semibold uppercase tracking-wider text-stone-700">
+              <label htmlFor="studio-category" className="block text-xs font-medium text-stone-700">
                 Category
               </label>
               <select
                 id="studio-category"
                 value={category}
                 onChange={(e) => setCategory(e.target.value as CircleCategory)}
-                className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2.5 text-sm text-stone-900"
+                className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-sm text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
               >
                 <option value="university">University</option>
                 <option value="neighbourhood">Neighbourhood</option>
-                <option value="professional">Professional Network</option>
-                <option value="creator">Creator Community</option>
-                <option value="learning">Learning Community</option>
-                <option value="sports">Sports Club</option>
-                <option value="project">Project Team</option>
+                <option value="professional">Professional</option>
+                <option value="creator">Creator</option>
+                <option value="learning">Learning</option>
+                <option value="sports">Sports</option>
+                <option value="project">Project</option>
                 <option value="local_business">Local Business</option>
-                <option value="general">General Community</option>
+                <option value="general">General</option>
               </select>
             </div>
 
             <div>
-              <label htmlFor="studio-visibility" className="block text-xs font-semibold uppercase tracking-wider text-stone-700">
-                Visibility Mode
+              <label htmlFor="studio-visibility" className="block text-xs font-medium text-stone-700">
+                Visibility
               </label>
               <select
                 id="studio-visibility"
@@ -619,356 +587,246 @@ export function CircleStudioClient({
                     setMembershipPolicy('open');
                   }
                 }}
-                className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2.5 text-sm text-stone-900"
+                className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-sm text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
               >
                 <option value="public">Public</option>
-                <option value="discoverable_approval">Discoverable with Approval</option>
-                <option value="private">Private (Invite Only)</option>
+                <option value="discoverable_approval">Approval required</option>
+                <option value="private">Private</option>
               </select>
             </div>
 
             <div>
-              <label htmlFor="studio-policy" className="block text-xs font-semibold uppercase tracking-wider text-stone-700">
-                Membership Policy
+              <label htmlFor="studio-policy" className="block text-xs font-medium text-stone-700">
+                Joining
               </label>
               <select
                 id="studio-policy"
                 value={membershipPolicy}
                 onChange={(e) => setMembershipPolicy(e.target.value as MembershipPolicy)}
                 disabled={visibility === 'private'}
-                className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2.5 text-sm text-stone-900 disabled:opacity-60"
+                className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-sm text-stone-900 disabled:opacity-60 focus:border-[#1B4332] focus:bg-white focus:outline-none"
               >
-                {visibility === 'public' && <option value="open">Open Joining</option>}
-                {visibility !== 'private' && <option value="approval">Approval Required</option>}
-                {visibility !== 'public' && <option value="invite_only">Invite Only</option>}
+                {visibility === 'public' && <option value="open">Open</option>}
+                {visibility !== 'private' && <option value="approval">Approval</option>}
+                {visibility !== 'public' && <option value="invite_only">Invite only</option>}
               </select>
             </div>
           </div>
 
-          <div className="flex items-center justify-between border-t border-stone-100 pt-4">
-            <span className="text-xs text-stone-500">
-              {hasUnsavedChanges
-                ? 'You have unsaved configuration changes.'
-                : 'Settings match server state.'}
-            </span>
+          <div className="flex justify-end border-t border-stone-100 pt-4">
             <button
               type="submit"
               disabled={busy || !hasUnsavedChanges}
-              className="rounded-xl bg-black px-5 py-2.5 text-xs font-semibold text-white shadow-sm hover:bg-zinc-800 disabled:opacity-50"
+              className="rounded-xl bg-[#1B4332] px-5 py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F] disabled:opacity-40"
             >
-              {busy ? 'Saving...' : 'Save Settings'}
+              {busy ? 'Saving...' : 'Save'}
             </button>
           </div>
         </form>
       )}
 
-      {/* TAB 2: CAPABILITY REGISTRY */}
+      {/* TAB 2: FEATURES / CAPABILITIES */}
       {activeTab === 'capabilities' && (
-        <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm space-y-5">
-          <div>
-            <h3 className="text-base font-bold text-stone-900">
-              Authoritative Capability Registry
-            </h3>
-            <p className="mt-1 text-xs text-stone-600">
-              Enable or disable capabilities for this Circle. Dependencies are enforced on the
-              server, and disabling a capability never deletes its existing historical data.
-            </p>
-          </div>
+        <div className="rounded-2xl border border-stone-200/80 bg-white divide-y divide-stone-100">
+          {capabilities.map((cap) => {
+            const def = cap.definition;
+            if (!def) return null;
+            const isPlanned = def.release_stage === 'planned';
 
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {capabilities.map((cap) => {
-              const def = cap.definition;
-              if (!def) return null;
-              const isPlanned = def.release_stage === 'planned';
-
-              return (
-                <div
-                  key={cap.capability_key}
-                  className={`flex flex-col justify-between rounded-xl border p-4 ${
-                    cap.enabled
-                      ? 'border-black/30 bg-stone-100/30'
-                      : 'border-stone-200 bg-stone-50/40'
-                  }`}
-                >
-                  <div>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-bold text-stone-900">{def.name}</span>
-                      <span
-                        className={`rounded px-2 py-0.5 text-[10px] font-semibold uppercase ${
-                          def.release_stage === 'stable'
-                            ? 'bg-zinc-950 text-white font-mono'
-                            : def.release_stage === 'beta'
-                              ? 'bg-blue-100 text-blue-900'
-                              : 'bg-stone-200 text-stone-700'
-                        }`}
-                      >
-                        {def.release_stage === 'planned' ? 'P1 Planned' : def.release_stage}
+            return (
+              <div
+                key={cap.capability_key}
+                className="flex flex-col justify-between gap-3 p-4 sm:flex-row sm:items-center"
+              >
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-stone-900">{def.name}</span>
+                    {isPlanned && (
+                      <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-medium text-stone-500">
+                        Soon
                       </span>
-                    </div>
-                    <p className="mt-1 text-xs text-stone-600">{def.description}</p>
-                    {def.dependencies.length > 0 && (
-                      <p className="mt-2 text-[11px] font-medium text-stone-500">
-                        Depends on: <code className="text-stone-700">{def.dependencies.join(', ')}</code>
-                      </p>
-                    )}
-
-                    {cap.enabled && cap.capability_key === 'discussions' && (
-                      <div className="mt-3 flex flex-wrap gap-3 border-t border-stone-200/60 pt-2.5 text-xs text-stone-700">
-                        <label className="inline-flex items-center gap-1.5 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={cap.settings?.allowMemberPosts !== false}
-                            disabled={busy}
-                            onChange={(e) =>
-                              handleToggleCapability(cap.capability_key, true, {
-                                ...cap.settings,
-                                allowMemberPosts: e.target.checked,
-                              })
-                            }
-                            className="rounded border-stone-200 text-stone-900"
-                          />
-                          <span>Allow member posts</span>
-                        </label>
-                        <label className="inline-flex items-center gap-1.5 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={cap.settings?.allowReactions !== false}
-                            disabled={busy}
-                            onChange={(e) =>
-                              handleToggleCapability(cap.capability_key, true, {
-                                ...cap.settings,
-                                allowReactions: e.target.checked,
-                              })
-                            }
-                            className="rounded border-stone-200 text-stone-900"
-                          />
-                          <span>Allow reactions</span>
-                        </label>
-                      </div>
                     )}
                   </div>
-
-                  <div className="mt-4 flex items-center justify-between border-t border-stone-200/80 pt-3">
-                    <span className="text-xs font-semibold text-stone-700">
-                      Status: {cap.enabled ? 'Enabled' : 'Disabled'}
-                    </span>
-
-                    <div className="flex items-center gap-2">
-                      {cap.enabled && !isPlanned && (
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => handleOpenCapSettings(cap)}
-                          className="flex items-center gap-1 rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 hover:text-black transition-colors"
-                        >
-                          <Settings2 className="h-3.5 w-3.5 text-stone-500" />
-                          <span>Configure</span>
-                        </button>
-                      )}
-
-                      {isPlanned ? (
-                        <span className="text-[11px] font-medium text-stone-400">
-                          Deferred to P1 Release
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => handleToggleCapability(cap.capability_key, !cap.enabled)}
-                          className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-                            cap.enabled
-                              ? 'border border-stone-200 bg-white text-stone-700 hover:bg-red-50 hover:text-red-800'
-                              : 'bg-black text-white hover:bg-zinc-800'
-                          }`}
-                        >
-                          {cap.enabled ? 'Disable' : 'Enable'}
-                        </button>
-                      )}
-                    </div>
-                  </div>
+                  <p className="mt-0.5 text-xs text-stone-500 line-clamp-1">{def.description}</p>
                 </div>
-              );
-            })}
-          </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {cap.enabled && !isPlanned && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => handleOpenCapSettings(cap)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-stone-200 px-2.5 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50"
+                    >
+                      <Settings2 className="h-3.5 w-3.5" />
+                      <span>Options</span>
+                    </button>
+                  )}
+
+                  {!isPlanned && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => handleToggleCapability(cap.capability_key, !cap.enabled)}
+                      className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                        cap.enabled
+                          ? 'border border-stone-200 bg-white text-stone-700 hover:bg-stone-50'
+                          : 'bg-[#1B4332] text-white hover:bg-[#2D6A4F]'
+                      }`}
+                    >
+                      {cap.enabled ? 'Disable' : 'Enable'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
-      {/* TAB 3: SPACES & NAVIGATION */}
+      {/* TAB 3: SPACES */}
       {activeTab === 'spaces' && (
-        <div className="space-y-6">
+        <div className="space-y-4">
           <form
             onSubmit={handleCreateSpace}
-            className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm space-y-4"
+            className="rounded-2xl border border-stone-200/80 bg-white p-5 space-y-3"
           >
-            <h3 className="text-base font-bold text-stone-900">Create a New Space</h3>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <div>
-                <label htmlFor="space-name" className="block text-xs font-semibold uppercase tracking-wider text-stone-700">
-                  Space Name *
-                </label>
-                <input
-                  id="space-name"
-                  type="text"
-                  required
-                  value={newSpaceName}
-                  onChange={(e) => setNewSpaceName(e.target.value)}
-                  placeholder="e.g. Research Seminars"
-                  className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-900"
-                />
-              </div>
+            <h3 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
+              New Space
+            </h3>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <input
+                id="space-name"
+                type="text"
+                required
+                value={newSpaceName}
+                onChange={(e) => setNewSpaceName(e.target.value)}
+                placeholder="Space name"
+                className="rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
+              />
 
-              <div>
-                <label htmlFor="space-capability" className="block text-xs font-semibold uppercase tracking-wider text-stone-700">
-                  Associated Capability
-                </label>
-                <select
-                  id="space-capability"
-                  value={newSpaceCapability}
-                  onChange={(e) => setNewSpaceCapability(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-900"
-                >
-                  <option value="discussions">Discussions & Posts</option>
-                  <option value="events">Events</option>
-                  <option value="learning_resources">Learning & Resources</option>
-                  <option value="marketplace">Marketplace & Community Listings</option>
-                  <option value="help_desk">Help Desk & Requests</option>
-                  <option value="projects_collaboration">Projects & Collaboration</option>
-                </select>
-              </div>
+              <select
+                id="space-capability"
+                value={newSpaceCapability}
+                onChange={(e) => setNewSpaceCapability(e.target.value)}
+                className="rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
+              >
+                <option value="discussions">Discussions</option>
+                <option value="events">Events</option>
+                <option value="learning_resources">Resources</option>
+                <option value="marketplace">Marketplace</option>
+                <option value="help_desk">Help Desk</option>
+                <option value="projects_collaboration">Projects</option>
+              </select>
 
-              <div>
-                <label htmlFor="space-policy" className="block text-xs font-semibold uppercase tracking-wider text-stone-700">
-                  Posting Permission
-                </label>
-                <select
-                  id="space-policy"
-                  value={newSpacePolicy}
-                  onChange={(e) => setNewSpacePolicy(e.target.value as typeof newSpacePolicy)}
-                  className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-900"
-                >
-                  <option value="members">All Active Members</option>
-                  <option value="moderators">Moderators & Admins Only</option>
-                  <option value="admins">Admins & Owners Only</option>
-                </select>
-              </div>
+              <select
+                id="space-policy"
+                value={newSpacePolicy}
+                onChange={(e) => setNewSpacePolicy(e.target.value as typeof newSpacePolicy)}
+                className="rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
+              >
+                <option value="members">All members can post</option>
+                <option value="moderators">Moderators & admins only</option>
+                <option value="admins">Admins only</option>
+              </select>
             </div>
 
-            <div>
-              <label htmlFor="space-desc" className="block text-xs font-semibold uppercase tracking-wider text-stone-700">
-                Description
-              </label>
+            <div className="flex items-center gap-3">
               <input
                 id="space-desc"
                 type="text"
                 value={newSpaceDescription}
                 onChange={(e) => setNewSpaceDescription(e.target.value)}
-                placeholder="What happens in this space?"
-                className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-900"
+                placeholder="Short description (optional)"
+                className="flex-1 rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
               />
-            </div>
-
-            <div className="flex justify-end">
               <button
                 type="submit"
                 disabled={busy}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-black px-4 py-2 text-xs font-semibold text-white hover:bg-zinc-800"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[#1B4332] px-4 py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
               >
                 <Plus className="h-3.5 w-3.5" />
-                <span>Create Space</span>
+                <span>Add</span>
               </button>
             </div>
           </form>
 
-          <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm space-y-4">
-            <h3 className="text-base font-bold text-stone-900">Configured Spaces</h3>
-            <div className="divide-y divide-stone-100">
-              {spaces.map((sp, idx) => (
-                <div
-                  key={sp.id}
-                  className="flex items-center justify-between py-3.5 first:pt-0 last:pb-0"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-bold text-stone-900">{sp.name}</span>
-                      <span className="rounded bg-stone-100 px-2 py-0.5 text-[10px] font-mono text-stone-600">
-                        /{sp.slug}
+          <div className="rounded-2xl border border-stone-200/80 bg-white divide-y divide-stone-100">
+            {spaces.map((sp, idx) => (
+              <div key={sp.id} className="flex items-center justify-between p-4">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-semibold text-stone-900">#{sp.name}</span>
+                    {sp.is_archived && (
+                      <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-900">
+                        Archived
                       </span>
-                      {sp.is_archived && (
-                        <span className="rounded bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-900">
-                          Archived
-                        </span>
-                      )}
-                    </div>
-                    <p className="mt-0.5 text-xs text-stone-600">{sp.description}</p>
+                    )}
                   </div>
-
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      disabled={busy || idx === 0}
-                      onClick={() => handleReorderSpace(idx, 'up')}
-                      className="rounded-lg border border-stone-200 px-2 py-1 text-xs font-medium text-stone-600 hover:bg-stone-100 disabled:opacity-40"
-                      title="Move up"
-                    >
-                      ↑
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busy || idx === spaces.length - 1}
-                      onClick={() => handleReorderSpace(idx, 'down')}
-                      className="rounded-lg border border-stone-200 px-2 py-1 text-xs font-medium text-stone-600 hover:bg-stone-100 disabled:opacity-40"
-                      title="Move down"
-                    >
-                      ↓
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleArchiveSpace(sp.id, !sp.is_archived)}
-                      className="inline-flex items-center gap-1 rounded-lg border border-stone-200 px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-100"
-                    >
-                      <Archive className="h-3.5 w-3.5" />
-                      <span>{sp.is_archived ? 'Restore' : 'Archive'}</span>
-                    </button>
-                  </div>
+                  {sp.description && (
+                    <p className="mt-0.5 text-xs text-stone-500">{sp.description}</p>
+                  )}
                 </div>
-              ))}
-            </div>
+
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={busy || idx === 0}
+                    onClick={() => handleReorderSpace(idx, 'up')}
+                    className="rounded-lg border border-stone-200 px-2 py-1 text-xs text-stone-600 hover:bg-stone-50 disabled:opacity-30"
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busy || idx === spaces.length - 1}
+                    onClick={() => handleReorderSpace(idx, 'down')}
+                    className="rounded-lg border border-stone-200 px-2 py-1 text-xs text-stone-600 hover:bg-stone-50 disabled:opacity-30"
+                  >
+                    ↓
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleArchiveSpace(sp.id, !sp.is_archived)}
+                    className="inline-flex items-center gap-1 rounded-lg border border-stone-200 px-2.5 py-1 text-xs font-medium text-stone-700 hover:bg-stone-50"
+                  >
+                    <Archive className="h-3 w-3" />
+                    <span>{sp.is_archived ? 'Restore' : 'Archive'}</span>
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
-      {/* TAB 4: MEMBERS, JOIN REQUESTS & INVITATIONS */}
+      {/* TAB 4: MEMBERS */}
       {activeTab === 'members' && (
-        <div className="space-y-6">
-          {/* Pending Join Requests */}
-          <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm space-y-4">
-            <div className="flex items-center gap-2">
-              <UserCheck className="h-4 w-4 text-stone-900" />
-              <h3 className="text-base font-bold text-stone-900">
-                Membership Join Requests ({pendingJoinCount} pending)
-              </h3>
-            </div>
+        <div className="space-y-4">
+          {joinRequests.length > 0 && (
+            <div className="rounded-2xl border border-stone-200/80 bg-white p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <UserCheck className="h-4 w-4 text-[#1B4332]" />
+                <h3 className="text-sm font-semibold text-stone-900">
+                  Requests ({pendingJoinCount})
+                </h3>
+              </div>
 
-            {joinRequests.length === 0 ? (
-              <p className="text-xs text-stone-500">No join requests recorded for this Circle.</p>
-            ) : (
               <div className="divide-y divide-stone-100">
                 {joinRequests.map((jr) => (
                   <div
                     key={jr.id}
-                    className="flex flex-col justify-between gap-3 py-3.5 sm:flex-row sm:items-center"
+                    className="flex flex-col justify-between gap-2 py-3 sm:flex-row sm:items-center"
                   >
                     <div>
-                      <p className="text-sm font-bold text-stone-900">
+                      <p className="text-sm font-semibold text-stone-900">
                         {jr.profile?.display_name ?? jr.user_id}{' '}
                         <span className="text-xs font-normal text-stone-500">
-                          ({jr.profile?.email})
+                          {jr.profile?.email}
                         </span>
                       </p>
                       {jr.message && (
-                        <p className="mt-0.5 text-xs text-stone-600 italic">
-                          &ldquo;{jr.message}&rdquo;
-                        </p>
+                        <p className="mt-0.5 text-xs text-stone-600">&ldquo;{jr.message}&rdquo;</p>
                       )}
                     </div>
 
@@ -977,477 +835,351 @@ export function CircleStudioClient({
                         <button
                           type="button"
                           onClick={() => handleReviewJoinRequest(jr.id, 'approve_request')}
-                          className="rounded-lg bg-black px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800"
+                          className="rounded-lg bg-[#1B4332] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
                         >
                           Approve
                         </button>
                         <button
                           type="button"
                           onClick={() => handleReviewJoinRequest(jr.id, 'reject_request')}
-                          className="rounded-lg border border-stone-200 px-3.5 py-1.5 text-xs font-medium text-stone-700 hover:bg-red-50 hover:text-red-800"
+                          className="rounded-lg border border-stone-200 px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-red-50 hover:text-red-800"
                         >
-                          Reject
+                          Decline
                         </button>
                       </div>
                     ) : (
-                      <span className="rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-semibold capitalize text-stone-700">
-                        {jr.status}
-                      </span>
+                      <span className="text-xs capitalize text-stone-500">{jr.status}</span>
                     )}
                   </div>
                 ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
 
-          {/* Issue Invitation */}
+          {/* Invite */}
           <form
             onSubmit={handleInviteMember}
-            className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm space-y-4"
+            className="rounded-2xl border border-stone-200/80 bg-white p-5 space-y-3"
           >
             <div className="flex items-center gap-2">
-              <Mail className="h-4 w-4 text-stone-900" />
-              <h3 className="text-base font-bold text-stone-900">Invite a Member by Email</h3>
+              <Mail className="h-4 w-4 text-stone-500" />
+              <h3 className="text-sm font-semibold text-stone-900">Invite</h3>
             </div>
 
-            <div className="flex flex-col gap-3 sm:flex-row">
+            <div className="flex flex-col gap-2.5 sm:flex-row">
               <input
                 type="email"
                 required
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
-                placeholder="colleague@example.com"
-                className="flex-1 rounded-xl border border-stone-200 bg-stone-50 px-3.5 py-2 text-xs text-stone-900"
+                placeholder="Email address"
+                className="flex-1 rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-xs text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
               />
               <select
                 value={inviteRole}
                 onChange={(e) => setInviteRole(e.target.value as Exclude<CircleRole, 'owner'>)}
-                className="rounded-xl border border-stone-200 bg-stone-50 px-3.5 py-2 text-xs text-stone-900"
+                className="rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs text-stone-900"
               >
                 <option value="member">Member</option>
                 <option value="moderator">Moderator</option>
-                <option value="admin">Administrator</option>
+                <option value="admin">Admin</option>
               </select>
               <button
                 type="submit"
                 disabled={busy}
-                className="rounded-xl bg-black px-5 py-2 text-xs font-semibold text-white hover:bg-zinc-800"
+                className="rounded-xl bg-[#1B4332] px-4 py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
               >
-                Send Invitation
+                Send invite
               </button>
             </div>
 
             {lastIssuedToken && (
-              <div className="rounded-xl border border-zinc-200 bg-zinc-100 p-3 text-xs text-zinc-900">
-                <p className="font-semibold">Invitation Link Ready:</p>
-                <p className="mt-1 font-mono break-all">
+              <div className="rounded-xl bg-[#F4F3EE] p-3 text-xs text-[#1B4332]">
+                <p className="font-mono break-all">
                   /circles/{initialCircle.slug}?inviteToken={lastIssuedToken}
                 </p>
               </div>
             )}
 
             {invitations.length > 0 && (
-              <div className="pt-2 text-xs text-stone-500">
-                Recent invitations:{' '}
+              <div className="text-[11px] text-stone-400">
+                Recent:{' '}
                 {invitations
-                  .slice(0, 4)
+                  .slice(0, 3)
                   .map((inv) => `${inv.invited_email} (${inv.status})`)
                   .join(' · ')}
               </div>
             )}
           </form>
 
-          {/* Member Roles Management */}
-          <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm space-y-4">
-            <h3 className="text-base font-bold text-stone-900">
-              Active Members & Role Assignments ({members.length})
-            </h3>
-            <div className="divide-y divide-stone-100">
-              {members.map((m) => (
-                <div
-                  key={m.id}
-                  className="flex flex-col justify-between gap-3 py-3 sm:flex-row sm:items-center"
-                >
-                  <div>
-                    <p className="text-sm font-bold text-stone-900">
-                      {m.profile?.display_name}{' '}
-                      <span className="text-xs font-normal text-stone-500">
-                        @{m.profile?.username}
-                      </span>
-                    </p>
-                    <p className="text-[11px] text-stone-500 capitalize">Status: {m.status}</p>
-                  </div>
-
-                  {m.role === 'owner' ? (
-                    <span className="rounded-full bg-black px-3 py-1 text-xs font-semibold text-white">
-                      Circle Owner
+          {/* Members List */}
+          <div className="rounded-2xl border border-stone-200/80 bg-white divide-y divide-stone-100">
+            {members.map((m) => (
+              <div
+                key={m.id}
+                className="flex flex-col justify-between gap-2 p-4 sm:flex-row sm:items-center"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-stone-900">
+                    {m.profile?.display_name}{' '}
+                    <span className="text-xs font-normal text-stone-400">
+                      @{m.profile?.username}
                     </span>
-                  ) : (
-                    <div className="flex flex-wrap items-center gap-2">
-                      <select
-                        value={m.role}
-                        onChange={(e) =>
-                          handleUpdateMemberRole(
-                            m.user_id,
-                            e.target.value as Exclude<CircleRole, 'owner'>
-                          )
-                        }
-                        className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-medium text-stone-800"
-                      >
-                        <option value="member">Member</option>
-                        <option value="moderator">Moderator</option>
-                        <option value="admin">Administrator</option>
-                      </select>
+                  </p>
+                  {m.status !== 'active' && (
+                    <span className="text-[11px] text-amber-700 capitalize">{m.status}</span>
+                  )}
+                </div>
 
+                {m.role === 'owner' ? (
+                  <span className="rounded-full bg-[#F4F3EE] px-2.5 py-0.5 text-xs font-semibold text-[#1B4332]">
+                    Owner
+                  </span>
+                ) : (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <select
+                      value={m.role}
+                      onChange={(e) =>
+                        handleUpdateMemberRole(
+                          m.user_id,
+                          e.target.value as Exclude<CircleRole, 'owner'>
+                        )
+                      }
+                      className="rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1 text-xs text-stone-800"
+                    >
+                      <option value="member">Member</option>
+                      <option value="moderator">Moderator</option>
+                      <option value="admin">Admin</option>
+                    </select>
+
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => handleToggleMemberSuspension(m.user_id, m.status)}
+                      className="rounded-lg border border-stone-200 px-2.5 py-1 text-xs text-stone-600 hover:bg-stone-50"
+                    >
+                      {m.status === 'suspended' ? 'Restore' : 'Suspend'}
+                    </button>
+
+                    {initialCircle.current_user_role === 'owner' && m.status === 'active' && (
                       <button
                         type="button"
                         disabled={busy}
-                        onClick={() => handleToggleMemberSuspension(m.user_id, m.status)}
-                        className="rounded-xl border border-stone-200 px-2.5 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-100"
+                        onClick={() =>
+                          handleTransferOwnership(
+                            m.user_id,
+                            m.profile?.display_name || m.user_id
+                          )
+                        }
+                        className="rounded-lg border border-stone-200 px-2.5 py-1 text-xs text-stone-600 hover:bg-stone-50"
                       >
-                        {m.status === 'suspended' ? 'Restore' : 'Suspend'}
+                        Make owner
                       </button>
-
-                      {initialCircle.current_user_role === 'owner' && m.status === 'active' && (
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() =>
-                            handleTransferOwnership(
-                              m.user_id,
-                              m.profile?.display_name || m.user_id
-                            )
-                          }
-                          className="rounded-xl border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs font-semibold text-amber-900 hover:bg-amber-100"
-                        >
-                          Make Owner
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* TAB: FINANCES & DUES */}
-      {activeTab === 'finances' && (
-        <StudioFinancesTab circle={initialCircle} spaces={spaces} members={members} />
-      )}
-
-      {/* TAB 5: AUDIT LOGS */}
-      {activeTab === 'audit' && (
-        <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm space-y-4">
-          <h3 className="text-base font-bold text-stone-900">Security & Configuration Audit Log</h3>
-          <div className="divide-y divide-stone-100 text-xs">
-            {initialLogs.map((log) => (
-              <div key={log.id} className="py-3 first:pt-0 last:pb-0">
-                <div className="flex items-center justify-between">
-                  <span className="font-mono font-semibold text-stone-900">{log.action}</span>
-                  <span className="text-stone-400">
-                    {new Date(log.created_at).toLocaleString()}
-                  </span>
-                </div>
-                <p className="mt-1 text-stone-600">
-                  Actor: {log.actor_name || log.actor_id || 'System'} · Entity: {log.entity_type} (
-                  {log.entity_id})
-                </p>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Capability Configuration Modal */}
-      {configCap && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="w-full max-w-lg rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-              <h3 className="text-base font-bold text-stone-900">
-                Configure {configCap.definition?.name || configCap.capability_key}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setConfigCap(null)}
-                className="text-stone-400 hover:text-stone-700"
-              >
-                ✕
-              </button>
+      {/* TAB 5: FINANCES */}
+      {activeTab === 'finances' && (
+        <StudioFinancesTab circle={initialCircle} spaces={spaces} members={members} />
+      )}
+
+      {/* TAB 6: AUDIT LOG */}
+      {activeTab === 'audit' && (
+        <div className="rounded-2xl border border-stone-200/80 bg-white divide-y divide-stone-100 text-xs">
+          {initialLogs.map((log) => (
+            <div key={log.id} className="flex items-center justify-between p-4">
+              <div>
+                <span className="font-mono font-semibold text-stone-900">{log.action}</span>
+                <p className="mt-0.5 text-stone-500">
+                  {log.actor_name || log.actor_id || 'System'} · {log.entity_type}
+                </p>
+              </div>
+              <span className="text-stone-400">
+                {new Date(log.created_at).toLocaleDateString()}
+              </span>
             </div>
-            <form onSubmit={handleSaveCapSettings} className="space-y-4">
-              <p className="text-xs text-stone-600">
-                Update custom configuration options for this capability. Changes take effect immediately.
-              </p>
-              <div className="space-y-2">
-                {Object.entries(capSettingsDraft).map(([k, v]) => (
-                  <div key={k} className="flex items-center justify-between text-xs">
-                    <span className="font-mono text-stone-700">{k}:</span>
-                    <input
-                      type="text"
-                      value={String(v)}
-                      onChange={(e) =>
-                        setCapSettingsDraft((prev) => ({
-                          ...prev,
-                          [k]: e.target.value === 'true' ? true : e.target.value === 'false' ? false : e.target.value,
-                        }))
-                      }
-                      className="rounded-lg border border-stone-200 px-2 py-1 text-xs"
-                    />
-                  </div>
-                ))}
-              </div>
-              <div className="flex justify-end gap-2 pt-2 border-t border-stone-100">
-                <button
-                  type="button"
-                  onClick={() => setConfigCap(null)}
-                  className="rounded-xl border border-stone-200 px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={busy}
-                  className="rounded-xl bg-black px-4 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800"
-                >
-                  Save Settings
-                </button>
-              </div>
-            </form>
-          </div>
+          ))}
         </div>
       )}
 
       {/* CAPABILITY SETTINGS MODAL */}
       {configCap && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-          <div className="w-full max-w-lg rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-5 shadow-xl space-y-4">
             <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-900">
-                  <Sliders className="h-4 w-4" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-stone-900">
-                    Configure {configCap.definition?.name || configCap.capability_key}
-                  </h3>
-                  <p className="text-xs text-stone-500">
-                    Capability key: <code className="font-mono text-stone-700">{configCap.capability_key}</code>
-                  </p>
-                </div>
-              </div>
+              <h3 className="text-sm font-semibold text-stone-900">
+                {configCap.definition?.name || configCap.capability_key}
+              </h3>
               <button
                 type="button"
                 onClick={() => setConfigCap(null)}
-                className="rounded-lg p-1.5 text-stone-400 hover:text-stone-700"
+                className="rounded-lg p-1 text-stone-400 hover:text-stone-700"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </button>
             </div>
 
-            <form onSubmit={handleSaveCapSettings} className="space-y-4">
-              {/* Specialized fields by capability */}
+            <form onSubmit={handleSaveCapSettings} className="space-y-3">
               {configCap.capability_key === 'discussions' && (
-                <div className="space-y-3">
-                  <label className="flex items-center gap-2 text-xs font-medium text-stone-800 cursor-pointer">
+                <div className="space-y-2.5">
+                  <label className="flex items-center gap-2 text-xs text-stone-800 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={capSettingsDraft.allowMemberPosts !== false}
                       onChange={(e) =>
-                        setCapSettingsDraft((prev) => ({ ...prev, allowMemberPosts: e.target.checked }))
+                        setCapSettingsDraft((prev) => ({
+                          ...prev,
+                          allowMemberPosts: e.target.checked,
+                        }))
                       }
-                      className="rounded border-stone-300 text-stone-900 focus:ring-0"
                     />
-                    <span>Allow all active members to create discussion posts</span>
+                    <span>Allow members to create posts</span>
                   </label>
-                  <label className="flex items-center gap-2 text-xs font-medium text-stone-800 cursor-pointer">
+                  <label className="flex items-center gap-2 text-xs text-stone-800 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={capSettingsDraft.allowReactions !== false}
                       onChange={(e) =>
-                        setCapSettingsDraft((prev) => ({ ...prev, allowReactions: e.target.checked }))
+                        setCapSettingsDraft((prev) => ({
+                          ...prev,
+                          allowReactions: e.target.checked,
+                        }))
                       }
-                      className="rounded border-stone-300 text-stone-900 focus:ring-0"
                     />
-                    <span>Allow emoji reactions on posts and comments</span>
+                    <span>Allow emoji reactions</span>
                   </label>
                   <div>
-                    <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-600">
-                      Moderation Strategy
-                    </label>
+                    <label className="block text-xs font-medium text-stone-700">Moderation</label>
                     <select
                       value={String(capSettingsDraft.moderationMode || 'post_publish')}
                       onChange={(e) =>
-                        setCapSettingsDraft((prev) => ({ ...prev, moderationMode: e.target.value }))
+                        setCapSettingsDraft((prev) => ({
+                          ...prev,
+                          moderationMode: e.target.value,
+                        }))
                       }
-                      className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/70 p-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900"
+                      className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 p-2 text-xs text-stone-900"
                     >
-                      <option value="post_publish">Instant Publish (Post-moderation on member reports)</option>
-                      <option value="pre_approval">Strict Pre-Approval (Moderators must approve before live)</option>
+                      <option value="post_publish">Instant publish</option>
+                      <option value="pre_approval">Require approval</option>
                     </select>
                   </div>
                 </div>
               )}
 
               {configCap.capability_key === 'spaces' && (
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   <div>
-                    <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-600">
-                      Maximum Spaces Allowed
-                    </label>
+                    <label className="block text-xs font-medium text-stone-700">Max spaces</label>
                     <input
                       type="number"
                       min={1}
                       max={100}
                       value={Number(capSettingsDraft.maxSpaces || 25)}
                       onChange={(e) =>
-                        setCapSettingsDraft((prev) => ({ ...prev, maxSpaces: Number(e.target.value) }))
-                      }
-                      className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/70 p-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900"
-                    />
-                  </div>
-                  <label className="flex items-center gap-2 text-xs font-medium text-stone-800 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={capSettingsDraft.allowMemberDirectoryPerSpace !== false}
-                      onChange={(e) =>
                         setCapSettingsDraft((prev) => ({
                           ...prev,
-                          allowMemberDirectoryPerSpace: e.target.checked,
+                          maxSpaces: Number(e.target.value),
                         }))
                       }
-                      className="rounded border-stone-300 text-stone-900 focus:ring-0"
+                      className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 p-2 text-xs text-stone-900"
                     />
-                    <span>Allow filtering member directories per space</span>
-                  </label>
+                  </div>
                 </div>
               )}
 
               {configCap.capability_key === 'member_directory' && (
-                <div className="space-y-3">
-                  <label className="flex items-center gap-2 text-xs font-medium text-stone-800 cursor-pointer">
+                <div className="space-y-2.5">
+                  <label className="flex items-center gap-2 text-xs text-stone-800 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={capSettingsDraft.showRoleBadges !== false}
                       onChange={(e) =>
-                        setCapSettingsDraft((prev) => ({ ...prev, showRoleBadges: e.target.checked }))
+                        setCapSettingsDraft((prev) => ({
+                          ...prev,
+                          showRoleBadges: e.target.checked,
+                        }))
                       }
-                      className="rounded border-stone-300 text-stone-900 focus:ring-0"
                     />
-                    <span>Display role badges (Owner, Admin, Moderator) in directory</span>
+                    <span>Show role badges</span>
                   </label>
-                  <label className="flex items-center gap-2 text-xs font-medium text-stone-800 cursor-pointer">
+                  <label className="flex items-center gap-2 text-xs text-stone-800 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={capSettingsDraft.showBio !== false}
                       onChange={(e) =>
                         setCapSettingsDraft((prev) => ({ ...prev, showBio: e.target.checked }))
                       }
-                      className="rounded border-stone-300 text-stone-900 focus:ring-0"
                     />
-                    <span>Display member biography snippets in directory listings</span>
+                    <span>Show member bios</span>
                   </label>
                 </div>
               )}
 
               {configCap.capability_key === 'events' && (
-                <div className="space-y-3">
-                  <label className="flex items-center gap-2 text-xs font-medium text-stone-800 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={capSettingsDraft.allowMemberEvents !== false}
-                      onChange={(e) =>
-                        setCapSettingsDraft((prev) => ({ ...prev, allowMemberEvents: e.target.checked }))
-                      }
-                      className="rounded border-stone-300 text-stone-900 focus:ring-0"
-                    />
-                    <span>Allow active members to organize and host community events</span>
-                  </label>
-                </div>
+                <label className="flex items-center gap-2 text-xs text-stone-800 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={capSettingsDraft.allowMemberEvents !== false}
+                    onChange={(e) =>
+                      setCapSettingsDraft((prev) => ({
+                        ...prev,
+                        allowMemberEvents: e.target.checked,
+                      }))
+                    }
+                  />
+                  <span>Allow members to host events</span>
+                </label>
               )}
 
               {configCap.capability_key === 'rsvps' && (
-                <div className="space-y-3">
-                  <label className="flex items-center gap-2 text-xs font-medium text-stone-800 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={capSettingsDraft.enableWaitlist !== false}
-                      onChange={(e) =>
-                        setCapSettingsDraft((prev) => ({ ...prev, enableWaitlist: e.target.checked }))
-                      }
-                      className="rounded border-stone-300 text-stone-900 focus:ring-0"
-                    />
-                    <span>Enable capacity limits with automated waitlist promotion</span>
-                  </label>
-                </div>
+                <label className="flex items-center gap-2 text-xs text-stone-800 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={capSettingsDraft.enableWaitlist !== false}
+                    onChange={(e) =>
+                      setCapSettingsDraft((prev) => ({
+                        ...prev,
+                        enableWaitlist: e.target.checked,
+                      }))
+                    }
+                  />
+                  <span>Enable waitlist</span>
+                </label>
               )}
 
               {configCap.capability_key === 'polls_decisions' && (
-                <div className="space-y-3">
-                  <label className="flex items-center gap-2 text-xs font-medium text-stone-800 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={Boolean(capSettingsDraft.allowAnonymousVotes)}
-                      onChange={(e) =>
-                        setCapSettingsDraft((prev) => ({ ...prev, allowAnonymousVotes: e.target.checked }))
-                      }
-                      className="rounded border-stone-300 text-stone-900 focus:ring-0"
-                    />
-                    <span>Allow anonymous voter identity on polls and proposals</span>
-                  </label>
-                </div>
-              )}
-
-              {configCap.capability_key === 'services_bookings' && (
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-600">
-                      Default Slot Duration
-                    </label>
-                    <select
-                      value={Number(capSettingsDraft.defaultSlotDuration || 60)}
-                      onChange={(e) =>
-                        setCapSettingsDraft((prev) => ({
-                          ...prev,
-                          defaultSlotDuration: Number(e.target.value),
-                        }))
-                      }
-                      className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/70 p-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900"
-                    >
-                      <option value={15}>15 minutes</option>
-                      <option value={30}>30 minutes</option>
-                      <option value={45}>45 minutes</option>
-                      <option value={60}>60 minutes (1 hour)</option>
-                      <option value={90}>90 minutes</option>
-                    </select>
-                  </div>
-                  <label className="flex items-center gap-2 text-xs font-medium text-stone-800 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={capSettingsDraft.allowInstantBooking !== false}
-                      onChange={(e) =>
-                        setCapSettingsDraft((prev) => ({ ...prev, allowInstantBooking: e.target.checked }))
-                      }
-                      className="rounded border-stone-300 text-stone-900 focus:ring-0"
-                    />
-                    <span>Allow service providers to offer Instant Confirmation</span>
-                  </label>
-                </div>
+                <label className="flex items-center gap-2 text-xs text-stone-800 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(capSettingsDraft.allowAnonymousVotes)}
+                    onChange={(e) =>
+                      setCapSettingsDraft((prev) => ({
+                        ...prev,
+                        allowAnonymousVotes: e.target.checked,
+                      }))
+                    }
+                  />
+                  <span>Allow anonymous votes</span>
+                </label>
               )}
 
               {configCap.capability_key === 'payments_finances' && (
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   <div>
-                    <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-600">
-                      Primary Currency
-                    </label>
+                    <label className="block text-xs font-medium text-stone-700">Currency</label>
                     <select
                       value={String(capSettingsDraft.currency || 'USD')}
                       onChange={(e) =>
                         setCapSettingsDraft((prev) => ({ ...prev, currency: e.target.value }))
                       }
-                      className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/70 p-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900"
+                      className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 p-2 text-xs text-stone-900"
                     >
                       <option value="USD">USD ($)</option>
                       <option value="EUR">EUR (€)</option>
@@ -1455,63 +1187,10 @@ export function CircleStudioClient({
                       <option value="CAD">CAD ($)</option>
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-600">
-                      Grace Period Days
-                    </label>
-                    <input
-                      type="number"
-                      min={0}
-                      max={90}
-                      value={Number(capSettingsDraft.grace_period_days || 14)}
-                      onChange={(e) =>
-                        setCapSettingsDraft((prev) => ({
-                          ...prev,
-                          grace_period_days: Number(e.target.value),
-                        }))
-                      }
-                      className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/70 p-2.5 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-stone-900"
-                    />
-                  </div>
-                  <label className="flex items-center gap-2 text-xs font-medium text-stone-800 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={capSettingsDraft.public_treasury_ledger !== false}
-                      onChange={(e) =>
-                        setCapSettingsDraft((prev) => ({
-                          ...prev,
-                          public_treasury_ledger: e.target.checked,
-                        }))
-                      }
-                      className="rounded border-stone-300 text-stone-900 focus:ring-0"
-                    />
-                    <span>Make community treasury ledger transparent to all members</span>
-                  </label>
-                  <label className="flex items-center gap-2 text-xs font-medium text-stone-800 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={capSettingsDraft.allow_offline_payments !== false}
-                      onChange={(e) =>
-                        setCapSettingsDraft((prev) => ({
-                          ...prev,
-                          allow_offline_payments: e.target.checked,
-                        }))
-                      }
-                      className="rounded border-stone-300 text-stone-900 focus:ring-0"
-                    />
-                    <span>Allow manual cash/bank transfer offline reconciliation</span>
-                  </label>
                 </div>
               )}
 
-              {/* Notice */}
-              <div className="pt-2 border-t border-stone-100">
-                <p className="text-[11px] text-stone-500">
-                  Settings are strictly validated on the server, persisted into <code className="text-stone-700">circle_capabilities</code>, and logged in the immutable audit log.
-                </p>
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-stone-100">
+              <div className="flex justify-end gap-2 pt-3 border-t border-stone-100">
                 <button
                   type="button"
                   onClick={() => setConfigCap(null)}
@@ -1522,9 +1201,9 @@ export function CircleStudioClient({
                 <button
                   type="submit"
                   disabled={busy}
-                  className="rounded-lg bg-black px-4 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+                  className="rounded-lg bg-[#1B4332] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#2D6A4F] disabled:opacity-50"
                 >
-                  {busy ? 'Saving...' : 'Save Configuration'}
+                  {busy ? 'Saving...' : 'Save'}
                 </button>
               </div>
             </form>
