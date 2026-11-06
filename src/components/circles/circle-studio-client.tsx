@@ -1170,6 +1170,116 @@ export function CircleStudioClient({
                 </label>
               )}
 
+              {configCap.capability_key === 'marketplace' && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-stone-700">
+                      Default currency
+                    </label>
+                    <select
+                      value={String(capSettingsDraft.defaultCurrency || 'USD')}
+                      onChange={(e) =>
+                        setCapSettingsDraft((prev) => ({
+                          ...prev,
+                          defaultCurrency: e.target.value,
+                        }))
+                      }
+                      className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 p-2 text-xs text-stone-900"
+                    >
+                      {[
+                        'USD',
+                        'NGN',
+                        'GHS',
+                        'KES',
+                        'ZAR',
+                        'EUR',
+                        'GBP',
+                        'CAD',
+                        'UGX',
+                        'TZS',
+                        'RWF',
+                        'ZMW',
+                        'USDT',
+                        'USDC',
+                      ].map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <label className="flex items-center gap-2 text-xs text-stone-800 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={capSettingsDraft.allowMultiCurrency !== false}
+                      onChange={(e) =>
+                        setCapSettingsDraft((prev) => ({
+                          ...prev,
+                          allowMultiCurrency: e.target.checked,
+                        }))
+                      }
+                    />
+                    <span>Allow sellers to pick other currencies</span>
+                  </label>
+
+                  <div>
+                    <label className="block text-xs font-medium text-stone-700">
+                      Community commission on sales (%)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={30}
+                      step={0.5}
+                      value={Number(capSettingsDraft.commissionPercentage ?? 0)}
+                      onChange={(e) =>
+                        setCapSettingsDraft((prev) => ({
+                          ...prev,
+                          commissionPercentage: Math.min(30, Math.max(0, Number(e.target.value))),
+                        }))
+                      }
+                      className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 p-2 text-xs text-stone-900"
+                    />
+                  </div>
+
+                  <label className="flex items-center gap-2 text-xs text-stone-800 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(capSettingsDraft.payToPostEnabled)}
+                      onChange={(e) =>
+                        setCapSettingsDraft((prev) => ({
+                          ...prev,
+                          payToPostEnabled: e.target.checked,
+                        }))
+                      }
+                    />
+                    <span>Enable Pay-to-Post listing fee</span>
+                  </label>
+
+                  {Boolean(capSettingsDraft.payToPostEnabled) && (
+                    <div>
+                      <label className="block text-xs font-medium text-stone-700">
+                        Posting fee ({String(capSettingsDraft.defaultCurrency || 'USD')})
+                      </label>
+                      <input
+                        type="number"
+                        min={0}
+                        step="any"
+                        value={Number(capSettingsDraft.payToPostFeeAmount ?? 0)}
+                        onChange={(e) =>
+                          setCapSettingsDraft((prev) => ({
+                            ...prev,
+                            payToPostFeeAmount: Math.max(0, Number(e.target.value)),
+                          }))
+                        }
+                        className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 p-2 text-xs text-stone-900"
+                      />
+                    </div>
+                  )}
+                </div>
+              )}
+
               {configCap.capability_key === 'payments_finances' && (
                 <div className="space-y-2.5">
                   <div>

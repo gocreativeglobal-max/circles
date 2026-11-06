@@ -1,4 +1,5 @@
 import { ListingActionType } from '@/types/domain';
+import { getBachsCurrency, isBachsSupportedCurrency } from '@/lib/payments/currencies';
 
 function formatAmount(val: number): string {
   const hasDecimals = !Number.isInteger(val);
@@ -17,8 +18,14 @@ export function formatListingPrice(item: {
   rate_interval?: string | null;
   price_currency?: string | null;
 }): string {
-  const currency = item.price_currency || 'USD';
-  const sym = currency === 'USD' ? '$' : `${currency} `;
+  const currency = (item.price_currency || 'USD').toUpperCase();
+  const sym = isBachsSupportedCurrency(currency)
+    ? getBachsCurrency(currency).symbol === currency
+      ? `${currency} `
+      : getBachsCurrency(currency).symbol
+    : currency === 'USD'
+      ? '$'
+      : `${currency} `;
 
   const transType =
     item.transaction_type ||
@@ -93,6 +100,8 @@ export function getActionLabel(
   listingType?: string | null
 ): string {
   switch (actionType) {
+    case 'checkout':
+      return 'Buy Now';
     case 'booking':
       return listingType === 'rental' ? 'Borrow Item' : 'Book Appointment';
     case 'application':

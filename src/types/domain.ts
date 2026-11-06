@@ -383,7 +383,60 @@ export interface AvailabilitySchedule {
 
 export type ListingTransactionType = 'free' | 'fixed' | 'rate' | 'range' | 'negotiable';
 export type ListingRateInterval = 'hourly' | 'daily' | 'weekly' | 'monthly' | 'annually';
-export type ListingActionType = 'inquiry' | 'booking' | 'application' | 'link';
+export type ListingActionType = 'inquiry' | 'booking' | 'application' | 'link' | 'checkout';
+
+export interface MarketplaceCircleSettings {
+  defaultCurrency?: string;
+  allowMultiCurrency?: boolean;
+  commissionPercentage?: number;
+  payToPostEnabled?: boolean;
+  payToPostFeeAmount?: number;
+  payToPostTypes?: string[];
+  allowedListingTypes?: string[];
+  postingPolicy?: 'all_members' | 'admins_only';
+}
+
+export interface MarketplaceOrderItem {
+  id: string;
+  circle_id: string;
+  listing_id: string;
+  listing_title?: string;
+  buyer_id: string;
+  seller_id: string;
+  gross_amount_cents: number;
+  platform_fee_cents: number;
+  circle_commission_cents: number;
+  seller_net_cents: number;
+  currency: string;
+  payment_method: string;
+  payment_reference: string | null;
+  buyer_note: string;
+  status: 'pending' | 'completed' | 'refunded' | 'cancelled';
+  created_at: string;
+  buyer?: Pick<UserProfile, 'id' | 'username' | 'display_name'>;
+  seller?: Pick<UserProfile, 'id' | 'username' | 'display_name'>;
+}
+
+export interface MemberWalletTransactionItem {
+  id: string;
+  user_id: string;
+  circle_id: string | null;
+  order_id: string | null;
+  entry_type: 'sale_credit' | 'withdrawal' | 'refund_debit';
+  amount_cents: number;
+  currency: string;
+  description: string;
+  payout_destination: string | null;
+  status: 'pending' | 'completed' | 'rejected';
+  created_at: string;
+}
+
+export interface MemberWalletBalanceItem {
+  currency: string;
+  available_cents: number;
+  total_earned_cents: number;
+  total_withdrawn_cents: number;
+}
 
 export interface MarketplaceListingItem {
   id: string;

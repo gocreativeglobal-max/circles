@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
+  checkoutMarketplaceListing,
   createListingInquiry,
   createMarketplaceListing,
   createServiceOrRentalBooking,
+  getCircleMarketplaceSettings,
+  getMemberWalletSummary,
   listCircleBookings,
   listCircleInquiries,
   listMarketplaceListings,
+  requestMemberWalletWithdrawal,
   respondToListingInquiry,
   toggleSavedListing,
   updateMarketplaceListing,
@@ -49,8 +53,19 @@ export async function GET(
     const bookings = user
       ? await listCircleBookings(user.id, params.circleId)
       : [];
+    const marketplaceSettings = await getCircleMarketplaceSettings(
+      user?.id ?? null,
+      params.circleId
+    );
+    const walletSummary = user ? await getMemberWalletSummary(user.id) : null;
 
-    return NextResponse.json({ listings, inquiries, bookings });
+    return NextResponse.json({
+      listings,
+      inquiries,
+      bookings,
+      marketplaceSettings,
+      walletSummary,
+    });
   } catch (error) {
     return handleApiError(error);
   }
@@ -70,6 +85,38 @@ export async function POST(
       if (!body.listingId) throw new ValidationError('listingId is required.');
       const saved = await toggleSavedListing(user.id, params.circleId, String(body.listingId));
       return NextResponse.json(saved);
+    }
+
+    if (body.action === 'checkout') {
+      if (!body.listingId) throw new ValidationError('listingId is required.');
+      const result = await checkoutMarketplaceListing(
+        user.id,
+        params.circleId,
+        String(body.listingId),
+        {
+          paymentMethod: body.paymentMethod,
+          buyerNote: body.buyerNote,
+        }
+      );
+      const walletSummary = await getMemberWalletSummary(user.id);
+      return NextResponse.json(
+        {
+          order: result.order,
+          listing: result.updatedListing,
+          walletSummary,
+        },
+        { status: 201 }
+      );
+    }
+
+    if (body.action === 'withdraw_wallet') {
+      const transaction = await requestMemberWalletWithdrawal(user.id, {
+        currency: String(body.currency || 'USD'),
+        amountCents: Number(body.amountCents || 0),
+        payoutDestination: String(body.payoutDestination || ''),
+      });
+      const walletSummary = await getMemberWalletSummary(user.id);
+      return NextResponse.json({ transaction, walletSummary }, { status: 201 });
     }
 
     if (body.action === 'inquiry') {

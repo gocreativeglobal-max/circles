@@ -4,15 +4,21 @@ import { Lock, ShoppingBag } from 'lucide-react';
 import { getAuthenticatedUser } from '@/lib/auth/session';
 import { getCircleBySlugOrId } from '@/features/circles/service';
 import {
+  getCircleMarketplaceSettings,
+  getMemberWalletSummary,
   listCircleBookings,
   listCircleInquiries,
   listMarketplaceListings,
+  normalizeMarketplaceSettings,
 } from '@/features/marketplace/service';
 import { canReadCircleContent } from '@/lib/authorization/permissions';
 import { MarketplaceBoard } from '@/components/circles/marketplace-board';
 import {
   ListingInquiryItem,
+  MarketplaceCircleSettings,
   MarketplaceListingItem,
+  MemberWalletBalanceItem,
+  MemberWalletTransactionItem,
   ServiceBookingItem,
 } from '@/types/domain';
 
@@ -51,11 +57,20 @@ export default async function CircleMarketplacePage({
   let listings: MarketplaceListingItem[] = [];
   let inquiries: ListingInquiryItem[] = [];
   let bookings: ServiceBookingItem[] = [];
+  let marketplaceSettings: Required<MarketplaceCircleSettings> = normalizeMarketplaceSettings();
+  let walletSummary: {
+    balances: MemberWalletBalanceItem[];
+    transactions: MemberWalletTransactionItem[];
+  } | null = null;
   try {
     listings = await listMarketplaceListings(user?.id ?? null, circle.id);
-    if (user && circle.current_user_membership_status === 'active') {
-      inquiries = await listCircleInquiries(user.id, circle.id);
-      bookings = await listCircleBookings(user.id, circle.id);
+    marketplaceSettings = await getCircleMarketplaceSettings(user?.id ?? null, circle.id);
+    if (user) {
+      walletSummary = await getMemberWalletSummary(user.id);
+      if (circle.current_user_membership_status === 'active') {
+        inquiries = await listCircleInquiries(user.id, circle.id);
+        bookings = await listCircleBookings(user.id, circle.id);
+      }
     }
   } catch {
     return (
@@ -83,6 +98,8 @@ export default async function CircleMarketplacePage({
       isMember={isMember}
       currentUserId={user?.id ?? null}
       currentUserRole={circle.current_user_role ?? null}
+      initialMarketplaceSettings={marketplaceSettings}
+      initialWalletSummary={walletSummary}
     />
   );
 }

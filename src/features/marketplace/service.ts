@@ -1,12 +1,16 @@
 import crypto from 'crypto';
 import { z } from 'zod';
-import { withRlsTransaction } from '@/lib/db/postgres';
+import { withRlsTransaction, withServiceRoleTransaction } from '@/lib/db/postgres';
 import {
   CircleRole,
   CircleVisibility,
   ListingInquiryItem,
+  MarketplaceCircleSettings,
   MarketplaceListingItem,
+  MarketplaceOrderItem,
   MembershipStatus,
+  MemberWalletBalanceItem,
+  MemberWalletTransactionItem,
   ServiceBookingItem,
 } from '@/types/domain';
 import {
@@ -18,6 +22,8 @@ import {
 } from '@/lib/errors';
 import { canReadCircleContent } from '@/lib/authorization/permissions';
 import { createNotification } from '@/features/notifications/service';
+import { isBachsSupportedCurrency } from '@/lib/payments/currencies';
+import { calculatePlatformFee } from '@/features/finances/platform-fees';
 
 const COMMERCE_CAPABILITY_KEYS = [
   'marketplace',
@@ -43,7 +49,14 @@ export const createListingSchema = z.object({
   title: z.string().trim().min(3).max(160),
   description: z.string().trim().max(10000).default(''),
   priceAmount: z.number().min(0).max(100000000).nullable().optional(),
-  priceCurrency: z.string().trim().length(3).default('USD'),
+  priceCurrency: z
+    .string()
+    .trim()
+    .min(3)
+    .max(4)
+    .toUpperCase()
+    .refine((c) => isBachsSupportedCurrency(c), 'Unsupported currency code.')
+    .default('USD'),
   pricingUnit: z
     .enum(['fixed', 'hourly', 'daily', 'monthly', 'free', 'negotiable'])
     .default('fixed'),
@@ -56,7 +69,7 @@ export const createListingSchema = z.object({
     .optional(),
   priceMin: z.number().min(0).max(100000000).nullable().optional(),
   priceMax: z.number().min(0).max(100000000).nullable().optional(),
-  actionType: z.enum(['inquiry', 'booking', 'application', 'link']).default('inquiry'),
+  actionType: z.enum(['inquiry', 'booking', 'application', 'link', 'checkout']).default('inquiry'),
   actionUrl: z.string().trim().max(2048).nullable().optional(),
   customFields: z.record(z.unknown()).default({}),
   tags: z.array(z.string().trim().max(40)).default([]),
@@ -81,13 +94,20 @@ export const updateListingSchema = z.object({
   category: z.string().trim().min(1).max(60).optional(),
   listingType: z.string().trim().min(1).max(40).optional(),
   priceAmount: z.number().min(0).max(100000000).nullable().optional(),
-  priceCurrency: z.string().trim().length(3).optional(),
+  priceCurrency: z
+    .string()
+    .trim()
+    .min(3)
+    .max(4)
+    .toUpperCase()
+    .refine((c) => isBachsSupportedCurrency(c), 'Unsupported currency code.')
+    .optional(),
   pricingUnit: z.enum(['fixed', 'hourly', 'daily', 'monthly', 'free', 'negotiable']).optional(),
   transactionType: z.enum(['free', 'fixed', 'rate', 'range', 'negotiable']).optional(),
   rateInterval: z.enum(['hourly', 'daily', 'weekly', 'monthly', 'annually']).nullable().optional(),
   priceMin: z.number().min(0).max(100000000).nullable().optional(),
   priceMax: z.number().min(0).max(100000000).nullable().optional(),
-  actionType: z.enum(['inquiry', 'booking', 'application', 'link']).optional(),
+  actionType: z.enum(['inquiry', 'booking', 'application', 'link', 'checkout']).optional(),
   actionUrl: z.string().trim().max(2048).nullable().optional(),
   customFields: z.record(z.unknown()).optional(),
   tags: z.array(z.string().trim().max(40)).optional(),
@@ -120,27 +140,96 @@ export const updateBookingSchema = z.object({
   providerNote: z.string().trim().max(2000).optional(),
 });
 
+export const checkoutListingSchema = z.object({
+  paymentMethod: z.enum(['bachs', 'card', 'mobile_money', 'bank_transfer', 'stablecoin']).default('bachs'),
+  buyerNote: z.string().trim().max(1000).default(''),
+});
+
+export const withdrawWalletSchema = z.object({
+  currency: z
+    .string()
+    .trim()
+    .min(3)
+    .max(4)
+    .toUpperCase()
+    .refine((c) => isBachsSupportedCurrency(c), 'Unsupported currency code.'),
+  amountCents: z.number().int().min(100),
+  payoutDestination: z.string().trim().min(3).max(240),
+});
+
+export function normalizeMarketplaceSettings(
+  raw?: Record<string, unknown> | null
+): Required<MarketplaceCircleSettings> {
+  const s = raw ?? {};
+  const defaultCurrency =
+    typeof s.defaultCurrency === 'string' && isBachsSupportedCurrency(s.defaultCurrency)
+      ? s.defaultCurrency.toUpperCase()
+      : 'USD';
+  const allowMultiCurrency = s.allowMultiCurrency !== false;
+  const commissionPercentage = Math.min(
+    30,
+    Math.max(0, Number(s.commissionPercentage ?? 0) || 0)
+  );
+  const payToPostEnabled = Boolean(s.payToPostEnabled);
+  const payToPostFeeAmount = Math.max(0, Number(s.payToPostFeeAmount ?? 0) || 0);
+  const payToPostTypes = Array.isArray(s.payToPostTypes)
+    ? (s.payToPostTypes as string[])
+    : ['job', 'property'];
+  const allowedListingTypes =
+    Array.isArray(s.allowedListingTypes) && s.allowedListingTypes.length > 0
+      ? (s.allowedListingTypes as string[])
+      : ['product', 'service', 'rental', 'property', 'job', 'custom'];
+  const postingPolicy = s.postingPolicy === 'admins_only' ? 'admins_only' : 'all_members';
+
+  return {
+    defaultCurrency,
+    allowMultiCurrency,
+    commissionPercentage,
+    payToPostEnabled,
+    payToPostFeeAmount,
+    payToPostTypes,
+    allowedListingTypes,
+    postingPolicy,
+  };
+}
+
 async function assertCommerceCapability(
   tx: { query: <T>(sql: string, values?: unknown[]) => Promise<{ rows: T[] }> },
   circleId: string,
   actorUserId: string | null
 ): Promise<{
-  circle: { id: string; slug: string; visibility: CircleVisibility };
+  circle: {
+    id: string;
+    slug: string;
+    visibility: CircleVisibility;
+    plan_tier?: 'free' | 'pro' | 'platinum' | 'enterprise';
+    custom_platform_fee_percentage?: number | null;
+  };
   membership: { role: CircleRole; status: MembershipStatus } | null;
   enabledKeys: Set<string>;
+  marketplaceSettings: Required<MarketplaceCircleSettings>;
 }> {
   const circleRes = await tx.query<{
     id: string;
     slug: string;
     visibility: CircleVisibility;
-  }>(`SELECT id, slug, visibility FROM public.circles WHERE id = $1 LIMIT 1;`, [circleId]);
+    plan_tier?: 'free' | 'pro' | 'platinum' | 'enterprise';
+    custom_platform_fee_percentage?: number | null;
+  }>(
+    `SELECT id, slug, visibility, plan_tier, custom_platform_fee_percentage
+     FROM public.circles WHERE id = $1 LIMIT 1;`,
+    [circleId]
+  );
   const circle = circleRes.rows[0];
   if (!circle) {
     throw new NotFoundError('Circle not found.');
   }
 
-  const capRes = await tx.query<{ capability_key: string }>(
-    `SELECT capability_key FROM public.circle_capabilities
+  const capRes = await tx.query<{
+    capability_key: string;
+    settings: Record<string, unknown> | null;
+  }>(
+    `SELECT capability_key, settings FROM public.circle_capabilities
      WHERE circle_id = $1 AND capability_key = ANY($2::text[]) AND enabled = true;`,
     [circleId, COMMERCE_CAPABILITY_KEYS]
   );
@@ -148,6 +237,10 @@ async function assertCommerceCapability(
   if (capRes.rows.length === 0) {
     throw new CapabilityDisabledError('marketplace');
   }
+
+  const mktCap =
+    capRes.rows.find((r) => r.capability_key === 'marketplace') ?? capRes.rows[0];
+  const marketplaceSettings = normalizeMarketplaceSettings(mktCap?.settings);
 
   let membership: { role: CircleRole; status: MembershipStatus } | null = null;
   if (actorUserId) {
@@ -163,6 +256,7 @@ async function assertCommerceCapability(
     circle,
     membership,
     enabledKeys: new Set(capRes.rows.map((r) => r.capability_key)),
+    marketplaceSettings,
   };
 }
 
@@ -223,11 +317,24 @@ export async function createMarketplaceListing(
 ): Promise<MarketplaceListingItem> {
   const parsed = createListingSchema.parse(input);
 
-  return withRlsTransaction(actorUserId, async (tx) => {
-    const { membership } = await assertCommerceCapability(tx, parsed.circleId, actorUserId);
+  const outcome = await withRlsTransaction(actorUserId, async (tx) => {
+    const { circle, membership, marketplaceSettings } = await assertCommerceCapability(
+      tx,
+      parsed.circleId,
+      actorUserId
+    );
     if (!membership || membership.status !== 'active') {
       throw new ForbiddenError('Only active Circle members can publish marketplace listings.');
     }
+
+    const isStaff = ['owner', 'admin', 'moderator'].includes(membership.role);
+    if (marketplaceSettings.postingPolicy === 'admins_only' && !isStaff) {
+      throw new ForbiddenError('Only Circle admins and moderators can post listings in this Circle.');
+    }
+
+    const resolvedCurrency = marketplaceSettings.allowMultiCurrency
+      ? parsed.priceCurrency.toUpperCase()
+      : marketplaceSettings.defaultCurrency;
 
     const listingId = crypto.randomUUID();
     const res = await tx.query<MarketplaceListingItem>(
@@ -253,7 +360,7 @@ export async function createMarketplaceListing(
         parsed.title,
         parsed.description,
         parsed.priceAmount ?? null,
-        parsed.priceCurrency.toUpperCase(),
+        resolvedCurrency,
         parsed.pricingUnit,
         parsed.condition ?? null,
         parsed.location ?? null,
@@ -284,8 +391,53 @@ export async function createMarketplaceListing(
       ]
     );
 
-    return normalizeListingRow(res.rows[0]);
+    const requiresPayToPost =
+      !isStaff &&
+      marketplaceSettings.payToPostEnabled &&
+      marketplaceSettings.payToPostFeeAmount > 0 &&
+      (marketplaceSettings.payToPostTypes.includes('all') ||
+        marketplaceSettings.payToPostTypes.includes(parsed.listingType));
+
+    return {
+      listing: normalizeListingRow(res.rows[0]),
+      requiresPayToPost,
+      payToPostFeeAmount: marketplaceSettings.payToPostFeeAmount,
+      payToPostCurrency: marketplaceSettings.defaultCurrency,
+      circle,
+    };
   });
+
+  if (outcome.requiresPayToPost) {
+    const grossFeeCents = Math.round(outcome.payToPostFeeAmount * 100);
+    const feeBreakdown = calculatePlatformFee(
+      outcome.circle.plan_tier || 'free',
+      grossFeeCents,
+      outcome.circle.custom_platform_fee_percentage
+    );
+    await withServiceRoleTransaction(async (stx) => {
+      await stx.query(
+        `INSERT INTO public.community_treasury_ledger (
+           id, circle_id, entry_type, category, amount_cents, currency,
+           description, is_public_to_members, recorded_by, metadata
+         ) VALUES ($1, $2, 'revenue', 'other', $3, $4, $5, true, $6, $7::jsonb);`,
+        [
+          crypto.randomUUID(),
+          parsed.circleId,
+          feeBreakdown.creatorNetCents,
+          outcome.payToPostCurrency,
+          `Pay-to-post listing fee: ${outcome.listing.title}`,
+          actorUserId,
+          JSON.stringify({
+            listing_id: outcome.listing.id,
+            gross_cents: grossFeeCents,
+            platform_fee_cents: feeBreakdown.feeCents,
+          }),
+        ]
+      );
+    });
+  }
+
+  return outcome.listing;
 }
 
 export async function listMarketplaceListings(
@@ -1018,6 +1170,281 @@ export async function listCircleBookings(
         display_name: r.provider_display_name,
       },
     }));
+  });
+}
+
+export async function getCircleMarketplaceSettings(
+  actorUserId: string | null,
+  circleId: string
+): Promise<Required<MarketplaceCircleSettings>> {
+  return withRlsTransaction(actorUserId, async (tx) => {
+    const { marketplaceSettings } = await assertCommerceCapability(tx, circleId, actorUserId);
+    return marketplaceSettings;
+  });
+}
+
+export async function checkoutMarketplaceListing(
+  actorUserId: string,
+  circleId: string,
+  listingId: string,
+  input?: z.input<typeof checkoutListingSchema>
+): Promise<{
+  order: MarketplaceOrderItem;
+  updatedListing: MarketplaceListingItem;
+}> {
+  const parsed = checkoutListingSchema.parse(input ?? {});
+
+  const outcome = await withServiceRoleTransaction(async (tx) => {
+    const { circle, membership, marketplaceSettings } = await assertCommerceCapability(
+      tx,
+      circleId,
+      actorUserId
+    );
+
+    if (
+      !canReadCircleContent(circle.visibility, {
+        userId: actorUserId,
+        circleRole: membership?.role ?? null,
+        membershipStatus: membership?.status ?? null,
+      })
+    ) {
+      throw new ForbiddenError('You do not have permission to purchase listings in this Circle.');
+    }
+
+    const listingRes = await tx.query<MarketplaceListingItem>(
+      `SELECT * FROM public.marketplace_listings WHERE id = $1 AND circle_id = $2 LIMIT 1;`,
+      [listingId, circleId]
+    );
+    const listing = listingRes.rows[0];
+    if (!listing) {
+      throw new NotFoundError('Listing not found in this Circle.');
+    }
+    if (listing.status !== 'published') {
+      throw new ValidationError('This listing is no longer available for purchase.');
+    }
+    if (listing.seller_id === actorUserId) {
+      throw new ValidationError('You cannot purchase your own listing.');
+    }
+
+    const priceAmount = Number(listing.price_amount ?? 0);
+    if (!priceAmount || priceAmount <= 0) {
+      throw new ValidationError('Only priced listings can be purchased via checkout.');
+    }
+
+    const grossAmountCents = Math.round(priceAmount * 100);
+    const feeBreakdown = calculatePlatformFee(
+      circle.plan_tier || 'free',
+      grossAmountCents,
+      circle.custom_platform_fee_percentage
+    );
+    const platformFeeCents = feeBreakdown.feeCents;
+    const rawCommissionCents = Math.round(
+      grossAmountCents * (marketplaceSettings.commissionPercentage / 100)
+    );
+    const circleCommissionCents = Math.min(
+      Math.max(0, grossAmountCents - platformFeeCents),
+      rawCommissionCents
+    );
+    const sellerNetCents = Math.max(
+      0,
+      grossAmountCents - platformFeeCents - circleCommissionCents
+    );
+
+    const orderId = crypto.randomUUID();
+    const paymentRef = `BACHS-MKT-${orderId.slice(0, 8).toUpperCase()}`;
+
+    const orderRes = await tx.query<MarketplaceOrderItem>(
+      `INSERT INTO public.marketplace_orders (
+         id, circle_id, listing_id, buyer_id, seller_id,
+         gross_amount_cents, platform_fee_cents, circle_commission_cents, seller_net_cents,
+         currency, payment_method, payment_reference, buyer_note, status
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 'completed')
+       RETURNING *;`,
+      [
+        orderId,
+        circleId,
+        listing.id,
+        actorUserId,
+        listing.seller_id,
+        grossAmountCents,
+        platformFeeCents,
+        circleCommissionCents,
+        sellerNetCents,
+        listing.price_currency,
+        parsed.paymentMethod,
+        paymentRef,
+        parsed.buyerNote,
+      ]
+    );
+
+    // Credit Seller's Member Wallet
+    if (sellerNetCents > 0) {
+      await tx.query(
+        `INSERT INTO public.member_wallet_transactions (
+           id, user_id, circle_id, order_id, entry_type,
+           amount_cents, currency, description, status
+         ) VALUES ($1, $2, $3, $4, 'sale_credit', $5, $6, $7, 'completed');`,
+        [
+          crypto.randomUUID(),
+          listing.seller_id,
+          circleId,
+          orderId,
+          sellerNetCents,
+          listing.price_currency,
+          `Sale of "${listing.title}"`,
+        ]
+      );
+    }
+
+    // Credit Circle Admin Treasury if commission > 0
+    if (circleCommissionCents > 0) {
+      await tx.query(
+        `INSERT INTO public.community_treasury_ledger (
+           id, circle_id, entry_type, category, amount_cents, currency,
+           description, is_public_to_members, recorded_by, metadata
+         ) VALUES ($1, $2, 'revenue', 'other', $3, $4, $5, true, $6, $7::jsonb);`,
+        [
+          crypto.randomUUID(),
+          circleId,
+          circleCommissionCents,
+          listing.price_currency,
+          `Marketplace commission (${marketplaceSettings.commissionPercentage}%): ${listing.title}`,
+          actorUserId,
+          JSON.stringify({
+            order_id: orderId,
+            listing_id: listing.id,
+            gross_amount_cents: grossAmountCents,
+            platform_fee_cents: platformFeeCents,
+            seller_net_cents: sellerNetCents,
+          }),
+        ]
+      );
+    }
+
+    // Auto-mark physical/item listings as sold
+    const shouldMarkSold = listing.listing_type === 'product' || listing.transaction_type === 'fixed';
+    const nextStatus = shouldMarkSold ? 'sold' : listing.status;
+    const updatedRes = await tx.query<MarketplaceListingItem>(
+      `UPDATE public.marketplace_listings
+       SET status = $1, updated_at = NOW()
+       WHERE id = $2 AND circle_id = $3
+       RETURNING *;`,
+      [nextStatus, listing.id, circleId]
+    );
+
+    const rawOrder = orderRes.rows[0];
+    return {
+      order: {
+        ...rawOrder,
+        listing_title: listing.title,
+        gross_amount_cents: Number(rawOrder.gross_amount_cents),
+        platform_fee_cents: Number(rawOrder.platform_fee_cents),
+        circle_commission_cents: Number(rawOrder.circle_commission_cents),
+        seller_net_cents: Number(rawOrder.seller_net_cents),
+      },
+      updatedListing: normalizeListingRow(updatedRes.rows[0]),
+      circleSlug: circle.slug,
+    };
+  });
+
+  await createNotification({
+    recipientId: outcome.order.seller_id,
+    actorId: actorUserId,
+    circleId,
+    eventType: 'listing_inquiry',
+    title: `Listing Sold: ${outcome.updatedListing.title}`,
+    body: `Your listing "${outcome.updatedListing.title}" was purchased on-platform and funds have been credited to your Member Wallet.`,
+    linkUrl: `/circles/${outcome.circleSlug}/marketplace`,
+  });
+
+  return {
+    order: outcome.order,
+    updatedListing: outcome.updatedListing,
+  };
+}
+
+export async function getMemberWalletSummary(actorUserId: string): Promise<{
+  balances: MemberWalletBalanceItem[];
+  transactions: MemberWalletTransactionItem[];
+}> {
+  return withRlsTransaction(actorUserId, async (tx) => {
+    const res = await tx.query<MemberWalletTransactionItem>(
+      `SELECT * FROM public.member_wallet_transactions
+       WHERE user_id = $1
+       ORDER BY created_at DESC
+       LIMIT 100;`,
+      [actorUserId]
+    );
+
+    const transactions: MemberWalletTransactionItem[] = res.rows.map((r) => ({
+      ...r,
+      amount_cents: Number(r.amount_cents),
+    }));
+
+    const byCurrency = new Map<
+      string,
+      { earned: number; withdrawn: number }
+    >();
+
+    for (const t of transactions) {
+      if (t.status === 'rejected') continue;
+      const cur = t.currency.toUpperCase();
+      const entry = byCurrency.get(cur) ?? { earned: 0, withdrawn: 0 };
+      if (t.entry_type === 'sale_credit') {
+        entry.earned += t.amount_cents;
+      } else if (t.entry_type === 'withdrawal' || t.entry_type === 'refund_debit') {
+        entry.withdrawn += t.amount_cents;
+      }
+      byCurrency.set(cur, entry);
+    }
+
+    const balances: MemberWalletBalanceItem[] = Array.from(byCurrency.entries()).map(
+      ([currency, { earned, withdrawn }]) => ({
+        currency,
+        available_cents: Math.max(0, earned - withdrawn),
+        total_earned_cents: earned,
+        total_withdrawn_cents: withdrawn,
+      })
+    );
+
+    return { balances, transactions };
+  });
+}
+
+export async function requestMemberWalletWithdrawal(
+  actorUserId: string,
+  input: z.input<typeof withdrawWalletSchema>
+): Promise<MemberWalletTransactionItem> {
+  const parsed = withdrawWalletSchema.parse(input);
+  const summary = await getMemberWalletSummary(actorUserId);
+  const bal = summary.balances.find((b) => b.currency === parsed.currency);
+  if (!bal || bal.available_cents < parsed.amountCents) {
+    throw new ValidationError(
+      `Insufficient ${parsed.currency} wallet balance for this withdrawal.`
+    );
+  }
+
+  return withRlsTransaction(actorUserId, async (tx) => {
+    const res = await tx.query<MemberWalletTransactionItem>(
+      `INSERT INTO public.member_wallet_transactions (
+         id, user_id, entry_type, amount_cents, currency,
+         description, payout_destination, status
+       ) VALUES ($1, $2, 'withdrawal', $3, $4, $5, $6, 'completed')
+       RETURNING *;`,
+      [
+        crypto.randomUUID(),
+        actorUserId,
+        parsed.amountCents,
+        parsed.currency,
+        `Payout to ${parsed.payoutDestination}`,
+        parsed.payoutDestination,
+      ]
+    );
+    const row = res.rows[0];
+    return {
+      ...row,
+      amount_cents: Number(row.amount_cents),
+    };
   });
 }
 

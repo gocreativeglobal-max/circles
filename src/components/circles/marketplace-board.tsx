@@ -1,186 +1,376 @@
 'use client';
 
 import React, { useMemo, useState } from 'react';
-import Link from 'next/link';
 import {
   Bookmark,
-  Calendar,
-  Check,
-  Download,
-  Edit3,
-  ExternalLink,
+  Briefcase,
+  CheckCircle2,
+  CreditCard,
+  Home,
   MapPin,
-  MessageSquare,
   Plus,
   Search,
-  Send,
-  User,
+  ShoppingBag,
+  Sliders,
+  Sparkles,
+  Trash2,
+  Wallet,
+  Wrench,
   X,
-  Zap,
 } from 'lucide-react';
 import {
+  AvailabilitySchedule,
   CircleRole,
   ListingInquiryItem,
+  MarketplaceCircleSettings,
   MarketplaceListingItem,
+  MemberWalletBalanceItem,
+  MemberWalletTransactionItem,
   ServiceBookingItem,
 } from '@/types/domain';
-import { DirectMessageDrawer } from '@/components/messages/direct-message-drawer';
+import { UniversalListingWizardModal } from './universal-listing-wizard-modal';
+import { formatListingPrice, getActionLabel } from '@/features/marketplace/listing-helpers';
+import { generateAvailableSlots } from '@/features/marketplace/calendar-utils';
 import {
-  generateAvailableSlots,
-  generateBookingIcs,
-} from '@/features/marketplace/calendar-utils';
-import { formatListingPrice } from '@/features/marketplace/listing-helpers';
-import { UniversalListingWizardModal } from '@/components/circles/universal-listing-wizard-modal';
+  BACHS_ACCEPTED_CURRENCIES,
+  formatBachsAmount,
+  getBachsCurrency,
+} from '@/lib/payments/currencies';
 
-export interface MarketplaceBoardProps {
+interface MarketplaceBoardProps {
   circleId: string;
-  circleSlug?: string;
+  circleSlug: string;
   initialListings: MarketplaceListingItem[];
   initialInquiries: ListingInquiryItem[];
   initialBookings: ServiceBookingItem[];
   isMember: boolean;
-  currentUserId?: string | null;
-  currentUserRole?: CircleRole | null;
+  currentUserId: string | null;
+  currentUserRole: CircleRole | null;
+  initialMarketplaceSettings?: MarketplaceCircleSettings;
+  initialWalletSummary?: {
+    balances: MemberWalletBalanceItem[];
+    transactions: MemberWalletTransactionItem[];
+  } | null;
 }
 
-const TYPE_FILTERS = [
-  { key: 'all', label: 'All' },
-  { key: 'product', label: 'Goods' },
-  { key: 'service', label: 'Services' },
-  { key: 'rental', label: 'Rentals' },
-  { key: 'housing', label: 'Housing' },
-  { key: 'job', label: 'Jobs' },
+const ALL_TYPE_PILLS = [
+  { id: 'all', label: 'All', icon: ShoppingBag },
+  { id: 'product', label: 'Goods', icon: ShoppingBag },
+  { id: 'service', label: 'Services', icon: Sparkles },
+  { id: 'rental', label: 'Rentals', icon: Wrench },
+  { id: 'property', label: 'Housing', icon: Home },
+  { id: 'job', label: 'Jobs', icon: Briefcase },
 ];
 
 export function MarketplaceBoard({
   circleId,
-  circleSlug,
   initialListings,
   initialInquiries,
   initialBookings,
   isMember,
   currentUserId,
   currentUserRole,
+  initialMarketplaceSettings,
+  initialWalletSummary = null,
 }: MarketplaceBoardProps) {
   const [listings, setListings] = useState<MarketplaceListingItem[]>(initialListings);
   const [inquiries, setInquiries] = useState<ListingInquiryItem[]>(initialInquiries);
   const [bookings, setBookings] = useState<ServiceBookingItem[]>(initialBookings);
+  const [mktSettings, setMktSettings] = useState<MarketplaceCircleSettings>(
+    initialMarketplaceSettings || {
+      defaultCurrency: 'USD',
+      allowMultiCurrency: true,
+      commissionPercentage: 0,
+      payToPostEnabled: false,
+      payToPostFeeAmount: 0,
+      payToPostTypes: ['job', 'property'],
+      allowedListingTypes: ['product', 'service', 'rental', 'property', 'job', 'custom'],
+      postingPolicy: 'all_members',
+    }
+  );
+  const [walletSummary, setWalletSummary] = useState(
+    initialWalletSummary || { balances: [], transactions: [] }
+  );
 
-  const [activeTab, setActiveTab] = useState<'browse' | 'saved' | 'activity'>('browse');
-  const [filterType, setFilterType] = useState<string>('all');
+  const [activeView, setActiveView] = useState<'browse' | 'saved' | 'activity' | 'wallet'>(
+    'browse'
+  );
+  const [selectedType, setSelectedType] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'newest' | 'price_asc' | 'price_desc'>('newest');
 
-  const [wizardModalOpen, setWizardModalOpen] = useState(false);
-  const [editingListingItem, setEditingListingItem] = useState<MarketplaceListingItem | null>(null);
-  const [selectedListing, setSelectedListing] = useState<MarketplaceListingItem | null>(null);
+  // Modals
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [editingListing, setEditingListing] = useState<MarketplaceListingItem | null>(null);
+  const [detailListing, setDetailListing] = useState<MarketplaceListingItem | null>(null);
 
-  const [inquiryListing, setInquiryListing] = useState<MarketplaceListingItem | null>(null);
+  // Checkout Modal State (Members & Non-Members)
+  const [checkoutListing, setCheckoutListing] = useState<MarketplaceListingItem | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<
+    'card' | 'mobile_money' | 'bank_transfer' | 'stablecoin'
+  >('card');
+  const [buyerNote, setBuyerNote] = useState('');
+  const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [orderReceipt, setOrderReceipt] = useState<{
+    title: string;
+    amountFormatted: string;
+    reference: string;
+  } | null>(null);
+
+  // Admin Customization Modal State
+  const [customizeOpen, setCustomizeOpen] = useState(false);
+  const [draftSettings, setDraftSettings] = useState<MarketplaceCircleSettings>(mktSettings);
+  const [savingSettings, setSavingSettings] = useState(false);
+
+  // Wallet Withdrawal State
+  const [withdrawCurrency, setWithdrawCurrency] = useState('USD');
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawDest, setWithdrawDest] = useState('');
+  const [withdrawing, setWithdrawing] = useState(false);
+  const [walletNotice, setWalletNotice] = useState<string | null>(null);
+
+  // Inquiry / Application Modal
+  const [inquiryTarget, setInquiryTarget] = useState<MarketplaceListingItem | null>(null);
   const [inquiryMessage, setInquiryMessage] = useState('');
   const [sendingInquiry, setSendingInquiry] = useState(false);
 
-  const [bookingListing, setBookingListing] = useState<MarketplaceListingItem | null>(null);
-  const [bookingType, setBookingType] = useState<'service' | 'rental'>('service');
-  const [bookingStartsAt, setBookingStartsAt] = useState('');
-  const [bookingEndsAt, setBookingEndsAt] = useState('');
+  // Booking Modal
+  const [bookingTarget, setBookingTarget] = useState<MarketplaceListingItem | null>(null);
+  const [bookingDate, setBookingDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [selectedSlot, setSelectedSlot] = useState<{ startsAt: string; endsAt: string } | null>(
+    null
+  );
   const [bookingNotes, setBookingNotes] = useState('');
   const [submittingBooking, setSubmittingBooking] = useState(false);
-  const [selectedBookingDate, setSelectedBookingDate] = useState('');
-  const [manualTimeOverride, setManualTimeOverride] = useState(false);
 
-  const [activityRoleFilter, setActivityRoleFilter] = useState<'all' | 'received' | 'sent'>('all');
-  const [inquiryReplyText, setInquiryReplyText] = useState<Record<string, string>>({});
+  const isStaff =
+    currentUserRole === 'owner' ||
+    currentUserRole === 'admin' ||
+    currentUserRole === 'moderator';
+  const isAdmin = currentUserRole === 'owner' || currentUserRole === 'admin';
 
-  const [dmDrawerOpen, setDmDrawerOpen] = useState(false);
-  const [activeDmConvoId, setActiveDmConvoId] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const canCreateListing =
+    isMember && (mktSettings.postingPolicy !== 'admins_only' || isStaff);
 
-  const isStaff = currentUserRole ? ['owner', 'admin', 'moderator'].includes(currentUserRole) : false;
+  const visibleTypePills = useMemo(() => {
+    const allowed = mktSettings.allowedListingTypes;
+    if (!allowed || allowed.length === 0) return ALL_TYPE_PILLS;
+    return ALL_TYPE_PILLS.filter(
+      (p) => p.id === 'all' || allowed.includes(p.id) || (p.id === 'property' && allowed.includes('housing'))
+    );
+  }, [mktSettings.allowedListingTypes]);
 
-  function handleOpenCreate() {
-    setEditingListingItem(null);
-    setWizardModalOpen(true);
-  }
-
-  function handleOpenEdit(item: MarketplaceListingItem) {
-    setEditingListingItem(item);
-    setWizardModalOpen(true);
-  }
-
-  function handleListingSaved(savedListing: MarketplaceListingItem, isEdit: boolean) {
-    if (isEdit) {
-      setListings((prev) => prev.map((l) => (l.id === savedListing.id ? savedListing : l)));
-      if (selectedListing?.id === savedListing.id) setSelectedListing(savedListing);
-    } else {
-      setListings((prev) => [savedListing, ...prev]);
-    }
-  }
-
-  async function handleQuickStatusUpdate(
-    listingId: string,
-    newStatus: 'published' | 'reserved' | 'sold' | 'archived'
-  ) {
-    try {
-      const res = await fetch(`/api/circles/${circleId}/marketplace`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ listingId, status: newStatus }),
+  const filteredListings = useMemo(() => {
+    return listings
+      .filter((item) => {
+        if (item.status === 'removed' || item.status === 'archived') return false;
+        if (activeView === 'saved' && !item.viewer_has_saved) return false;
+        if (selectedType !== 'all') {
+          if (selectedType === 'property') {
+            if (item.listing_type !== 'property' && item.listing_type !== 'housing') return false;
+          } else if (item.listing_type !== selectedType) {
+            return false;
+          }
+        }
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase();
+          const inTitle = item.title.toLowerCase().includes(q);
+          const inDesc = (item.description || '').toLowerCase().includes(q);
+          const inCat = (item.category || '').toLowerCase().includes(q);
+          const inLoc = (item.location || '').toLowerCase().includes(q);
+          if (!inTitle && !inDesc && !inCat && !inLoc) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        if (sortBy === 'price_asc') {
+          return (a.price_amount ?? 0) - (b.price_amount ?? 0);
+        }
+        if (sortBy === 'price_desc') {
+          return (b.price_amount ?? 0) - (a.price_amount ?? 0);
+        }
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to update status.');
-      setListings((prev) => prev.map((l) => (l.id === listingId ? data.listing : l)));
-      if (selectedListing?.id === listingId) setSelectedListing(data.listing);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to update status.');
-    }
-  }
+  }, [listings, activeView, selectedType, searchQuery, sortBy]);
+
+  const availableSlots = useMemo(() => {
+    if (!bookingTarget) return [];
+    const rawSched = bookingTarget.availability_schedule;
+    const schedule: AvailabilitySchedule =
+      (typeof rawSched === 'string'
+        ? (JSON.parse(rawSched) as AvailabilitySchedule)
+        : rawSched) || {
+        days: [1, 2, 3, 4, 5],
+        startTime: '09:00',
+        endTime: '17:00',
+        slotDurationMinutes: bookingTarget.service_duration_minutes || 60,
+        bufferMinutes: 0,
+      };
+    const existingForListing = bookings
+      .filter(
+        (b) =>
+          b.listing_id === bookingTarget.id &&
+          (b.status === 'pending' || b.status === 'approved')
+      )
+      .map((b) => ({ starts_at: b.starts_at, ends_at: b.ends_at, status: b.status }));
+    return generateAvailableSlots(schedule, bookingDate, existingForListing);
+  }, [bookingTarget, bookingDate, bookings]);
 
   async function handleToggleSave(listingId: string) {
+    if (!currentUserId) return;
+    setListings((prev) =>
+      prev.map((l) => (l.id === listingId ? { ...l, viewer_has_saved: !l.viewer_has_saved } : l))
+    );
+    await fetch(`/api/circles/${circleId}/marketplace`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'toggle_save', listingId }),
+    });
+  }
+
+  async function handleDeleteListing(listingId: string) {
+    const res = await fetch(`/api/circles/${circleId}/marketplace`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ listingId, status: 'removed' }),
+    });
+    if (res.ok) {
+      setListings((prev) => prev.filter((l) => l.id !== listingId));
+      if (detailListing?.id === listingId) setDetailListing(null);
+    }
+  }
+
+  function triggerPrimaryAction(item: MarketplaceListingItem) {
+    const aType = item.action_type || 'inquiry';
+    if (aType === 'link' && item.action_url) {
+      window.open(item.action_url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    if (!currentUserId) {
+      window.location.href = '/sign-in';
+      return;
+    }
+    if (aType === 'checkout') {
+      setCheckoutListing(item);
+      setCheckoutError(null);
+      setBuyerNote('');
+      return;
+    }
+    if (aType === 'booking') {
+      setBookingTarget(item);
+      setSelectedSlot(null);
+      setBookingNotes('');
+      return;
+    }
+    setInquiryTarget(item);
+    setInquiryMessage('');
+  }
+
+  async function handleSubmitCheckout(e: React.FormEvent) {
+    e.preventDefault();
+    if (!checkoutListing) return;
+    setCheckoutBusy(true);
+    setCheckoutError(null);
     try {
       const res = await fetch(`/api/circles/${circleId}/marketplace`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'toggle_save', listingId }),
+        body: JSON.stringify({
+          action: 'checkout',
+          listingId: checkoutListing.id,
+          paymentMethod,
+          buyerNote,
+        }),
       });
       const data = await res.json();
-      if (res.ok) {
-        setListings((prev) =>
-          prev.map((l) => (l.id === listingId ? { ...l, viewer_has_saved: data.saved } : l))
-        );
-        if (selectedListing?.id === listingId) {
-          setSelectedListing((prev) => (prev ? { ...prev, viewer_has_saved: data.saved } : null));
-        }
+      if (!res.ok) {
+        setCheckoutError(data.error || 'Payment failed.');
+        return;
       }
+      if (data.listing) {
+        setListings((prev) =>
+          prev.map((l) => (l.id === data.listing.id ? data.listing : l))
+        );
+      }
+      if (data.walletSummary) {
+        setWalletSummary(data.walletSummary);
+      }
+      setOrderReceipt({
+        title: checkoutListing.title,
+        amountFormatted: formatBachsAmount(
+          Number(data.order?.gross_amount_cents || Math.round((checkoutListing.price_amount || 0) * 100)),
+          checkoutListing.price_currency || 'USD'
+        ),
+        reference: data.order?.payment_reference || 'PAID',
+      });
+      setCheckoutListing(null);
+      setDetailListing(null);
     } catch {
-      // Ignore
+      setCheckoutError('Network error during checkout.');
+    } finally {
+      setCheckoutBusy(false);
     }
   }
 
-  async function handleOpenInquiry(item: MarketplaceListingItem) {
-    if (item.seller_id && item.seller_id !== currentUserId) {
-      try {
-        const res = await fetch(`/api/circles/${circleId}/messages/conversations`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ targetUserId: item.seller_id, listingId: item.id }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          setActiveDmConvoId(data.conversation.id);
-          setDmDrawerOpen(true);
-          return;
-        }
-      } catch {
-        // Fall back to inquiry modal
+  async function handleSaveCustomize(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingSettings(true);
+    try {
+      const res = await fetch(`/api/circles/${circleId}/capabilities`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          capabilityKey: 'marketplace',
+          enabled: true,
+          settings: draftSettings,
+        }),
+      });
+      if (res.ok) {
+        setMktSettings(draftSettings);
+        setCustomizeOpen(false);
       }
+    } finally {
+      setSavingSettings(false);
     }
-    setInquiryListing(item);
-    setInquiryMessage('');
+  }
+
+  async function handleWithdrawWallet(e: React.FormEvent) {
+    e.preventDefault();
+    const amountCents = Math.round(Number(withdrawAmount || 0) * 100);
+    if (amountCents < 100 || !withdrawDest.trim()) return;
+    setWithdrawing(true);
+    setWalletNotice(null);
+    try {
+      const res = await fetch(`/api/circles/${circleId}/marketplace`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'withdraw_wallet',
+          currency: withdrawCurrency,
+          amountCents,
+          payoutDestination: withdrawDest.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setWalletNotice(data.error || 'Could not process withdrawal.');
+        return;
+      }
+      if (data.walletSummary) {
+        setWalletSummary(data.walletSummary);
+      }
+      setWithdrawAmount('');
+      setWithdrawDest('');
+      setWalletNotice('Withdrawal processed.');
+    } finally {
+      setWithdrawing(false);
+    }
   }
 
   async function handleSendInquiry(e: React.FormEvent) {
     e.preventDefault();
-    if (!inquiryListing || !inquiryMessage.trim()) return;
+    if (!inquiryTarget || !inquiryMessage.trim()) return;
     setSendingInquiry(true);
     try {
       const res = await fetch(`/api/circles/${circleId}/marketplace`, {
@@ -188,109 +378,24 @@ export function MarketplaceBoard({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'inquiry',
-          listingId: inquiryListing.id,
+          listingId: inquiryTarget.id,
           message: inquiryMessage.trim(),
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to send inquiry.');
-      setInquiries((prev) => [data.inquiry, ...prev]);
-      setInquiryListing(null);
-      setInquiryMessage('');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to send inquiry.');
+      if (res.ok && data.inquiry) {
+        setInquiries((prev) => [data.inquiry, ...prev]);
+        setInquiryTarget(null);
+        setInquiryMessage('');
+      }
     } finally {
       setSendingInquiry(false);
     }
   }
 
-  const availableBookingDates = useMemo(() => {
-    if (!bookingListing) return [];
-    const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const opDays =
-      bookingListing.availability_schedule?.days &&
-      bookingListing.availability_schedule.days.length > 0
-        ? bookingListing.availability_schedule.days
-        : [1, 2, 3, 4, 5];
-
-    const dates: { dateStr: string; label: string; weekday: string; isOperating: boolean }[] = [];
-    for (let i = 1; i <= 14; i++) {
-      const d = new Date(Date.now() + i * 86400_000);
-      const dateStr = d.toISOString().slice(0, 10);
-      const dayOfWeek = d.getDay();
-      dates.push({
-        dateStr,
-        weekday: daysOfWeek[dayOfWeek],
-        label: `${months[d.getMonth()]} ${d.getDate()}`,
-        isOperating: opDays.includes(dayOfWeek),
-      });
-    }
-    return dates;
-  }, [bookingListing]);
-
-  const computedBookingSlots = useMemo(() => {
-    if (!bookingListing || !selectedBookingDate) return [];
-    const sched = bookingListing.availability_schedule || {
-      days: [1, 2, 3, 4, 5],
-      startTime: '09:00',
-      endTime: '17:00',
-      slotDurationMinutes: bookingListing.service_duration_minutes || 60,
-      bufferMinutes: 0,
-    };
-    const listingBookings = bookings.filter((b) => b.listing_id === bookingListing.id);
-    return generateAvailableSlots(sched, selectedBookingDate, listingBookings);
-  }, [bookingListing, selectedBookingDate, bookings]);
-
-  function handleDownloadIcs(booking: ServiceBookingItem) {
-    const icsContent = generateBookingIcs(
-      booking,
-      booking.listing_title || 'Booking',
-      circleSlug || 'Circle'
-    );
-    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `booking-${booking.id.slice(0, 8)}.ics`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }
-
-  function handleOpenBooking(item: MarketplaceListingItem) {
-    setBookingListing(item);
-    setBookingType(item.listing_type === 'rental' ? 'rental' : 'service');
-    const tomorrow = new Date(Date.now() + 86400_000);
-    const dateStr = tomorrow.toISOString().slice(0, 10);
-    setSelectedBookingDate(dateStr);
-    setManualTimeOverride(false);
-
-    const sched = item.availability_schedule || {
-      days: [1, 2, 3, 4, 5],
-      startTime: '09:00',
-      endTime: '17:00',
-      slotDurationMinutes: item.service_duration_minutes || 60,
-      bufferMinutes: 0,
-    };
-    const listingBookings = bookings.filter((b) => b.listing_id === item.id);
-    const slots = generateAvailableSlots(sched, dateStr, listingBookings);
-    const firstAvail = slots.find((s) => s.available);
-    if (firstAvail) {
-      setBookingStartsAt(firstAvail.startsAt.slice(0, 16));
-      setBookingEndsAt(firstAvail.endsAt.slice(0, 16));
-    } else {
-      const now = Date.now();
-      setBookingStartsAt(new Date(now + 86400_000).toISOString().slice(0, 16));
-      setBookingEndsAt(new Date(now + 90000_000).toISOString().slice(0, 16));
-    }
-    setBookingNotes('');
-  }
-
   async function handleSendBooking(e: React.FormEvent) {
     e.preventDefault();
-    if (!bookingListing) return;
+    if (!bookingTarget || !selectedSlot) return;
     setSubmittingBooking(true);
     try {
       const res = await fetch(`/api/circles/${circleId}/marketplace`, {
@@ -298,19 +403,18 @@ export function MarketplaceBoard({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'booking',
-          listingId: bookingListing.id,
-          bookingType,
-          startsAt: new Date(bookingStartsAt).toISOString(),
-          endsAt: new Date(bookingEndsAt).toISOString(),
+          listingId: bookingTarget.id,
+          bookingType: bookingTarget.listing_type === 'rental' ? 'rental' : 'service',
+          startsAt: selectedSlot.startsAt,
+          endsAt: selectedSlot.endsAt,
           notes: bookingNotes.trim(),
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to submit booking.');
-      setBookings((prev) => [data.booking, ...prev]);
-      setBookingListing(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to schedule booking.');
+      if (res.ok && data.booking) {
+        setBookings((prev) => [data.booking, ...prev]);
+        setBookingTarget(null);
+      }
     } finally {
       setSubmittingBooking(false);
     }
@@ -318,400 +422,315 @@ export function MarketplaceBoard({
 
   async function handleRespondInquiry(
     inquiryId: string,
-    nextStatus: 'responded' | 'accepted' | 'declined' | 'closed'
+    status: 'accepted' | 'declined',
+    sellerResponse?: string
   ) {
-    const responseText = inquiryReplyText[inquiryId]?.trim() || '';
-    try {
-      const res = await fetch(`/api/circles/${circleId}/marketplace`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'respond_inquiry',
-          inquiryId,
-          status: nextStatus,
-          sellerResponse: responseText || undefined,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to update inquiry.');
-      setInquiries((prev) => prev.map((inq) => (inq.id === inquiryId ? data.inquiry : inq)));
-      setInquiryReplyText((prev) => {
-        const next = { ...prev };
-        delete next[inquiryId];
-        return next;
-      });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to respond.');
+    const res = await fetch(`/api/circles/${circleId}/marketplace`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'respond_inquiry', inquiryId, status, sellerResponse }),
+    });
+    const data = await res.json();
+    if (res.ok && data.inquiry) {
+      setInquiries((prev) => prev.map((i) => (i.id === inquiryId ? data.inquiry : i)));
     }
   }
 
-  async function handleUpdateBookingStatus(
+  async function handleUpdateBooking(
     bookingId: string,
-    nextStatus: 'approved' | 'rejected' | 'cancelled' | 'completed' | 'returned',
-    providerNote?: string
+    status: 'approved' | 'rejected' | 'cancelled' | 'completed'
   ) {
-    try {
-      const res = await fetch(`/api/circles/${circleId}/marketplace`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'update_booking',
-          bookingId,
-          status: nextStatus,
-          providerNote,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to update booking.');
+    const res = await fetch(`/api/circles/${circleId}/marketplace`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'update_booking', bookingId, status }),
+    });
+    const data = await res.json();
+    if (res.ok && data.booking) {
       setBookings((prev) => prev.map((b) => (b.id === bookingId ? data.booking : b)));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Update failed.');
     }
   }
 
-  const visibleListings = useMemo(() => {
-    let list = [...listings];
-    if (activeTab === 'saved') list = list.filter((l) => l.viewer_has_saved);
-    if (filterType !== 'all') list = list.filter((l) => l.listing_type === filterType);
-
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      list = list.filter(
-        (l) =>
-          l.title.toLowerCase().includes(q) ||
-          l.description.toLowerCase().includes(q) ||
-          l.category.toLowerCase().includes(q) ||
-          (l.location || '').toLowerCase().includes(q) ||
-          (Array.isArray(l.tags) && l.tags.some((t) => t.toLowerCase().includes(q)))
-      );
-    }
-
-    if (sortBy === 'price_asc') {
-      list.sort((a, b) => (a.price_amount ?? 0) - (b.price_amount ?? 0));
-    } else if (sortBy === 'price_desc') {
-      list.sort((a, b) => (b.price_amount ?? 0) - (a.price_amount ?? 0));
-    } else {
-      list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    }
-    return list;
-  }, [listings, activeTab, filterType, searchQuery, sortBy]);
-
-  const filteredInquiries = useMemo(() => {
-    if (activityRoleFilter === 'received') return inquiries.filter((i) => i.seller_id === currentUserId);
-    if (activityRoleFilter === 'sent') return inquiries.filter((i) => i.buyer_id === currentUserId);
-    return inquiries;
-  }, [inquiries, activityRoleFilter, currentUserId]);
-
-  const filteredBookings = useMemo(() => {
-    if (activityRoleFilter === 'received') return bookings.filter((b) => b.provider_id === currentUserId);
-    if (activityRoleFilter === 'sent') return bookings.filter((b) => b.requester_id === currentUserId);
-    return bookings;
-  }, [bookings, activityRoleFilter, currentUserId]);
-
-  const totalActivityCount = inquiries.length + bookings.length;
-
-  const primaryBtn =
-    'inline-flex items-center gap-1.5 rounded-lg bg-[#1B4332] px-3.5 py-2 text-sm font-medium text-white hover:bg-[#2D6A4F] disabled:opacity-50';
-  const ghostBtn =
-    'inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50';
+  const activityCount = inquiries.length + bookings.length;
 
   return (
     <div className="space-y-5">
-      {/* Top bar: tabs + actions */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200">
-        <div className="-mb-px flex items-center gap-5">
-          <button
-            type="button"
-            onClick={() => setActiveTab('browse')}
-            className={`border-b-2 pb-2.5 text-sm transition-colors ${
-              activeTab === 'browse'
-                ? 'border-[#1B4332] font-medium text-stone-900'
-                : 'border-transparent text-stone-500 hover:text-stone-800'
-            }`}
-          >
-            All listings
-          </button>
-          {isMember && (
-            <button
-              type="button"
-              onClick={() => setActiveTab('saved')}
-              className={`border-b-2 pb-2.5 text-sm transition-colors ${
-                activeTab === 'saved'
-                  ? 'border-[#1B4332] font-medium text-stone-900'
-                  : 'border-transparent text-stone-500 hover:text-stone-800'
-              }`}
-            >
-              Saved
-            </button>
-          )}
-          {isMember && (
-            <button
-              type="button"
-              onClick={() => setActiveTab('activity')}
-              className={`inline-flex items-center gap-1.5 border-b-2 pb-2.5 text-sm transition-colors ${
-                activeTab === 'activity'
-                  ? 'border-[#1B4332] font-medium text-stone-900'
-                  : 'border-transparent text-stone-500 hover:text-stone-800'
-              }`}
-            >
-              <span>Requests</span>
-              {totalActivityCount > 0 && (
-                <span className="rounded-full bg-stone-200 px-1.5 py-0.2 text-[11px] font-medium text-stone-700">
-                  {totalActivityCount}
-                </span>
-              )}
-            </button>
-          )}
+      {/* Top Bar */}
+      <div className="flex flex-col justify-between gap-3 border-b border-stone-200 pb-3 sm:flex-row sm:items-center">
+        <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+          {[
+            { id: 'browse', label: 'All listings' },
+            { id: 'saved', label: 'Saved' },
+            ...(isMember
+              ? [
+                  {
+                    id: 'activity',
+                    label: `Requests${activityCount > 0 ? ` (${activityCount})` : ''}`,
+                  },
+                ]
+              : []),
+            ...(currentUserId ? [{ id: 'wallet', label: 'Wallet' }] : []),
+          ].map((tab) => {
+            const active = activeView === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveView(tab.id as typeof activeView)}
+                className={`relative px-3.5 py-2 text-xs font-medium transition-colors whitespace-nowrap ${
+                  active ? 'text-[#1B4332] font-semibold' : 'text-stone-500 hover:text-stone-900'
+                }`}
+              >
+                {tab.label}
+                {active && (
+                  <span className="absolute inset-x-0 -bottom-[13px] h-0.5 rounded-full bg-[#1B4332]" />
+                )}
+              </button>
+            );
+          })}
         </div>
 
-        <div className="mb-2 flex items-center gap-2">
-          {isMember && (
+        <div className="flex items-center gap-2">
+          {isAdmin && (
             <button
               type="button"
               onClick={() => {
-                setActiveDmConvoId(null);
-                setDmDrawerOpen(true);
+                setDraftSettings(mktSettings);
+                setCustomizeOpen(true);
               }}
-              className={ghostBtn}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs font-medium text-stone-700 hover:bg-stone-50"
             >
-              <MessageSquare className="h-3.5 w-3.5" />
-              Messages
+              <Sliders className="h-3.5 w-3.5" />
+              <span>Customize</span>
             </button>
           )}
-          {isMember && (
-            <button type="button" onClick={handleOpenCreate} className={primaryBtn}>
-              <Plus className="h-4 w-4" />
-              New listing
+
+          {canCreateListing && (
+            <button
+              type="button"
+              onClick={() => {
+                setEditingListing(null);
+                setWizardOpen(true);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#1B4332] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>New listing</span>
             </button>
           )}
         </div>
       </div>
 
-      {error && (
-        <div className="flex items-center justify-between rounded-xl border border-red-200 bg-red-50 px-3.5 py-2 text-xs text-red-700">
-          <span>{error}</span>
-          <button type="button" onClick={() => setError(null)}>
-            <X className="h-3.5 w-3.5" />
+      {/* Order Confirmation Banner */}
+      {orderReceipt && (
+        <div className="flex items-center justify-between rounded-xl border border-[#1B4332]/20 bg-[#F4F3EE] px-4 py-3 text-xs text-[#1B4332]">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 shrink-0" />
+            <span>
+              Purchased <strong>{orderReceipt.title}</strong> ({orderReceipt.amountFormatted}) · Ref:{' '}
+              <code className="font-mono">{orderReceipt.reference}</code>
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setOrderReceipt(null)}
+            className="text-[#1B4332]/70 hover:text-[#1B4332]"
+          >
+            <X className="h-4 w-4" />
           </button>
         </div>
       )}
 
-      {/* Filter row */}
-      {activeTab !== 'activity' && (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-1">
-            {TYPE_FILTERS.map((t) => {
-              const active = filterType === t.key;
-              return (
-                <button
-                  key={t.key}
-                  type="button"
-                  onClick={() => setFilterType(t.key)}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
-                    active
-                      ? 'bg-[#1B4332] text-white'
-                      : 'text-stone-600 hover:bg-stone-200/60 hover:text-stone-900'
-                  }`}
-                >
-                  {t.label}
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-stone-400" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search..."
-                className="w-44 rounded-lg border border-stone-200 bg-white py-1 pl-8 pr-3 text-xs text-stone-800 placeholder-stone-400 focus:border-[#2D6A4F] focus:outline-none sm:w-56"
-              />
+      {/* BROWSE / SAVED VIEW */}
+      {(activeView === 'browse' || activeView === 'saved') && (
+        <>
+          {/* Filter & Search Bar */}
+          <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 sm:pb-0">
+              {visibleTypePills.map((pill) => {
+                const Icon = pill.icon;
+                const active = selectedType === pill.id;
+                return (
+                  <button
+                    key={pill.id}
+                    type="button"
+                    onClick={() => setSelectedType(pill.id)}
+                    className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors ${
+                      active
+                        ? 'bg-[#1B4332] text-white'
+                        : 'bg-white border border-stone-200/80 text-stone-600 hover:bg-stone-100'
+                    }`}
+                  >
+                    <Icon className="h-3.5 w-3.5" />
+                    <span>{pill.label}</span>
+                  </button>
+                );
+              })}
             </div>
 
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-              className="rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-xs text-stone-700 focus:outline-none"
-            >
-              <option value="newest">Newest</option>
-              <option value="price_asc">Price: low</option>
-              <option value="price_desc">Price: high</option>
-            </select>
-          </div>
-        </div>
-      )}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1 sm:w-56">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-stone-400" />
+                <input
+                  type="search"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search..."
+                  className="w-full rounded-xl border border-stone-200 bg-white py-1.5 pl-8 pr-3 text-xs text-stone-900 focus:border-[#1B4332] focus:outline-none"
+                />
+              </div>
 
-      {/* Listings grid */}
-      {activeTab !== 'activity' && (
-        <>
-          {visibleListings.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-stone-200 bg-white py-16 text-center text-sm text-stone-500">
-              {activeTab === 'saved' ? 'No saved listings.' : 'No listings yet.'}
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+                className="rounded-xl border border-stone-200 bg-white px-2.5 py-1.5 text-xs text-stone-700 focus:border-[#1B4332] focus:outline-none"
+              >
+                <option value="newest">Newest</option>
+                <option value="price_asc">Price: Low to High</option>
+                <option value="price_desc">Price: High to Low</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Grid */}
+          {filteredListings.length === 0 ? (
+            <div className="rounded-2xl border border-stone-200/80 bg-white p-12 text-center">
+              <ShoppingBag className="mx-auto h-7 w-7 text-stone-300" />
+              <p className="mt-2 text-sm font-medium text-stone-700">No listings found</p>
+              {canCreateListing && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingListing(null);
+                    setWizardOpen(true);
+                  }}
+                  className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-[#1B4332] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  <span>Post a listing</span>
+                </button>
+              )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {visibleListings.map((item) => {
-                const isSeller = currentUserId === item.seller_id;
-                const canManage = isSeller || isStaff;
-                const hasImage = item.image_urls && item.image_urls.length > 0;
-                const specEntries =
-                  item.custom_fields && typeof item.custom_fields === 'object'
-                    ? Object.entries(item.custom_fields).slice(0, 2)
-                    : [];
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredListings.map((item) => {
+                const isOwner = currentUserId && item.seller_id === currentUserId;
+                const priceLabel = formatListingPrice(item);
+                const coverImg = item.image_urls?.[0] || null;
+                const isSold = item.status === 'sold';
 
                 return (
-                  <article
+                  <div
                     key={item.id}
-                    className="flex flex-col justify-between overflow-hidden rounded-xl border border-stone-200 bg-white transition-colors hover:border-stone-300"
+                    onClick={() => setDetailListing(item)}
+                    className="group flex cursor-pointer flex-col justify-between overflow-hidden rounded-2xl border border-stone-200/80 bg-white transition-all hover:border-stone-300 hover:shadow-xs"
                   >
                     <div>
-                      {hasImage && (
-                        <button
-                          type="button"
-                          onClick={() => setSelectedListing(item)}
-                          className="block h-44 w-full overflow-hidden bg-stone-100 text-left"
-                        >
+                      {coverImg && (
+                        <div className="relative h-40 w-full overflow-hidden bg-stone-100">
                           {/* eslint-disable-next-line @next/next/no-img-element */}
                           <img
-                            src={item.image_urls[0]}
+                            src={coverImg}
                             alt={item.title}
-                            className="h-full w-full object-cover"
+                            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
                           />
-                        </button>
+                          {isSold && (
+                            <span className="absolute left-3 top-3 rounded-lg bg-stone-900/90 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
+                              Sold
+                            </span>
+                          )}
+                        </div>
                       )}
 
-                      <div className="space-y-2 p-4">
-                        <div className="flex items-baseline justify-between gap-2">
-                          <Link
-                            href={`/circles/${circleSlug}/marketplace/${item.id}`}
-                            className="truncate text-sm font-semibold text-stone-900 hover:underline"
+                      <div className="p-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-[11px] font-medium text-stone-400">
+                            {item.category}
+                          </span>
+                          <span
+                            className={`rounded-md px-2 py-0.5 text-xs font-semibold ${
+                              isSold
+                                ? 'bg-stone-100 text-stone-400 line-through'
+                                : 'bg-[#F4F3EE] text-[#1B4332]'
+                            }`}
                           >
-                            {item.title}
-                          </Link>
-                          <span className="shrink-0 text-sm font-semibold text-[#1B4332]">
-                            {formatListingPrice(item)}
+                            {priceLabel}
                           </span>
                         </div>
 
+                        <h3 className="mt-1.5 text-sm font-semibold text-stone-900 line-clamp-1">
+                          {item.title}
+                        </h3>
+
                         {item.description && (
-                          <p className="line-clamp-2 text-xs leading-relaxed text-stone-600">
+                          <p className="mt-1 text-xs text-stone-500 line-clamp-2">
                             {item.description}
                           </p>
                         )}
 
-                        {(specEntries.length > 0 || item.location) && (
-                          <div className="flex flex-wrap items-center gap-2 pt-0.5 text-xs text-stone-500">
-                            {specEntries.map(([k, v]) => (
-                              <span key={k} className="rounded bg-stone-100 px-1.5 py-0.5 text-[11px]">
-                                {k}: {String(v)}
-                              </span>
-                            ))}
-                            {item.location && (
-                              <span className="inline-flex items-center gap-1 text-[11px] text-stone-400">
-                                <MapPin className="h-3 w-3" />
-                                <span className="max-w-[120px] truncate">{item.location}</span>
-                              </span>
-                            )}
-                          </div>
+                        {item.location && (
+                          <p className="mt-2 inline-flex items-center gap-1 text-[11px] text-stone-400">
+                            <MapPin className="h-3 w-3" />
+                            <span>{item.location}</span>
+                          </p>
                         )}
                       </div>
                     </div>
 
-                    <div className="flex items-center justify-between border-t border-stone-100 px-4 py-2.5">
-                      <div className="flex min-w-0 items-center gap-2 text-xs text-stone-500">
-                        {item.seller?.avatar_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={item.seller.avatar_url}
-                            alt=""
-                            className="h-5 w-5 rounded-full object-cover"
-                          />
-                        ) : (
-                          <User className="h-3.5 w-3.5 text-stone-400" />
-                        )}
-                        <span className="truncate">{item.seller?.display_name || 'Member'}</span>
-                      </div>
+                    <div
+                      className="flex items-center justify-between border-t border-stone-100 px-4 py-2.5"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <span className="text-[11px] text-stone-500 truncate">
+                        {item.seller?.display_name || 'Member'}
+                      </span>
 
                       <div className="flex items-center gap-1.5">
-                        {item.status !== 'published' && (
-                          <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-stone-600">
-                            {item.status}
-                          </span>
-                        )}
-
-                        {isMember && (
+                        {currentUserId && (
                           <button
                             type="button"
                             onClick={() => handleToggleSave(item.id)}
-                            className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-800"
-                            aria-label="Save"
+                            className={`rounded-lg p-1.5 transition-colors ${
+                              item.viewer_has_saved
+                                ? 'text-[#1B4332]'
+                                : 'text-stone-400 hover:bg-stone-100 hover:text-stone-700'
+                            }`}
+                            title="Save"
                           >
-                            <Bookmark
-                              className={`h-3.5 w-3.5 ${
-                                item.viewer_has_saved ? 'fill-current text-[#1B4332]' : ''
-                              }`}
-                            />
+                            <Bookmark className="h-3.5 w-3.5" />
                           </button>
                         )}
 
-                        {!isSeller && isMember && item.status === 'published' && (
-                          <>
-                            {item.action_type === 'link' && item.action_url ? (
-                              <a
-                                href={item.action_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className={ghostBtn}
-                              >
-                                Open
-                                <ExternalLink className="h-3 w-3" />
-                              </a>
-                            ) : item.action_type === 'booking' ||
-                              item.listing_type === 'service' ||
-                              item.listing_type === 'rental' ? (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenBooking(item)}
-                                className={ghostBtn}
-                              >
-                                {item.listing_type === 'rental' ? 'Borrow' : 'Book'}
-                              </button>
-                            ) : item.action_type === 'application' ? (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenInquiry(item)}
-                                className={ghostBtn}
-                              >
-                                Apply
-                              </button>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => handleOpenInquiry(item)}
-                                className={ghostBtn}
-                              >
-                                Message
-                              </button>
-                            )}
-                          </>
-                        )}
-
-                        {canManage && (
+                        {isOwner ? (
                           <button
                             type="button"
-                            onClick={() => handleOpenEdit(item)}
-                            className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-800"
-                            aria-label="Edit"
+                            onClick={() => {
+                              setEditingListing(item);
+                              setWizardOpen(true);
+                            }}
+                            className="rounded-lg border border-stone-200 px-2.5 py-1 text-xs font-medium text-stone-700 hover:bg-stone-50"
                           >
-                            <Edit3 className="h-3.5 w-3.5" />
+                            Edit
+                          </button>
+                        ) : isSold ? (
+                          <span className="rounded-lg bg-stone-100 px-2.5 py-1 text-xs font-medium text-stone-400">
+                            Sold
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => triggerPrimaryAction(item)}
+                            className="inline-flex items-center gap-1 rounded-lg bg-[#1B4332] px-2.5 py-1 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
+                          >
+                            {item.action_type === 'checkout' && (
+                              <CreditCard className="h-3 w-3" />
+                            )}
+                            <span>{getActionLabel(item.action_type, item.listing_type)}</span>
                           </button>
                         )}
                       </div>
                     </div>
-                  </article>
+                  </div>
                 );
               })}
             </div>
@@ -719,455 +738,776 @@ export function MarketplaceBoard({
         </>
       )}
 
-      {/* Activity tab */}
-      {activeTab === 'activity' && (
-        <div className="space-y-4">
-          <div className="flex items-center gap-1">
-            {(['all', 'received', 'sent'] as const).map((mode) => (
+      {/* WALLET VIEW (Member Wallet) */}
+      {activeView === 'wallet' && (
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+          {/* Balances & Withdraw */}
+          <div className="space-y-4 lg:col-span-1">
+            <div className="rounded-2xl border border-stone-200/80 bg-white p-5 space-y-3">
+              <div className="flex items-center gap-2">
+                <Wallet className="h-4 w-4 text-[#1B4332]" />
+                <h3 className="text-sm font-semibold text-stone-900">Member Wallet</h3>
+              </div>
+
+              {walletSummary.balances.length === 0 ? (
+                <p className="text-xs text-stone-500">
+                  No balance yet. When you sell items on the platform, your earnings appear here.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {walletSummary.balances.map((b) => (
+                    <div
+                      key={b.currency}
+                      className="flex items-center justify-between rounded-xl bg-[#FAF9F6] px-3.5 py-2.5"
+                    >
+                      <span className="text-xs font-medium text-stone-600">{b.currency}</span>
+                      <span className="text-sm font-bold text-[#1B4332]">
+                        {formatBachsAmount(b.available_cents, b.currency)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <form
+              onSubmit={handleWithdrawWallet}
+              className="rounded-2xl border border-stone-200/80 bg-white p-5 space-y-3"
+            >
+              <h4 className="text-xs font-semibold uppercase tracking-wider text-stone-400">
+                Withdraw Funds
+              </h4>
+
+              {walletNotice && (
+                <p className="rounded-lg bg-[#F4F3EE] px-3 py-1.5 text-xs font-medium text-[#1B4332]">
+                  {walletNotice}
+                </p>
+              )}
+
+              <div className="grid grid-cols-2 gap-2">
+                <select
+                  value={withdrawCurrency}
+                  onChange={(e) => setWithdrawCurrency(e.target.value)}
+                  className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-900"
+                >
+                  {BACHS_ACCEPTED_CURRENCIES.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.code} ({c.symbol})
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="number"
+                  min={1}
+                  step="any"
+                  required
+                  value={withdrawAmount}
+                  onChange={(e) => setWithdrawAmount(e.target.value)}
+                  placeholder="Amount"
+                  className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-900"
+                />
+              </div>
+
+              <input
+                type="text"
+                required
+                value={withdrawDest}
+                onChange={(e) => setWithdrawDest(e.target.value)}
+                placeholder="Bank account, Mobile Money, or Wallet address"
+                className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-900"
+              />
+
               <button
-                key={mode}
-                type="button"
-                onClick={() => setActivityRoleFilter(mode)}
-                className={`rounded-lg px-2.5 py-1 text-xs font-medium capitalize ${
-                  activityRoleFilter === mode
-                    ? 'bg-[#1B4332] text-white'
-                    : 'text-stone-600 hover:bg-stone-100'
-                }`}
+                type="submit"
+                disabled={withdrawing}
+                className="w-full rounded-xl bg-[#1B4332] py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F] disabled:opacity-50"
               >
-                {mode}
+                {withdrawing ? 'Processing...' : 'Withdraw'}
               </button>
-            ))}
+            </form>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-            {/* Inquiries */}
-            <div className="space-y-3 rounded-xl border border-stone-200 bg-white p-4">
-              <h4 className="text-sm font-semibold text-stone-900">
-                Inquiries ({filteredInquiries.length})
-              </h4>
-
-              {filteredInquiries.length === 0 ? (
-                <p className="py-6 text-center text-xs text-stone-400">None yet.</p>
-              ) : (
-                <div className="space-y-2.5">
-                  {filteredInquiries.map((inq) => {
-                    const isSeller = inq.seller_id === currentUserId;
-                    const canReply = isSeller && inq.status === 'open';
-                    return (
-                      <div key={inq.id} className="space-y-2 rounded-lg border border-stone-200 p-3">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="truncate font-medium text-stone-900">
-                            {inq.listing_title || 'Listing'}
-                          </span>
-                          <span className="text-stone-400">{inq.status}</span>
-                        </div>
-                        <p className="text-xs text-stone-700">{inq.message}</p>
-                        {inq.seller_response && (
-                          <p className="rounded bg-[#F4F3EE] p-2 text-xs text-[#1B4332]">
-                            {inq.seller_response}
-                          </p>
-                        )}
-                        {canReply && (
-                          <div className="space-y-2 pt-1">
-                            <textarea
-                              rows={2}
-                              value={inquiryReplyText[inq.id] || ''}
-                              onChange={(e) =>
-                                setInquiryReplyText((prev) => ({
-                                  ...prev,
-                                  [inq.id]: e.target.value,
-                                }))
-                              }
-                              placeholder="Reply..."
-                              className="w-full rounded-lg border border-stone-200 p-2 text-xs"
-                            />
-                            <div className="flex justify-end gap-1.5">
-                              <button
-                                type="button"
-                                onClick={() => handleRespondInquiry(inq.id, 'declined')}
-                                className={ghostBtn}
-                              >
-                                Decline
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleRespondInquiry(inq.id, 'accepted')}
-                                className="rounded-lg bg-[#1B4332] px-3 py-1.5 text-xs font-medium text-white"
-                              >
-                                Accept
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Bookings */}
-            <div className="space-y-3 rounded-xl border border-stone-200 bg-white p-4">
-              <h4 className="text-sm font-semibold text-stone-900">
-                Bookings ({filteredBookings.length})
-              </h4>
-
-              {filteredBookings.length === 0 ? (
-                <p className="py-6 text-center text-xs text-stone-400">None yet.</p>
-              ) : (
-                <div className="space-y-2.5">
-                  {filteredBookings.map((b) => {
-                    const isProvider = b.provider_id === currentUserId;
-                    const canReview = isProvider && b.status === 'pending';
-                    const isApprovedRental =
-                      isProvider && b.status === 'approved' && b.booking_type === 'rental';
-
-                    return (
-                      <div key={b.id} className="space-y-2 rounded-lg border border-stone-200 p-3">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="truncate font-medium text-stone-900">
-                            {b.listing_title || 'Listing'}
-                          </span>
-                          <span className="text-stone-400">{b.status}</span>
-                        </div>
-                        <p className="text-xs text-stone-500">
-                          {new Date(b.starts_at).toLocaleString([], {
-                            dateStyle: 'short',
-                            timeStyle: 'short',
-                          })}
-                        </p>
-                        {b.notes && <p className="text-xs text-stone-600">{b.notes}</p>}
-
-                        <div className="flex items-center justify-between pt-1">
-                          {b.status === 'approved' || b.status === 'completed' ? (
-                            <button
-                              type="button"
-                              onClick={() => handleDownloadIcs(b)}
-                              className="inline-flex items-center gap-1 text-xs text-stone-600 hover:text-stone-900"
-                            >
-                              <Download className="h-3 w-3" />
-                              .ics
-                            </button>
-                          ) : (
-                            <span />
-                          )}
-                          <div className="flex items-center gap-1.5">
-                            {canReview && (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdateBookingStatus(b.id, 'rejected')}
-                                  className={ghostBtn}
-                                >
-                                  Decline
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => handleUpdateBookingStatus(b.id, 'approved')}
-                                  className="inline-flex items-center gap-1 rounded-lg bg-[#1B4332] px-3 py-1.5 text-xs font-medium text-white"
-                                >
-                                  <Check className="h-3 w-3" />
-                                  Approve
-                                </button>
-                              </>
-                            )}
-                            {isApprovedRental && (
-                              <button
-                                type="button"
-                                onClick={() => handleUpdateBookingStatus(b.id, 'returned')}
-                                className={ghostBtn}
-                              >
-                                Returned
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+          {/* Wallet Transactions */}
+          <div className="rounded-2xl border border-stone-200/80 bg-white p-5 lg:col-span-2">
+            <h3 className="text-sm font-semibold text-stone-900 mb-3">Wallet Activity</h3>
+            {walletSummary.transactions.length === 0 ? (
+              <p className="text-xs text-stone-400">No transactions recorded yet.</p>
+            ) : (
+              <div className="divide-y divide-stone-100">
+                {walletSummary.transactions.map((tx) => (
+                  <div key={tx.id} className="flex items-center justify-between py-3 text-xs">
+                    <div>
+                      <p className="font-semibold text-stone-900">{tx.description}</p>
+                      <p className="text-[11px] text-stone-400">
+                        {new Date(tx.created_at).toLocaleDateString()} · {tx.status}
+                      </p>
+                    </div>
+                    <span
+                      className={`font-semibold ${
+                        tx.entry_type === 'sale_credit' ? 'text-[#1B4332]' : 'text-stone-700'
+                      }`}
+                    >
+                      {tx.entry_type === 'sale_credit' ? '+' : '-'}
+                      {formatBachsAmount(tx.amount_cents, tx.currency)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Wizard modal */}
-      <UniversalListingWizardModal
-        isOpen={wizardModalOpen}
-        onClose={() => {
-          setWizardModalOpen(false);
-          setEditingListingItem(null);
-        }}
-        circleId={circleId}
-        circleSlug={circleSlug}
-        editingListing={editingListingItem}
-        onSaved={handleListingSaved}
-      />
+      {/* ACTIVITY / REQUESTS VIEW */}
+      {activeView === 'activity' && (
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          {/* Inquiries */}
+          <div className="rounded-2xl border border-stone-200/80 bg-white p-5 space-y-3">
+            <h3 className="text-sm font-semibold text-stone-900">Messages & Applications</h3>
+            {inquiries.length === 0 ? (
+              <p className="text-xs text-stone-400">No messages yet.</p>
+            ) : (
+              <div className="divide-y divide-stone-100">
+                {inquiries.map((inq) => {
+                  const isSeller = inq.seller_id === currentUserId;
+                  return (
+                    <div key={inq.id} className="py-3 first:pt-0 last:pb-0 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-stone-900">
+                          {inq.listing_title || 'Listing'}
+                        </span>
+                        <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-medium capitalize text-stone-600">
+                          {inq.status}
+                        </span>
+                      </div>
+                      <p className="text-xs text-stone-600">{inq.message}</p>
+                      {isSeller && inq.status === 'open' && (
+                        <div className="flex items-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => handleRespondInquiry(inq.id, 'accepted', 'Accepted')}
+                            className="rounded-lg bg-[#1B4332] px-2.5 py-1 text-[11px] font-semibold text-white"
+                          >
+                            Accept
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleRespondInquiry(inq.id, 'declined', 'Declined')}
+                            className="rounded-lg border border-stone-200 px-2.5 py-1 text-[11px] font-medium text-stone-600"
+                          >
+                            Decline
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
-      {/* Quick detail modal */}
-      {selectedListing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/50 p-4 backdrop-blur-xs">
-          <div className="max-h-[90vh] w-full max-w-lg space-y-4 overflow-y-auto rounded-2xl border border-stone-200 bg-white p-5 shadow-xl">
+          {/* Bookings */}
+          <div className="rounded-2xl border border-stone-200/80 bg-white p-5 space-y-3">
+            <h3 className="text-sm font-semibold text-stone-900">Bookings & Rentals</h3>
+            {bookings.length === 0 ? (
+              <p className="text-xs text-stone-400">No bookings yet.</p>
+            ) : (
+              <div className="divide-y divide-stone-100">
+                {bookings.map((b) => {
+                  const isProvider = b.provider_id === currentUserId;
+                  return (
+                    <div key={b.id} className="py-3 first:pt-0 last:pb-0 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-semibold text-stone-900">
+                          {b.listing_title || 'Booking'}
+                        </span>
+                        <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-medium capitalize text-stone-600">
+                          {b.status}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-stone-500">
+                        {new Date(b.starts_at).toLocaleString([], {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </p>
+                      {isProvider && b.status === 'pending' && (
+                        <div className="flex items-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateBooking(b.id, 'approved')}
+                            className="rounded-lg bg-[#1B4332] px-2.5 py-1 text-[11px] font-semibold text-white"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateBooking(b.id, 'rejected')}
+                            className="rounded-lg border border-stone-200 px-2.5 py-1 text-[11px] font-medium text-stone-600"
+                          >
+                            Decline
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* QUICK DETAIL MODAL */}
+      {detailListing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <div className="max-h-[88vh] w-full max-w-lg overflow-y-auto rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl space-y-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="text-base font-semibold text-stone-900">{selectedListing.title}</h3>
-                <p className="text-sm font-semibold text-[#1B4332]">
-                  {formatListingPrice(selectedListing)}
-                </p>
+                <span className="text-xs font-medium text-stone-400">
+                  {detailListing.category}
+                </span>
+                <h3 className="text-lg font-bold text-stone-900">{detailListing.title}</h3>
               </div>
               <button
                 type="button"
-                onClick={() => setSelectedListing(null)}
+                onClick={() => setDetailListing(null)}
                 className="rounded-lg p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            {selectedListing.image_urls && selectedListing.image_urls.length > 0 && (
-              <div className="flex gap-2 overflow-x-auto">
-                {selectedListing.image_urls.map((imgUrl, idx) => (
-                  <div
-                    key={idx}
-                    className="h-48 w-full shrink-0 overflow-hidden rounded-xl bg-stone-100"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={imgUrl} alt="" className="h-full w-full object-cover" />
-                  </div>
-                ))}
+            {detailListing.image_urls?.[0] && (
+              <div className="overflow-hidden rounded-xl bg-stone-100">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={detailListing.image_urls[0]}
+                  alt={detailListing.title}
+                  className="max-h-64 w-full object-cover"
+                />
               </div>
             )}
 
-            {selectedListing.description && (
-              <p className="whitespace-pre-line text-sm leading-relaxed text-stone-600">
-                {selectedListing.description}
+            <div className="flex items-center justify-between">
+              <span className="rounded-lg bg-[#F4F3EE] px-3 py-1 text-sm font-semibold text-[#1B4332]">
+                {formatListingPrice(detailListing)}
+              </span>
+              {detailListing.location && (
+                <span className="inline-flex items-center gap-1 text-xs text-stone-500">
+                  <MapPin className="h-3.5 w-3.5" />
+                  {detailListing.location}
+                </span>
+              )}
+            </div>
+
+            {detailListing.description && (
+              <p className="whitespace-pre-line text-sm leading-relaxed text-stone-700">
+                {detailListing.description}
               </p>
             )}
 
-            {selectedListing.custom_fields &&
-              typeof selectedListing.custom_fields === 'object' &&
-              Object.keys(selectedListing.custom_fields).length > 0 && (
-                <div className="grid grid-cols-2 gap-2 rounded-xl bg-stone-50 p-3 text-xs">
-                  {Object.entries(selectedListing.custom_fields).map(([k, v]) => (
+            {detailListing.custom_fields &&
+              Object.keys(detailListing.custom_fields).length > 0 && (
+                <div className="grid grid-cols-2 gap-2 rounded-xl bg-[#FAF9F6] p-3">
+                  {Object.entries(detailListing.custom_fields).map(([k, v]) => (
                     <div key={k}>
-                      <span className="text-stone-400">{k}: </span>
-                      <span className="font-medium text-stone-800">{String(v)}</span>
+                      <span className="block text-[10px] uppercase text-stone-400">{k}</span>
+                      <span className="text-xs font-medium text-stone-800">{String(v)}</span>
                     </div>
                   ))}
                 </div>
               )}
 
-            <div className="flex items-center justify-between border-t border-stone-100 pt-3">
-              {currentUserId === selectedListing.seller_id || isStaff ? (
-                <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between border-t border-stone-100 pt-4">
+              <span className="text-xs text-stone-500">
+                Posted by {detailListing.seller?.display_name || 'Member'}
+              </span>
+
+              <div className="flex items-center gap-2">
+                {(isStaff || detailListing.seller_id === currentUserId) && (
                   <button
                     type="button"
-                    onClick={() => {
-                      const item = selectedListing;
-                      setSelectedListing(null);
-                      handleOpenEdit(item);
-                    }}
-                    className={ghostBtn}
+                    onClick={() => handleDeleteListing(detailListing.id)}
+                    className="rounded-xl border border-stone-200 p-2 text-stone-500 hover:bg-red-50 hover:text-red-600"
+                    title="Delete"
                   >
-                    Edit
+                    <Trash2 className="h-4 w-4" />
                   </button>
-                  {selectedListing.status === 'published' && (
-                    <button
-                      type="button"
-                      onClick={() => handleQuickStatusUpdate(selectedListing.id, 'reserved')}
-                      className={ghostBtn}
-                    >
-                      Mark reserved
-                    </button>
-                  )}
-                  {selectedListing.status === 'reserved' && (
-                    <button
-                      type="button"
-                      onClick={() => handleQuickStatusUpdate(selectedListing.id, 'sold')}
-                      className={ghostBtn}
-                    >
-                      Mark sold
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <span />
-              )}
+                )}
 
-              <Link
-                href={`/circles/${circleSlug}/marketplace/${selectedListing.id}`}
-                className={ghostBtn}
-              >
-                Open page
-                <ExternalLink className="h-3 w-3" />
-              </Link>
+                {detailListing.seller_id !== currentUserId && detailListing.status !== 'sold' && (
+                  <>
+                    {detailListing.action_type === 'checkout' && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const target = detailListing;
+                          setDetailListing(null);
+                          setInquiryTarget(target);
+                        }}
+                        className="rounded-xl border border-stone-200 px-3 py-2 text-xs font-medium text-stone-700 hover:bg-stone-50"
+                      >
+                        Message seller
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const target = detailListing;
+                        setDetailListing(null);
+                        triggerPrimaryAction(target);
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-[#1B4332] px-4 py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
+                    >
+                      {detailListing.action_type === 'checkout' && (
+                        <CreditCard className="h-3.5 w-3.5" />
+                      )}
+                      <span>
+                        {getActionLabel(detailListing.action_type, detailListing.listing_type)}
+                      </span>
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Inquiry modal */}
-      {inquiryListing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/50 p-4 backdrop-blur-xs">
+      {/* ON-PLATFORM CHECKOUT MODAL (Members & Non-Members) */}
+      {checkoutListing && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
           <form
-            onSubmit={handleSendInquiry}
-            className="w-full max-w-md space-y-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-xl"
+            onSubmit={handleSubmitCheckout}
+            className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl space-y-4"
           >
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-stone-900">{inquiryListing.title}</h3>
+            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+              <div className="flex items-center gap-2">
+                <CreditCard className="h-4 w-4 text-[#1B4332]" />
+                <h4 className="text-sm font-semibold text-stone-900">Checkout</h4>
+              </div>
               <button
                 type="button"
-                onClick={() => setInquiryListing(null)}
-                className="rounded-lg p-1 text-stone-400 hover:bg-stone-100"
+                onClick={() => setCheckoutListing(null)}
+                className="text-stone-400 hover:text-stone-700"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <textarea
-              required
-              rows={3}
-              value={inquiryMessage}
-              onChange={(e) => setInquiryMessage(e.target.value)}
-              placeholder="Write a message..."
-              className="w-full rounded-xl border border-stone-200 p-3 text-sm focus:border-[#2D6A4F] focus:outline-none"
-            />
-            <div className="flex justify-end gap-2">
+
+            {checkoutError && (
+              <div className="rounded-xl bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                {checkoutError}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between rounded-xl bg-[#FAF9F6] p-3.5">
+              <div>
+                <p className="text-sm font-semibold text-stone-900">{checkoutListing.title}</p>
+                <p className="text-xs text-stone-500">
+                  Seller: {checkoutListing.seller?.display_name || 'Member'}
+                </p>
+              </div>
+              <span className="text-base font-bold text-[#1B4332]">
+                {formatListingPrice(checkoutListing)}
+              </span>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-stone-700 mb-1.5">
+                Payment method ({getBachsCurrency(checkoutListing.price_currency || 'USD').paymentMethodsDescription})
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {[
+                  { id: 'card', label: 'Card' },
+                  { id: 'mobile_money', label: 'Mobile Money' },
+                  { id: 'bank_transfer', label: 'Bank Transfer' },
+                  { id: 'stablecoin', label: 'USDT / USDC' },
+                ].map((pm) => (
+                  <button
+                    key={pm.id}
+                    type="button"
+                    onClick={() => setPaymentMethod(pm.id as typeof paymentMethod)}
+                    className={`rounded-xl border px-3 py-2 text-xs font-medium transition-colors ${
+                      paymentMethod === pm.id
+                        ? 'border-[#1B4332] bg-[#F4F3EE] text-[#1B4332] font-semibold'
+                        : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-50'
+                    }`}
+                  >
+                    {pm.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-stone-700 mb-1">
+                Delivery / pickup note (optional)
+              </label>
+              <input
+                type="text"
+                value={buyerNote}
+                onChange={(e) => setBuyerNote(e.target.value)}
+                placeholder="Coordinate pickup or delivery details..."
+                className="w-full rounded-xl border border-stone-200 px-3 py-2 text-xs text-stone-900 focus:border-[#1B4332] focus:outline-none"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-stone-100">
               <button
                 type="button"
-                onClick={() => setInquiryListing(null)}
-                className="rounded-lg px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-100"
+                onClick={() => setCheckoutListing(null)}
+                className="rounded-xl border border-stone-200 px-3.5 py-2 text-xs font-medium text-stone-700"
               >
                 Cancel
               </button>
-              <button type="submit" disabled={sendingInquiry} className={primaryBtn}>
-                <Send className="h-3.5 w-3.5" />
-                {sendingInquiry ? 'Sending…' : 'Send'}
+              <button
+                type="submit"
+                disabled={checkoutBusy}
+                className="rounded-xl bg-[#1B4332] px-5 py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F] disabled:opacity-50"
+              >
+                {checkoutBusy ? 'Processing...' : `Pay ${formatListingPrice(checkoutListing)}`}
               </button>
             </div>
           </form>
         </div>
       )}
 
-      {/* Booking modal */}
-      {bookingListing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/50 p-4 backdrop-blur-xs">
+      {/* ADMIN MARKETPLACE CUSTOMIZATION MODAL */}
+      {customizeOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
           <form
-            onSubmit={handleSendBooking}
-            className="w-full max-w-md space-y-4 rounded-2xl border border-stone-200 bg-white p-5 shadow-xl"
+            onSubmit={handleSaveCustomize}
+            className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl border border-stone-200 bg-white p-6 shadow-xl space-y-4"
           >
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-stone-900">{bookingListing.title}</h3>
+            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+              <h4 className="text-sm font-semibold text-stone-900">Customize Marketplace</h4>
               <button
                 type="button"
-                onClick={() => setBookingListing(null)}
-                className="rounded-lg p-1 text-stone-400 hover:bg-stone-100"
+                onClick={() => setCustomizeOpen(false)}
+                className="text-stone-400 hover:text-stone-700"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
-            <div className="flex gap-1.5 overflow-x-auto pb-1">
-              {availableBookingDates.map((item) => {
-                const selected = selectedBookingDate === item.dateStr;
-                return (
-                  <button
-                    key={item.dateStr}
-                    type="button"
-                    onClick={() => {
-                      setSelectedBookingDate(item.dateStr);
-                      const sched = bookingListing.availability_schedule || {
-                        days: [1, 2, 3, 4, 5],
-                        startTime: '09:00',
-                        endTime: '17:00',
-                        slotDurationMinutes: bookingListing.service_duration_minutes || 60,
-                        bufferMinutes: 0,
-                      };
-                      const listingBookings = bookings.filter(
-                        (b) => b.listing_id === bookingListing.id
-                      );
-                      const slots = generateAvailableSlots(sched, item.dateStr, listingBookings);
-                      const firstAvail = slots.find((s) => s.available);
-                      if (firstAvail) {
-                        setBookingStartsAt(firstAvail.startsAt.slice(0, 16));
-                        setBookingEndsAt(firstAvail.endsAt.slice(0, 16));
+            {/* Currency Configuration */}
+            <div className="space-y-2">
+              <label className="block text-xs font-medium text-stone-700">Default currency</label>
+              <select
+                value={draftSettings.defaultCurrency || 'USD'}
+                onChange={(e) =>
+                  setDraftSettings((prev) => ({ ...prev, defaultCurrency: e.target.value }))
+                }
+                className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-900"
+              >
+                {BACHS_ACCEPTED_CURRENCIES.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.code} ({c.symbol}) — {c.name}
+                  </option>
+                ))}
+              </select>
+
+              <label className="flex items-center gap-2 text-xs text-stone-700 cursor-pointer pt-1">
+                <input
+                  type="checkbox"
+                  checked={draftSettings.allowMultiCurrency !== false}
+                  onChange={(e) =>
+                    setDraftSettings((prev) => ({
+                      ...prev,
+                      allowMultiCurrency: e.target.checked,
+                    }))
+                  }
+                />
+                <span>Allow sellers to pick other currencies</span>
+              </label>
+            </div>
+
+            {/* Admin Commission % */}
+            <div>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-stone-700">
+                  Community commission on sales (%)
+                </label>
+                <span className="text-xs font-semibold text-[#1B4332]">
+                  {draftSettings.commissionPercentage ?? 0}%
+                </span>
+              </div>
+              <input
+                type="number"
+                min={0}
+                max={30}
+                step={0.5}
+                value={draftSettings.commissionPercentage ?? 0}
+                onChange={(e) =>
+                  setDraftSettings((prev) => ({
+                    ...prev,
+                    commissionPercentage: Math.min(30, Math.max(0, Number(e.target.value))),
+                  }))
+                }
+                className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-900"
+              />
+            </div>
+
+            {/* Pay-to-Post Setting */}
+            <div className="rounded-xl border border-stone-200 bg-[#FAF9F6] p-3.5 space-y-2.5">
+              <label className="flex items-center justify-between text-xs font-medium text-stone-800 cursor-pointer">
+                <span>Pay-to-Post listing fee</span>
+                <input
+                  type="checkbox"
+                  checked={Boolean(draftSettings.payToPostEnabled)}
+                  onChange={(e) =>
+                    setDraftSettings((prev) => ({
+                      ...prev,
+                      payToPostEnabled: e.target.checked,
+                    }))
+                  }
+                />
+              </label>
+
+              {draftSettings.payToPostEnabled && (
+                <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div>
+                    <label className="block text-[11px] text-stone-500">
+                      Fee ({draftSettings.defaultCurrency || 'USD'})
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="any"
+                      value={draftSettings.payToPostFeeAmount ?? 0}
+                      onChange={(e) =>
+                        setDraftSettings((prev) => ({
+                          ...prev,
+                          payToPostFeeAmount: Math.max(0, Number(e.target.value)),
+                        }))
                       }
-                    }}
-                    className={`flex min-w-[60px] flex-col items-center rounded-xl border p-2 text-xs ${
-                      selected
-                        ? 'border-[#1B4332] bg-[#1B4332] text-white'
-                        : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-50'
-                    }`}
-                  >
-                    <span className="text-[10px] opacity-75">{item.weekday}</span>
-                    <span className="font-semibold">{item.label}</span>
-                  </button>
-                );
-              })}
+                      className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs text-stone-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] text-stone-500">Applies to</label>
+                    <select
+                      value={
+                        (draftSettings.payToPostTypes || []).includes('all')
+                          ? 'all'
+                          : 'jobs_housing'
+                      }
+                      onChange={(e) =>
+                        setDraftSettings((prev) => ({
+                          ...prev,
+                          payToPostTypes:
+                            e.target.value === 'all' ? ['all'] : ['job', 'property'],
+                        }))
+                      }
+                      className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs text-stone-900"
+                    >
+                      <option value="jobs_housing">Jobs & Housing only</option>
+                      <option value="all">All listings</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Who can post */}
+            <div>
+              <label className="block text-xs font-medium text-stone-700 mb-1">Who can post</label>
+              <select
+                value={draftSettings.postingPolicy || 'all_members'}
+                onChange={(e) =>
+                  setDraftSettings((prev) => ({
+                    ...prev,
+                    postingPolicy: e.target.value as 'all_members' | 'admins_only',
+                  }))
+                }
+                className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-900"
+              >
+                <option value="all_members">All active members</option>
+                <option value="admins_only">Admins & moderators only</option>
+              </select>
+            </div>
+
+            {/* Enabled Listing Types */}
+            <div>
+              <label className="block text-xs font-medium text-stone-700 mb-1.5">
+                Allowed listing types
+              </label>
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { id: 'product', label: 'Goods' },
+                  { id: 'service', label: 'Services' },
+                  { id: 'rental', label: 'Rentals' },
+                  { id: 'property', label: 'Housing' },
+                  { id: 'job', label: 'Jobs' },
+                  { id: 'custom', label: 'Other' },
+                ].map((t) => {
+                  const current = draftSettings.allowedListingTypes || [
+                    'product',
+                    'service',
+                    'rental',
+                    'property',
+                    'job',
+                    'custom',
+                  ];
+                  const active = current.includes(t.id);
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => {
+                        const next = active
+                          ? current.filter((x) => x !== t.id)
+                          : [...current, t.id];
+                        if (next.length > 0) {
+                          setDraftSettings((prev) => ({ ...prev, allowedListingTypes: next }));
+                        }
+                      }}
+                      className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors ${
+                        active
+                          ? 'border-[#1B4332] bg-[#F4F3EE] text-[#1B4332] font-semibold'
+                          : 'border-stone-200 bg-white text-stone-500'
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2 border-t border-stone-100">
+              <button
+                type="button"
+                onClick={() => setCustomizeOpen(false)}
+                className="rounded-xl border border-stone-200 px-3.5 py-2 text-xs font-medium text-stone-700"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={savingSettings}
+                className="rounded-xl bg-[#1B4332] px-4 py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F] disabled:opacity-50"
+              >
+                {savingSettings ? 'Saving...' : 'Save'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* INQUIRY / APPLICATION MODAL */}
+      {inquiryTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <form
+            onSubmit={handleSendInquiry}
+            className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-5 shadow-xl space-y-4"
+          >
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-semibold text-stone-900">
+                {inquiryTarget.action_type === 'application' ? 'Apply' : 'Message'}:{' '}
+                {inquiryTarget.title}
+              </h4>
+              <button
+                type="button"
+                onClick={() => setInquiryTarget(null)}
+                className="text-stone-400 hover:text-stone-700"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <textarea
+              rows={4}
+              required
+              value={inquiryMessage}
+              onChange={(e) => setInquiryMessage(e.target.value)}
+              placeholder="Write your message..."
+              className="w-full rounded-xl border border-stone-200 p-3 text-xs text-stone-900 focus:border-[#1B4332] focus:outline-none"
+            />
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setInquiryTarget(null)}
+                className="rounded-xl border border-stone-200 px-3 py-1.5 text-xs font-medium text-stone-700"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={sendingInquiry}
+                className="rounded-xl bg-[#1B4332] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
+              >
+                {sendingInquiry ? 'Sending...' : 'Send'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* BOOKING MODAL */}
+      {bookingTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-xs">
+          <form
+            onSubmit={handleSendBooking}
+            className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-5 shadow-xl space-y-4"
+          >
+            <div className="flex items-center justify-between">
+              <h4 className="text-sm font-semibold text-stone-900">Book: {bookingTarget.title}</h4>
+              <button
+                type="button"
+                onClick={() => setBookingTarget(null)}
+                className="text-stone-400 hover:text-stone-700"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
 
             <div>
-              <div className="mb-1.5 flex items-center justify-between text-xs">
-                <span className="text-stone-500">Time</span>
-                <button
-                  type="button"
-                  onClick={() => setManualTimeOverride((v) => !v)}
-                  className="text-stone-500 underline"
-                >
-                  {manualTimeOverride ? 'Slots' : 'Custom'}
-                </button>
-              </div>
+              <label className="block text-xs font-medium text-stone-700 mb-1">Date</label>
+              <input
+                type="date"
+                value={bookingDate}
+                onChange={(e) => {
+                  setBookingDate(e.target.value);
+                  setSelectedSlot(null);
+                }}
+                className="w-full rounded-xl border border-stone-200 px-3 py-2 text-xs text-stone-900"
+              />
+            </div>
 
-              {!manualTimeOverride ? (
-                computedBookingSlots.length > 0 ? (
-                  <div className="grid max-h-36 grid-cols-3 gap-1.5 overflow-y-auto">
-                    {computedBookingSlots.map((slot, idx) => {
-                      const selected =
-                        bookingStartsAt === slot.startsAt.slice(0, 16) &&
-                        bookingEndsAt === slot.endsAt.slice(0, 16);
-                      return (
-                        <button
-                          key={idx}
-                          type="button"
-                          disabled={!slot.available}
-                          onClick={() => {
-                            setBookingStartsAt(slot.startsAt.slice(0, 16));
-                            setBookingEndsAt(slot.endsAt.slice(0, 16));
-                          }}
-                          className={`rounded-lg border p-2 text-xs ${
-                            selected
-                              ? 'border-[#1B4332] bg-[#F4F3EE] font-medium text-[#1B4332]'
-                              : slot.available
-                              ? 'border-stone-200 text-stone-800 hover:bg-stone-50'
-                              : 'border-stone-100 bg-stone-50 text-stone-300 line-through'
-                          }`}
-                        >
-                          {slot.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <p className="rounded-lg bg-stone-50 p-3 text-center text-xs text-stone-500">
-                    No slots on this date.
-                  </p>
-                )
+            <div>
+              <label className="block text-xs font-medium text-stone-700 mb-1">Time slots</label>
+              {availableSlots.length === 0 ? (
+                <p className="text-xs text-stone-400">No slots on this date.</p>
               ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  <input
-                    type="datetime-local"
-                    required
-                    value={bookingStartsAt}
-                    onChange={(e) => setBookingStartsAt(e.target.value)}
-                    className="rounded-lg border border-stone-200 p-2 text-xs"
-                  />
-                  <input
-                    type="datetime-local"
-                    required
-                    value={bookingEndsAt}
-                    onChange={(e) => setBookingEndsAt(e.target.value)}
-                    className="rounded-lg border border-stone-200 p-2 text-xs"
-                  />
+                <div className="grid grid-cols-3 gap-1.5 max-h-36 overflow-y-auto">
+                  {availableSlots.map((slot) => {
+                    const active = selectedSlot?.startsAt === slot.startsAt;
+                    return (
+                      <button
+                        key={slot.startsAt}
+                        type="button"
+                        disabled={!slot.available}
+                        onClick={() =>
+                          setSelectedSlot({ startsAt: slot.startsAt, endsAt: slot.endsAt })
+                        }
+                        className={`rounded-lg border px-2 py-1.5 text-[11px] font-medium ${
+                          !slot.available
+                            ? 'border-stone-100 bg-stone-50 text-stone-300'
+                            : active
+                              ? 'border-[#1B4332] bg-[#1B4332] text-white'
+                              : 'border-stone-200 text-stone-700 hover:bg-stone-50'
+                        }`}
+                      >
+                        {slot.label}
+                      </button>
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1176,42 +1516,45 @@ export function MarketplaceBoard({
               rows={2}
               value={bookingNotes}
               onChange={(e) => setBookingNotes(e.target.value)}
-              placeholder="Note (optional)"
-              className="w-full rounded-xl border border-stone-200 p-2.5 text-xs focus:border-[#2D6A4F] focus:outline-none"
+              placeholder="Notes (optional)"
+              className="w-full rounded-xl border border-stone-200 p-2.5 text-xs text-stone-900"
             />
 
             <div className="flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setBookingListing(null)}
-                className="rounded-lg px-3 py-1.5 text-sm text-stone-600 hover:bg-stone-100"
+                onClick={() => setBookingTarget(null)}
+                className="rounded-xl border border-stone-200 px-3 py-1.5 text-xs font-medium text-stone-700"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                disabled={submittingBooking || !bookingStartsAt}
-                className={primaryBtn}
+                disabled={!selectedSlot || submittingBooking}
+                className="rounded-xl bg-[#1B4332] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#2D6A4F] disabled:opacity-40"
               >
-                {bookingListing.is_instant_bookable ? (
-                  <Zap className="h-3.5 w-3.5" />
-                ) : (
-                  <Calendar className="h-3.5 w-3.5" />
-                )}
-                {submittingBooking ? 'Booking…' : 'Confirm'}
+                {submittingBooking ? 'Booking...' : 'Confirm'}
               </button>
             </div>
           </form>
         </div>
       )}
 
-      <DirectMessageDrawer
+      {/* UNIVERSAL WIZARD MODAL */}
+      <UniversalListingWizardModal
+        isOpen={wizardOpen}
+        onClose={() => setWizardOpen(false)}
         circleId={circleId}
-        isOpen={dmDrawerOpen}
-        onClose={() => setDmDrawerOpen(false)}
-        currentUserId={currentUserId}
-        activeConversationId={activeDmConvoId}
-        onSelectConversation={(id) => setActiveDmConvoId(id)}
+        editingListing={editingListing}
+        marketplaceSettings={mktSettings}
+        isStaff={isStaff}
+        onSaved={(saved, isEdit) => {
+          if (isEdit) {
+            setListings((prev) => prev.map((l) => (l.id === saved.id ? saved : l)));
+          } else {
+            setListings((prev) => [saved, ...prev]);
+          }
+        }}
       />
     </div>
   );
