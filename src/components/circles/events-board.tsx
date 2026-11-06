@@ -84,6 +84,36 @@ export function EventsBoard({
   const [loadingRoster, setLoadingRoster] = useState(false);
   const [rosterSearch, setRosterSearch] = useState('');
 
+  const isStaff = currentUserRole ? ['owner', 'admin', 'moderator'].includes(currentUserRole) : false;
+
+  // Extract all distinct topics across events for filter pill bar
+  const allAvailableTopics = useMemo(() => {
+    const set = new Set<string>();
+    events.forEach((e) => {
+      e.topics?.forEach((t) => set.add(t));
+    });
+    return Array.from(set);
+  }, [events]);
+
+  function handleOpenCreate() {
+    setCreateWizardOpen(true);
+  }
+
+  function handleOpenEdit(ev: CircleEventItem) {
+    setSettingsModalEvent(ev);
+  }
+
+  function handleEventCreated(newEvent: CircleEventItem) {
+    setEvents((prev) => [newEvent, ...prev]);
+  }
+
+  function handleEventUpdated(updatedEvent: CircleEventItem) {
+    setEvents((prev) => prev.map((e) => (e.id === updatedEvent.id ? updatedEvent : e)));
+    if (selectedEventDetail?.id === updatedEvent.id) {
+      setSelectedEventDetail(updatedEvent);
+    }
+  }
+
   // Cancel Event
   async function handleCancelEvent(eventId: string) {
     if (!window.confirm('Are you sure you want to cancel this event? Attendees will be notified.')) {
