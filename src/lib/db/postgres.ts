@@ -42,6 +42,7 @@ interface GlobalDbState {
   __circlesRemotePoolUrl?: string;
   __circlesServiceRoleCanMutateAuthUsers?: boolean;
   __circlesCustomTestPool?: RemotePgPoolLike | null;
+  __circlesRemoteMigrationsPromise?: Promise<MigrationRunResult>;
 }
 
 const globalForPg = globalThis as unknown as GlobalDbState;
@@ -232,10 +233,45 @@ async function withEmbeddedDbMutex<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
+/**
+ * Ensures pending database migrations are applied to remote PostgreSQL / Supabase
+ * upon startup/first transaction, running idempotently inside a service transaction.
+ */
+export async function ensureRemoteMigrationsApplied(): Promise<void> {
+  if (globalForPg.__circlesCustomTestPool) return;
+  if (getActiveDatabaseBackend() !== 'remote_pg') return;
+
+  if (!globalForPg.__circlesRemoteMigrationsPromise) {
+    globalForPg.__circlesRemoteMigrationsPromise = (async () => {
+      try {
+        const res = await runDatabaseMigrations();
+        if (res.applied.length > 0) {
+          logger.info('Remote PostgreSQL migrations successfully applied', {
+            applied: res.applied,
+          });
+        }
+        return res;
+      } catch (err) {
+        logger.warn('Remote database migration auto-check non-fatal error', {
+          error: err instanceof Error ? err.message : String(err),
+        });
+        return { applied: [], skipped: [] };
+      }
+    })();
+  }
+
+  try {
+    await globalForPg.__circlesRemoteMigrationsPromise;
+  } catch {
+    // Non-fatal
+  }
+}
+
 async function executeRemoteRlsTransaction<T>(
   userId: string | null,
   callback: (tx: DbTransaction) => Promise<T>
 ): Promise<T> {
+  await ensureRemoteMigrationsApplied();
   const pool = getRemotePgPool();
   const client = await pool.connect();
 
@@ -280,6 +316,7 @@ async function executeRemoteRlsTransaction<T>(
 async function executeRemoteServiceRoleTransaction<T>(
   callback: (tx: DbTransaction) => Promise<T>
 ): Promise<T> {
+  await ensureRemoteMigrationsApplied();
   const pool = getRemotePgPool();
   const client = await pool.connect();
 

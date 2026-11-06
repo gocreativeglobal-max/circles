@@ -127,7 +127,13 @@ export const updateEventSchema = z.object({
   status: z.enum(['draft', 'published', 'cancelled', 'completed']).optional(),
 });
 
-const EVENT_CAPABILITY_KEYS = ['events', 'rsvps', 'attendance', 'activities_meetups'];
+const EVENT_CAPABILITY_KEYS = [
+  'events',
+  'events_activities',
+  'rsvps',
+  'attendance',
+  'activities_meetups',
+];
 
 async function assertEventCapabilityAndMembership(
   tx: { query: <T>(sql: string, values?: unknown[]) => Promise<{ rows: T[] }> },
@@ -215,39 +221,82 @@ export async function createCircleEvent(
     const hostControls = normalizeHostControls(parsed.hostControls);
     const hostId = parsed.hostId ?? actorUserId;
 
-    const inserted = await tx.query<CircleEventItem>(
-      `INSERT INTO public.circle_events (
-         id, circle_id, space_id, organizer_id, host_id, title, description, event_type,
-         location_type, venue_text, meeting_url, starts_at, ends_at, timezone,
-         capacity, registration_closes_at, cover_image_url, topics, repeat_frequency,
-         live_room_default_view, visibility, host_controls, status
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, 'published')
-       RETURNING *;`,
-      [
-        eventId,
-        parsed.circleId,
-        parsed.spaceId ?? null,
-        actorUserId,
-        hostId,
-        parsed.title,
-        parsed.description,
-        parsed.eventType,
-        parsed.locationType,
-        parsed.venueText,
-        parsed.meetingUrl ?? null,
-        parsed.startsAt,
-        parsed.endsAt,
-        parsed.timezone,
-        parsed.capacity ?? null,
-        parsed.registrationClosesAt ?? null,
-        parsed.coverImageUrl ?? null,
-        parsed.topics ?? [],
-        parsed.repeatFrequency ?? 'none',
-        parsed.liveRoomDefaultView ?? 'gallery',
-        parsed.visibility ?? 'community',
-        JSON.stringify(hostControls),
-      ]
-    );
+    let insertedRow: CircleEventItem;
+    try {
+      const inserted = await tx.query<CircleEventItem>(
+        `INSERT INTO public.circle_events (
+           id, circle_id, space_id, organizer_id, host_id, title, description, event_type,
+           location_type, venue_text, meeting_url, starts_at, ends_at, timezone,
+           capacity, registration_closes_at, cover_image_url, topics, repeat_frequency,
+           live_room_default_view, visibility, host_controls, status
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, 'published')
+         RETURNING *;`,
+        [
+          eventId,
+          parsed.circleId,
+          parsed.spaceId ?? null,
+          actorUserId,
+          hostId,
+          parsed.title,
+          parsed.description,
+          parsed.eventType,
+          parsed.locationType,
+          parsed.venueText,
+          parsed.meetingUrl ?? null,
+          parsed.startsAt,
+          parsed.endsAt,
+          parsed.timezone,
+          parsed.capacity ?? null,
+          parsed.registrationClosesAt ?? null,
+          parsed.coverImageUrl ?? null,
+          parsed.topics ?? [],
+          parsed.repeatFrequency ?? 'none',
+          parsed.liveRoomDefaultView ?? 'gallery',
+          parsed.visibility ?? 'community',
+          JSON.stringify(hostControls),
+        ]
+      );
+      insertedRow = inserted.rows[0];
+    } catch {
+      // Graceful fallback for legacy database schemas where 0027 columns are not yet present
+      const fallbackLocation = ['in_person', 'online', 'hybrid'].includes(parsed.locationType)
+        ? parsed.locationType
+        : 'online';
+      const insertedLegacy = await tx.query<CircleEventItem>(
+        `INSERT INTO public.circle_events (
+           id, circle_id, space_id, organizer_id, title, description, event_type,
+           location_type, venue_text, meeting_url, starts_at, ends_at, timezone,
+           capacity, registration_closes_at, status
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, 'published')
+         RETURNING *;`,
+        [
+          eventId,
+          parsed.circleId,
+          parsed.spaceId ?? null,
+          actorUserId,
+          parsed.title,
+          parsed.description,
+          parsed.eventType,
+          fallbackLocation,
+          parsed.venueText,
+          parsed.meetingUrl ?? null,
+          parsed.startsAt,
+          parsed.endsAt,
+          parsed.timezone,
+          parsed.capacity ?? null,
+          parsed.registrationClosesAt ?? null,
+        ]
+      );
+      insertedRow = {
+        ...insertedLegacy.rows[0],
+        host_id: hostId,
+        topics: parsed.topics ?? [],
+        repeat_frequency: parsed.repeatFrequency ?? 'none',
+        live_room_default_view: parsed.liveRoomDefaultView ?? 'gallery',
+        visibility: parsed.visibility ?? 'community',
+        host_controls: hostControls,
+      };
+    }
 
     await tx.query(
       `INSERT INTO public.audit_logs (id, circle_id, actor_id, action, entity_type, entity_id, metadata)
@@ -262,7 +311,7 @@ export async function createCircleEvent(
     );
 
     return {
-      ...inserted.rows[0],
+      ...insertedRow,
       going_count: 0,
       waitlisted_count: 0,
       attended_count: 0,
@@ -297,74 +346,97 @@ export async function listCircleEvents(
       throw new ForbiddenError('You do not have permission to view events in this Circle.');
     }
 
-    const res = await tx.query<
-      CircleEventItem & {
-        space_name: string | null;
-        organizer_username: string;
-        organizer_display_name: string;
-        organizer_avatar_url: string | null;
-        organizer_email?: string | null;
-        host_username?: string | null;
-        host_display_name?: string | null;
-        host_avatar_url?: string | null;
-        host_email?: string | null;
-        going_count: number;
-        waitlisted_count: number;
-        attended_count: number;
-        viewer_rsvp_status: 'going' | 'waitlisted' | 'cancelled' | null;
-        viewer_attended: boolean | null;
-        sample_attendees?: Array<{
-          user_id: string;
-          status: 'going' | 'waitlisted' | 'cancelled';
-          username: string;
-          display_name: string;
-          avatar_url: string | null;
-        }> | null;
-      }
-    >(
-      `SELECT e.*,
-         s.name AS space_name,
-         COALESCE(p.username, 'member') AS organizer_username,
-         COALESCE(p.display_name, 'Organizer') AS organizer_display_name,
-         p.avatar_url AS organizer_avatar_url,
-         p.email AS organizer_email,
-         hp.username AS host_username,
-         hp.display_name AS host_display_name,
-         hp.avatar_url AS host_avatar_url,
-         hp.email AS host_email,
-         (SELECT COUNT(*)::int FROM public.event_rsvps r WHERE r.event_id = e.id AND r.status = 'going') AS going_count,
-         (SELECT COUNT(*)::int FROM public.event_rsvps r WHERE r.event_id = e.id AND r.status = 'waitlisted') AS waitlisted_count,
-         (SELECT COUNT(*)::int FROM public.event_rsvps r WHERE r.event_id = e.id AND r.attended = true) AS attended_count,
-         (SELECT r.status FROM public.event_rsvps r WHERE r.event_id = e.id AND r.user_id = $2 LIMIT 1) AS viewer_rsvp_status,
-         (SELECT r.attended FROM public.event_rsvps r WHERE r.event_id = e.id AND r.user_id = $2 LIMIT 1) AS viewer_attended,
-         (SELECT json_agg(json_build_object(
-            'user_id', r2.user_id,
-            'status', r2.status,
-            'username', ap.username,
-            'display_name', ap.display_name,
-            'avatar_url', ap.avatar_url
-          )) FROM (
-            SELECT r_sub.user_id, r_sub.status
-            FROM public.event_rsvps r_sub
-            WHERE r_sub.event_id = e.id AND r_sub.status = 'going'
-            ORDER BY r_sub.created_at ASC
-            LIMIT 12
-          ) r2
-          JOIN public.profiles ap ON ap.id = r2.user_id
-         ) AS sample_attendees
-       FROM public.circle_events e
-       LEFT JOIN public.circle_spaces s ON s.id = e.space_id AND s.circle_id = e.circle_id
-       LEFT JOIN public.profiles p ON p.id = e.organizer_id
-       LEFT JOIN public.profiles hp ON hp.id = e.host_id
-       WHERE e.circle_id = $1
-       ORDER BY e.starts_at ASC;`,
-      [circleId, actorUserId]
-    );
+    type EventRow = CircleEventItem & {
+      space_name: string | null;
+      organizer_username: string;
+      organizer_display_name: string;
+      organizer_avatar_url: string | null;
+      organizer_email?: string | null;
+      host_username?: string | null;
+      host_display_name?: string | null;
+      host_avatar_url?: string | null;
+      host_email?: string | null;
+      going_count: number;
+      waitlisted_count: number;
+      attended_count: number;
+      viewer_rsvp_status: 'going' | 'waitlisted' | 'cancelled' | null;
+      viewer_attended: boolean | null;
+      sample_attendees?: Array<{
+        user_id: string;
+        status: 'going' | 'waitlisted' | 'cancelled';
+        username: string;
+        display_name: string;
+        avatar_url: string | null;
+      }> | null;
+    };
+
+    let rawRows: EventRow[] = [];
+    try {
+      const res = await tx.query<EventRow>(
+        `SELECT e.*,
+           s.name AS space_name,
+           COALESCE(p.username, 'member') AS organizer_username,
+           COALESCE(p.display_name, 'Organizer') AS organizer_display_name,
+           p.avatar_url AS organizer_avatar_url,
+           hp.username AS host_username,
+           hp.display_name AS host_display_name,
+           hp.avatar_url AS host_avatar_url,
+           (SELECT COUNT(*)::int FROM public.event_rsvps r WHERE r.event_id = e.id AND r.status = 'going') AS going_count,
+           (SELECT COUNT(*)::int FROM public.event_rsvps r WHERE r.event_id = e.id AND r.status = 'waitlisted') AS waitlisted_count,
+           (SELECT COUNT(*)::int FROM public.event_rsvps r WHERE r.event_id = e.id AND r.attended = true) AS attended_count,
+           (SELECT r.status FROM public.event_rsvps r WHERE r.event_id = e.id AND r.user_id = $2 LIMIT 1) AS viewer_rsvp_status,
+           (SELECT r.attended FROM public.event_rsvps r WHERE r.event_id = e.id AND r.user_id = $2 LIMIT 1) AS viewer_attended,
+           (SELECT json_agg(json_build_object(
+              'user_id', r2.user_id,
+              'status', r2.status,
+              'username', ap.username,
+              'display_name', ap.display_name,
+              'avatar_url', ap.avatar_url
+            )) FROM (
+              SELECT r_sub.user_id, r_sub.status
+              FROM public.event_rsvps r_sub
+              WHERE r_sub.event_id = e.id AND r_sub.status = 'going'
+              ORDER BY r_sub.created_at ASC
+              LIMIT 12
+            ) r2
+            JOIN public.profiles ap ON ap.id = r2.user_id
+           ) AS sample_attendees
+         FROM public.circle_events e
+         LEFT JOIN public.circle_spaces s ON s.id = e.space_id AND s.circle_id = e.circle_id
+         LEFT JOIN public.profiles p ON p.id = e.organizer_id
+         LEFT JOIN public.profiles hp ON hp.id = e.host_id
+         WHERE e.circle_id = $1
+         ORDER BY e.starts_at ASC;`,
+        [circleId, actorUserId]
+      );
+      rawRows = res.rows;
+    } catch {
+      // Fallback query if migration 0027 is still pending on remote PostgreSQL
+      const fallbackRes = await tx.query<EventRow>(
+        `SELECT e.*,
+           s.name AS space_name,
+           COALESCE(p.username, 'member') AS organizer_username,
+           COALESCE(p.display_name, 'Organizer') AS organizer_display_name,
+           p.avatar_url AS organizer_avatar_url,
+           (SELECT COUNT(*)::int FROM public.event_rsvps r WHERE r.event_id = e.id AND r.status = 'going') AS going_count,
+           (SELECT COUNT(*)::int FROM public.event_rsvps r WHERE r.event_id = e.id AND r.status = 'waitlisted') AS waitlisted_count,
+           (SELECT COUNT(*)::int FROM public.event_rsvps r WHERE r.event_id = e.id AND r.attended = true) AS attended_count,
+           (SELECT r.status FROM public.event_rsvps r WHERE r.event_id = e.id AND r.user_id = $2 LIMIT 1) AS viewer_rsvp_status,
+           (SELECT r.attended FROM public.event_rsvps r WHERE r.event_id = e.id AND r.user_id = $2 LIMIT 1) AS viewer_attended
+         FROM public.circle_events e
+         LEFT JOIN public.circle_spaces s ON s.id = e.space_id AND s.circle_id = e.circle_id
+         LEFT JOIN public.profiles p ON p.id = e.organizer_id
+         WHERE e.circle_id = $1
+         ORDER BY e.starts_at ASC;`,
+        [circleId, actorUserId]
+      );
+      rawRows = fallbackRes.rows;
+    }
 
     const nowMs = Date.now();
     const timeframe = options?.timeframe ?? 'all';
 
-    return res.rows
+    return rawRows
       .filter((row) => {
         if (options?.eventType && row.event_type !== options.eventType) {
           return false;
@@ -542,49 +614,69 @@ export async function updateCircleEvent(
       ]
     );
 
-    const fullRes = await tx.query<
-      CircleEventItem & {
-        space_name: string | null;
-        organizer_username: string;
-        organizer_display_name: string;
-        organizer_avatar_url: string | null;
-        organizer_email?: string | null;
-        host_username?: string | null;
-        host_display_name?: string | null;
-        host_avatar_url?: string | null;
-        host_email?: string | null;
-        going_count: number;
-        waitlisted_count: number;
-        attended_count: number;
-        viewer_rsvp_status: 'going' | 'waitlisted' | 'cancelled' | null;
-        viewer_attended: boolean | null;
-      }
-    >(
-      `SELECT e.*,
-         s.name AS space_name,
-         COALESCE(p.username, 'member') AS organizer_username,
-         COALESCE(p.display_name, 'Organizer') AS organizer_display_name,
-         p.avatar_url AS organizer_avatar_url,
-         p.email AS organizer_email,
-         hp.username AS host_username,
-         hp.display_name AS host_display_name,
-         hp.avatar_url AS host_avatar_url,
-         hp.email AS host_email,
-         (SELECT COUNT(*)::int FROM public.event_rsvps r WHERE r.event_id = e.id AND r.status = 'going') AS going_count,
-         (SELECT COUNT(*)::int FROM public.event_rsvps r WHERE r.event_id = e.id AND r.status = 'waitlisted') AS waitlisted_count,
-         (SELECT COUNT(*)::int FROM public.event_rsvps r WHERE r.event_id = e.id AND r.attended = true) AS attended_count,
-         (SELECT r.status FROM public.event_rsvps r WHERE r.event_id = e.id AND r.user_id = $2 LIMIT 1) AS viewer_rsvp_status,
-         (SELECT r.attended FROM public.event_rsvps r WHERE r.event_id = e.id AND r.user_id = $2 LIMIT 1) AS viewer_attended
-       FROM public.circle_events e
-       LEFT JOIN public.circle_spaces s ON s.id = e.space_id AND s.circle_id = e.circle_id
-       LEFT JOIN public.profiles p ON p.id = e.organizer_id
-       LEFT JOIN public.profiles hp ON hp.id = e.host_id
-       WHERE e.id = $1 AND e.circle_id = $3
-       LIMIT 1;`,
-      [eventId, actorUserId, circleId]
-    );
+    type FullRow = CircleEventItem & {
+      space_name: string | null;
+      organizer_username: string;
+      organizer_display_name: string;
+      organizer_avatar_url: string | null;
+      organizer_email?: string | null;
+      host_username?: string | null;
+      host_display_name?: string | null;
+      host_avatar_url?: string | null;
+      host_email?: string | null;
+      going_count: number;
+      waitlisted_count: number;
+      attended_count: number;
+      viewer_rsvp_status: 'going' | 'waitlisted' | 'cancelled' | null;
+      viewer_attended: boolean | null;
+    };
 
-    const updatedRow = fullRes.rows[0];
+    let updatedRow: FullRow;
+    try {
+      const fullRes = await tx.query<FullRow>(
+        `SELECT e.*,
+           s.name AS space_name,
+           COALESCE(p.username, 'member') AS organizer_username,
+           COALESCE(p.display_name, 'Organizer') AS organizer_display_name,
+           p.avatar_url AS organizer_avatar_url,
+           hp.username AS host_username,
+           hp.display_name AS host_display_name,
+           hp.avatar_url AS host_avatar_url,
+           (SELECT COUNT(*)::int FROM public.event_rsvps r WHERE r.event_id = e.id AND r.status = 'going') AS going_count,
+           (SELECT COUNT(*)::int FROM public.event_rsvps r WHERE r.event_id = e.id AND r.status = 'waitlisted') AS waitlisted_count,
+           (SELECT COUNT(*)::int FROM public.event_rsvps r WHERE r.event_id = e.id AND r.attended = true) AS attended_count,
+           (SELECT r.status FROM public.event_rsvps r WHERE r.event_id = e.id AND r.user_id = $2 LIMIT 1) AS viewer_rsvp_status,
+           (SELECT r.attended FROM public.event_rsvps r WHERE r.event_id = e.id AND r.user_id = $2 LIMIT 1) AS viewer_attended
+         FROM public.circle_events e
+         LEFT JOIN public.circle_spaces s ON s.id = e.space_id AND s.circle_id = e.circle_id
+         LEFT JOIN public.profiles p ON p.id = e.organizer_id
+         LEFT JOIN public.profiles hp ON hp.id = e.host_id
+         WHERE e.id = $1 AND e.circle_id = $3
+         LIMIT 1;`,
+        [eventId, actorUserId, circleId]
+      );
+      updatedRow = fullRes.rows[0];
+    } catch {
+      const fallbackRes = await tx.query<FullRow>(
+        `SELECT e.*,
+           s.name AS space_name,
+           COALESCE(p.username, 'member') AS organizer_username,
+           COALESCE(p.display_name, 'Organizer') AS organizer_display_name,
+           p.avatar_url AS organizer_avatar_url,
+           (SELECT COUNT(*)::int FROM public.event_rsvps r WHERE r.event_id = e.id AND r.status = 'going') AS going_count,
+           (SELECT COUNT(*)::int FROM public.event_rsvps r WHERE r.event_id = e.id AND r.status = 'waitlisted') AS waitlisted_count,
+           (SELECT COUNT(*)::int FROM public.event_rsvps r WHERE r.event_id = e.id AND r.attended = true) AS attended_count,
+           (SELECT r.status FROM public.event_rsvps r WHERE r.event_id = e.id AND r.user_id = $2 LIMIT 1) AS viewer_rsvp_status,
+           (SELECT r.attended FROM public.event_rsvps r WHERE r.event_id = e.id AND r.user_id = $2 LIMIT 1) AS viewer_attended
+         FROM public.circle_events e
+         LEFT JOIN public.circle_spaces s ON s.id = e.space_id AND s.circle_id = e.circle_id
+         LEFT JOIN public.profiles p ON p.id = e.organizer_id
+         WHERE e.id = $1 AND e.circle_id = $3
+         LIMIT 1;`,
+        [eventId, actorUserId, circleId]
+      );
+      updatedRow = fallbackRes.rows[0];
+    }
     const updatedItem: CircleEventItem = {
       id: updatedRow.id,
       circle_id: updatedRow.circle_id,

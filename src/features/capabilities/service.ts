@@ -77,6 +77,13 @@ export async function isCapabilityEnabledForCircle(
     if (capabilityKey === 'marketplace' || CONSOLIDATED_LISTING_CAPABILITIES.has(capabilityKey)) {
       keysToCheck.push('marketplace', ...Array.from(CONSOLIDATED_LISTING_CAPABILITIES));
     }
+    if (
+      ['events', 'events_activities', 'rsvps', 'attendance', 'activities_meetups'].includes(
+        capabilityKey
+      )
+    ) {
+      keysToCheck.push('events', 'events_activities', 'rsvps', 'attendance', 'activities_meetups');
+    }
     const res = await tx.query<{ enabled: boolean }>(
       `SELECT enabled FROM public.circle_capabilities
        WHERE circle_id = $1 AND capability_key = ANY($2::text[]) AND enabled = true
