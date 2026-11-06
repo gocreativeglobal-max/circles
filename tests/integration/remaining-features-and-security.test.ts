@@ -34,6 +34,7 @@ import {
   listJobApplications,
   reviewJobApplication,
   submitJobApplication,
+  updateJobOpportunity,
 } from '@/features/jobs/service';
 import {
   createCircleProject,
