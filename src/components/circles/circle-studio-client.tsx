@@ -830,7 +830,7 @@ export function CircleStudioClient({
                   <option value="discussions">Discussions & Posts</option>
                   <option value="events">Events</option>
                   <option value="learning_resources">Learning & Resources</option>
-                  <option value="jobs_opportunities">Jobs & Opportunities</option>
+                  <option value="marketplace">Marketplace & Community Listings</option>
                   <option value="help_desk">Help Desk & Requests</option>
                   <option value="projects_collaboration">Projects & Collaboration</option>
                 </select>

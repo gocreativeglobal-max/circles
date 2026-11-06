@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { formatListingPrice, getActionLabel, LISTING_PRESETS } from '@/features/marketplace/listing-helpers';
+import {
+  CAPABILITY_REGISTRY,
+  CONSOLIDATED_LISTING_CAPABILITIES,
+  getAllCapabilityDefinitions,
+} from '@/features/capabilities/registry';
 
 describe('Universal Customizable Listings Suite', () => {
   it('formats free listings accurately', () => {
@@ -94,5 +99,25 @@ describe('Universal Customizable Listings Suite', () => {
     expect(LISTING_PRESETS.job.defaultAction).toBe('application');
     expect(LISTING_PRESETS.rental).toBeDefined();
     expect(LISTING_PRESETS.rental.defaultAction).toBe('booking');
+  });
+
+  it('consolidates standalone listing sub-capabilities into unified marketplace', () => {
+    // Verified consolidated capability set
+    expect(CONSOLIDATED_LISTING_CAPABILITIES.has('housing_property')).toBe(true);
+    expect(CONSOLIDATED_LISTING_CAPABILITIES.has('jobs_opportunities')).toBe(true);
+    expect(CONSOLIDATED_LISTING_CAPABILITIES.has('rentals_sharing')).toBe(true);
+    expect(CONSOLIDATED_LISTING_CAPABILITIES.has('services_bookings')).toBe(true);
+    expect(CONSOLIDATED_LISTING_CAPABILITIES.has('listings_discovery')).toBe(true);
+
+    // Marketplace is the unified active capability in the studio catalog
+    const allDefs = getAllCapabilityDefinitions();
+    expect(allDefs.some((c) => c.key === 'marketplace')).toBe(true);
+    for (const legacyKey of CONSOLIDATED_LISTING_CAPABILITIES) {
+      expect(allDefs.some((c) => c.key === legacyKey)).toBe(false);
+    }
+
+    // Marketplace is configured with the unified navigation
+    expect(CAPABILITY_REGISTRY.marketplace.navigation_config.path).toBe('marketplace');
+    expect(CAPABILITY_REGISTRY.marketplace.navigation_config.label).toBe('Marketplace');
   });
 });

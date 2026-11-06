@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { withRlsTransaction } from '@/lib/db/postgres';
 import {
   CAPABILITY_REGISTRY,
+  CONSOLIDATED_LISTING_CAPABILITIES,
   getAllCapabilityDefinitions,
   getCapabilityDefinition,
   validateCapabilityTransition,
@@ -31,11 +32,22 @@ export async function getCircleCapabilities(
 
     const existingMap = new Map(res.rows.map((r) => [r.capability_key, r]));
 
+    // If any legacy standalone listing capability was enabled, marketplace is enabled
+    const hasAnyListingEnabled = Array.from(existingMap.entries()).some(
+      ([k, v]) => (k === 'marketplace' || CONSOLIDATED_LISTING_CAPABILITIES.has(k)) && v.enabled
+    );
+
     return getAllCapabilityDefinitions().map((def) => {
       const existing = existingMap.get(def.key);
+      const isEnabled =
+        def.key === 'marketplace'
+          ? Boolean(existing?.enabled) || hasAnyListingEnabled
+          : Boolean(existing?.enabled);
+
       if (existing) {
         return {
           ...existing,
+          enabled: isEnabled,
           definition: def,
         };
       }
@@ -43,7 +55,7 @@ export async function getCircleCapabilities(
         id: `virtual-${circleId}-${def.key}`,
         circle_id: circleId,
         capability_key: def.key,
-        enabled: false,
+        enabled: isEnabled,
         settings: def.default_settings,
         enabled_by: null,
         enabled_at: null,
@@ -61,11 +73,15 @@ export async function isCapabilityEnabledForCircle(
   capabilityKey: string
 ): Promise<boolean> {
   return withRlsTransaction(actorUserId, async (tx) => {
+    const keysToCheck = [capabilityKey];
+    if (capabilityKey === 'marketplace' || CONSOLIDATED_LISTING_CAPABILITIES.has(capabilityKey)) {
+      keysToCheck.push('marketplace', ...Array.from(CONSOLIDATED_LISTING_CAPABILITIES));
+    }
     const res = await tx.query<{ enabled: boolean }>(
       `SELECT enabled FROM public.circle_capabilities
-       WHERE circle_id = $1 AND capability_key = $2
+       WHERE circle_id = $1 AND capability_key = ANY($2::text[]) AND enabled = true
        LIMIT 1;`,
-      [circleId, capabilityKey]
+      [circleId, keysToCheck]
     );
     return Boolean(res.rows[0]?.enabled);
   });
@@ -275,6 +291,14 @@ export async function getCircleNavigation(
       },
     ];
 
+    // Consolidate legacy standalone listing capabilities into unified marketplace
+    const hasMarketplace =
+      enabledKeys.has('marketplace') ||
+      Array.from(CONSOLIDATED_LISTING_CAPABILITIES).some((k) => enabledKeys.has(k));
+    if (hasMarketplace) {
+      enabledKeys.add('marketplace');
+    }
+
     const orderedNavCapabilityKeys = [
       'discussions',
       'spaces',
@@ -283,11 +307,6 @@ export async function getCircleNavigation(
       'activities_meetups',
       'polls_decisions',
       'marketplace',
-      'listings_discovery',
-      'services_bookings',
-      'rentals_sharing',
-      'housing_property',
-      'jobs_opportunities',
       'learning_resources',
       'shared_resources',
       'media_publishing',
@@ -305,10 +324,10 @@ export async function getCircleNavigation(
         const def = CAPABILITY_REGISTRY[key];
         if (def) {
           const baseRoute = def.navigation_config.path.split('?')[0];
-          // Avoid duplicate top-level tabs if primary module route is already added (e.g., events + rsvps + attendance)
+          // Avoid duplicate top-level tabs if primary module route is already added (e.g., events + rsvps + attendance, marketplace)
           if (
             seenBaseRoutes.has(baseRoute) &&
-            ['events', 'resources'].includes(baseRoute)
+            ['events', 'resources', 'marketplace'].includes(baseRoute)
           ) {
             continue;
           }

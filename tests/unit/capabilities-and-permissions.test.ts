@@ -15,7 +15,7 @@ import {
 describe('Capability Registry & Dependency Rules', () => {
   it('defines a complete capability catalog with valid dependencies', () => {
     const all = getAllCapabilityDefinitions();
-    expect(all.length).toBeGreaterThanOrEqual(20);
+    expect(all.length).toBeGreaterThanOrEqual(18);
 
     for (const cap of all) {
       for (const dep of cap.dependencies) {
@@ -27,6 +27,12 @@ describe('Capability Registry & Dependency Rules', () => {
     expect(defaults).toContain('discussions');
     expect(defaults).toContain('spaces');
     expect(defaults).toContain('member_directory');
+
+    // Marketplace is the unified capability; standalone sub-capabilities are consolidated
+    expect(all.some((c) => c.key === 'marketplace')).toBe(true);
+    expect(all.some((c) => c.key === 'housing_property')).toBe(false);
+    expect(all.some((c) => c.key === 'jobs_opportunities')).toBe(false);
+    expect(all.some((c) => c.key === 'rentals_sharing')).toBe(false);
   });
 
   it('rejects enabling a capability when its required dependency is disabled', () => {

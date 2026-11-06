@@ -121,15 +121,18 @@ export function CircleOnboardingChecklist({
         {
           id: 'explore_capabilities',
           title: 'Explore Circle Capabilities',
-          description: enabledCapabilityKeys.includes('services_bookings')
-            ? 'Discover bookable services, upcoming events, and resource libraries in this Circle.'
-            : 'Browse discussions, view fellow members, and discover shared resources.',
-          actionLabel: enabledCapabilityKeys.includes('services_bookings')
-            ? 'Explore Marketplace'
-            : 'View Members',
-          actionHref: enabledCapabilityKeys.includes('services_bookings')
-            ? `/circles/${circle.slug}/marketplace`
-            : `/circles/${circle.slug}/members`,
+          description:
+            enabledCapabilityKeys.includes('marketplace') || enabledCapabilityKeys.includes('services_bookings')
+              ? 'Discover community listings, bookable services, and upcoming events in this Circle.'
+              : 'Browse discussions, view fellow members, and discover shared resources.',
+          actionLabel:
+            enabledCapabilityKeys.includes('marketplace') || enabledCapabilityKeys.includes('services_bookings')
+              ? 'Explore Marketplace'
+              : 'View Members',
+          actionHref:
+            enabledCapabilityKeys.includes('marketplace') || enabledCapabilityKeys.includes('services_bookings')
+              ? `/circles/${circle.slug}/marketplace`
+              : `/circles/${circle.slug}/members`,
           icon: Compass,
         },
         {

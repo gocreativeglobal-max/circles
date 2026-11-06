@@ -31,13 +31,11 @@ export interface CircleCollapsibleLayoutProps {
 // Clean descriptive subtitles maintaining the platform's monochrome theme
 const CAPABILITY_SUBTITLES: Record<string, string> = {
   discussions: 'Conversations & posts',
-  marketplace: 'Goods, rent & services',
+  marketplace: 'Listings, housing & gigs',
   events: 'Meetups & gatherings',
   polls: 'Votes & decisions',
   resources: 'Shared files & guides',
   courses: 'Learning modules',
-  jobs: 'Opportunities & gigs',
-  housing: 'Rooms & rentals',
   governance: 'Proposals & committees',
   projects: 'Collaborative projects',
   challenges: 'Points & badges',

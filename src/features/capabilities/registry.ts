@@ -228,14 +228,17 @@ export const CAPABILITY_REGISTRY: Record<string, CapabilityDefinition> = {
   },
   marketplace: {
     key: 'marketplace',
-    name: 'Marketplace',
-    description: 'Peer-to-peer buying, selling, and community exchange spaces.',
-    version: '1.0.0',
+    name: 'Marketplace & Community Listings',
+    description:
+      'Universal community listings for goods, housing, rentals, services, gigs, and custom offers.',
+    version: '2.0.0',
     category: 'commerce_discovery',
     default_enabled: false,
     release_stage: 'stable',
     dependencies: ['spaces'],
-    default_settings: {},
+    default_settings: {
+      defaultSlotDuration: 60,
+    },
     required_permissions: ['marketplace.read'],
     navigation_config: {
       label: 'Marketplace',
@@ -426,8 +429,22 @@ export const CAPABILITY_REGISTRY: Record<string, CapabilityDefinition> = {
   },
 };
 
+/**
+ * Legacy standalone listing sub-capabilities that are consolidated into the single
+ * unified `marketplace` ("Marketplace & Community Listings") capability.
+ */
+export const CONSOLIDATED_LISTING_CAPABILITIES = new Set([
+  'listings_discovery',
+  'services_bookings',
+  'rentals_sharing',
+  'jobs_opportunities',
+  'housing_property',
+]);
+
 export function getAllCapabilityDefinitions(): CapabilityDefinition[] {
-  return Object.values(CAPABILITY_REGISTRY);
+  return Object.values(CAPABILITY_REGISTRY).filter(
+    (cap) => !CONSOLIDATED_LISTING_CAPABILITIES.has(cap.key)
+  );
 }
 
 export function getCapabilityDefinition(key: string): CapabilityDefinition {
