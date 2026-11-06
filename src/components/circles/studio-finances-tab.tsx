@@ -1171,6 +1171,197 @@ export function StudioFinancesTab({
             </div>
           </div>
 
+          {/* The 5 Exceptional Features Comparison Matrix */}
+          <div className="rounded-2xl border border-stone-200 bg-white overflow-hidden shadow-sm">
+            <div className="border-b border-stone-200 bg-stone-50/80 px-6 py-4">
+              <h4 className="text-sm font-bold text-stone-900">
+                Feature Availability & Tier Gating Matrix
+              </h4>
+              <p className="text-xs text-stone-500">
+                All LMS authoring, quizzes, and community tools are free for everyone. Upgrades unlock branding, storage, ad-free experience, and integrations.
+              </p>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-stone-50 text-[11px] font-semibold uppercase tracking-wider text-stone-500 border-b border-stone-200">
+                  <tr>
+                    <th className="px-5 py-3">Feature</th>
+                    <th className="px-5 py-3 text-center">Free / Starter ($0)</th>
+                    <th className="px-5 py-3 text-center">Pro Creator ($29/mo)</th>
+                    <th className="px-5 py-3 text-center text-forest-800">Platinum ($99/mo)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-stone-100 text-stone-700">
+                  <tr className="bg-forest-50/20">
+                    <td className="px-5 py-3.5 font-semibold text-stone-900">
+                      All LMS & Teaching Tools (Quizzes, Dripping, Question Banks, Learning Paths)
+                    </td>
+                    <td className="px-5 py-3.5 text-center font-bold text-emerald-700">
+                      ✓ 100% Unlocked
+                    </td>
+                    <td className="px-5 py-3.5 text-center font-bold text-emerald-700">
+                      ✓ 100% Unlocked
+                    </td>
+                    <td className="px-5 py-3.5 text-center font-bold text-emerald-700">
+                      ✓ 100% Unlocked
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-5 py-3.5 font-medium text-stone-900">
+                      Unlimited Members & Discussion Spaces
+                    </td>
+                    <td className="px-5 py-3.5 text-center font-semibold text-emerald-700">
+                      ✓ Unlimited
+                    </td>
+                    <td className="px-5 py-3.5 text-center font-semibold text-emerald-700">
+                      ✓ Unlimited
+                    </td>
+                    <td className="px-5 py-3.5 text-center font-semibold text-emerald-700">
+                      ✓ Unlimited
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-5 py-3.5 font-medium text-stone-900">
+                      Bachs Payments (14 Currencies + Crypto)
+                    </td>
+                    <td className="px-5 py-3.5 text-center font-semibold text-stone-800">
+                      10% Take-Rate
+                    </td>
+                    <td className="px-5 py-3.5 text-center font-semibold text-emerald-700">
+                      5% Take-Rate (50% cut)
+                    </td>
+                    <td className="px-5 py-3.5 text-center font-semibold text-emerald-700">
+                      2% Take-Rate (80% cut)
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-5 py-3.5 font-medium text-stone-900">
+                      Cloud Media & Attachment Storage
+                    </td>
+                    <td className="px-5 py-3.5 text-center font-mono text-stone-600">
+                      500 MB (Video embeds free)
+                    </td>
+                    <td className="px-5 py-3.5 text-center font-mono font-semibold text-emerald-800">
+                      50 GB Native Storage
+                    </td>
+                    <td className="px-5 py-3.5 text-center font-mono font-semibold text-emerald-800">
+                      250 GB Enterprise Storage
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-5 py-3.5 font-medium text-stone-900">
+                      Member Ad Experience
+                    </td>
+                    <td className="px-5 py-3.5 text-center text-amber-700 font-medium">
+                      Platform Partner Ads
+                    </td>
+                    <td className="px-5 py-3.5 text-center text-emerald-700 font-bold">
+                      ✓ 100% Ad-Free
+                    </td>
+                    <td className="px-5 py-3.5 text-center text-emerald-700 font-bold">
+                      ✓ 100% Ad-Free
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-5 py-3.5 font-medium text-stone-900">
+                      Custom Domain Mapping (<span className="font-mono">academy.brand.com</span>)
+                    </td>
+                    <td className="px-5 py-3.5 text-center text-stone-400">
+                      No (Circles Subpath)
+                    </td>
+                    <td className="px-5 py-3.5 text-center text-emerald-700 font-bold">
+                      ✓ Included
+                    </td>
+                    <td className="px-5 py-3.5 text-center text-emerald-700 font-bold">
+                      ✓ Included
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-5 py-3.5 font-medium text-stone-900">
+                      White-Label Emails & Branding Removal
+                    </td>
+                    <td className="px-5 py-3.5 text-center text-stone-400">
+                      Standard Circles Footer
+                    </td>
+                    <td className="px-5 py-3.5 text-center text-emerald-700 font-semibold">
+                      ✓ Custom Sender Domain
+                    </td>
+                    <td className="px-5 py-3.5 text-center text-emerald-700 font-bold">
+                      ✓ Full White-Label
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-5 py-3.5 font-medium text-stone-900">
+                      Circle Sponsor Engine (Sell Your Own Ads & Keep 100%)
+                    </td>
+                    <td className="px-5 py-3.5 text-center text-stone-400">
+                      —
+                    </td>
+                    <td className="px-5 py-3.5 text-center text-stone-400">
+                      —
+                    </td>
+                    <td className="px-5 py-3.5 text-center text-emerald-700 font-bold">
+                      ✓ Unlocked (Keep 100%)
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="px-5 py-3.5 font-medium text-stone-900">
+                      Direct Accounting ERP Sync (QuickBooks, Xero, Yardi)
+                    </td>
+                    <td className="px-5 py-3.5 text-center text-stone-400">
+                      —
+                    </td>
+                    <td className="px-5 py-3.5 text-center text-stone-600">
+                      Basic CSV Export
+                    </td>
+                    <td className="px-5 py-3.5 text-center text-emerald-700 font-bold">
+                      ✓ Live Automated Sync
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Circle Sponsor Engine (Platinum Feature Tool / Teaser) */}
+          <div className="rounded-2xl border border-stone-200 bg-white p-6 shadow-sm">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="rounded-xl bg-amber-50 p-2.5 text-amber-700 shrink-0">
+                  <Crown className="h-5 w-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-sm font-bold text-stone-900">Circle Sponsor Engine</h4>
+                    <span className="rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-800">
+                      Platinum Feature
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-stone-600 max-w-xl leading-relaxed">
+                    Sell your own corporate sponsorships to brand partners, place custom partner cards in your community feeds, and keep <strong>100% of whatever sponsorship revenue you negotiate</strong>.
+                  </p>
+                </div>
+              </div>
+
+              {currentTier === 'platinum' || currentTier === 'enterprise' ? (
+                <div className="rounded-xl bg-emerald-50 border border-emerald-200 px-4 py-2 text-xs font-bold text-emerald-800 shrink-0">
+                  ✓ Sponsor Engine Active
+                </div>
+              ) : (
+                <Button
+                  onClick={() => handleSwitchTier('platinum')}
+                  disabled={tierSaving}
+                  size="sm"
+                  className="shrink-0 gap-1.5"
+                >
+                  <Crown className="h-3.5 w-3.5 text-amber-300" />
+                  Upgrade to Platinum ($99)
+                </Button>
+              )}
+            </div>
+          </div>
+
           {/* Platform Revenue Deductions Ledger Table */}
           <div className="rounded-2xl border border-stone-200 bg-white overflow-hidden shadow-sm">
             <div className="border-b border-stone-200 bg-stone-50/70 px-6 py-4">

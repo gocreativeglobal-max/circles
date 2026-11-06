@@ -3,20 +3,55 @@ import { ForbiddenError } from '@/lib/errors';
 import {
   PlatformPlanTier,
   PlatformTierDefinition,
+  GatedTierFeature,
   PLATFORM_TIERS,
   FeeCalculationResult,
   calculatePlatformFee,
+  isTierFeatureAllowed,
   formatBytes,
 } from './platform-fee-constants';
 
 export {
   type PlatformPlanTier,
   type PlatformTierDefinition,
+  type GatedTierFeature,
   PLATFORM_TIERS,
   type FeeCalculationResult,
   calculatePlatformFee,
+  isTierFeatureAllowed,
   formatBytes,
 };
+
+/**
+ * Asserts that a Circle has access to a specific premium tier feature.
+ * Throws a clear ForbiddenError directing the user to upgrade if not permitted.
+ */
+export function assertCircleTierEntitlement(
+  tier: PlatformPlanTier,
+  feature: GatedTierFeature
+): void {
+  if (isTierFeatureAllowed(tier, feature)) {
+    return;
+  }
+
+  const upgradeTarget =
+    feature === 'circle_sponsor_engine' || feature === 'direct_erp_sync'
+      ? 'Platinum ($99/mo)'
+      : 'Pro ($29/mo)';
+
+  const featureNames: Record<GatedTierFeature, string> = {
+    ad_free_experience: 'Ad-Free Community Experience',
+    custom_domain: 'Custom Domain Mapping',
+    white_label_emails: 'White-Label Branding & Email Sender',
+    circle_sponsor_engine: 'Circle Sponsor Engine',
+    direct_erp_sync: 'Direct Accounting ERP & Webhook Sync',
+    priority_support: 'Priority Support',
+  };
+
+  throw new ForbiddenError(
+    `"${featureNames[feature]}" is not included in your circle's ${PLATFORM_TIERS[tier].name} plan. Please upgrade to ${upgradeTarget} in Circle Studio to unlock.`
+  );
+}
 
 export interface CircleStorageUsage {
   usedBytes: number;

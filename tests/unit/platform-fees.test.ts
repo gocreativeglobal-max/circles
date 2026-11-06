@@ -3,9 +3,11 @@ import {
   PLATFORM_TIERS,
   calculatePlatformFee,
   formatBytes,
+  isTierFeatureAllowed,
 } from '../../src/features/finances/platform-fee-constants';
+import { assertCircleTierEntitlement } from '../../src/features/finances/platform-fees';
 
-describe('Circles Tiered Platform Fees & Storage Quotas', () => {
+describe('Circles Tiered Platform Fees, Storage & Feature Gating', () => {
   describe('Tier Definitions & Storage Allocations', () => {
     it('defines Free / Starter tier at 10% fee, $0/month, and 500 MB storage', () => {
       const free = PLATFORM_TIERS.free;
@@ -49,6 +51,56 @@ describe('Circles Tiered Platform Fees & Storage Quotas', () => {
       expect(enterprise.storageFormatted).toBe('1 TB+');
       expect(enterprise.storageBytes).toBe(1024 * 1024 * 1024 * 1024);
       expect(enterprise.allFeaturesUnlocked).toBe(true);
+    });
+  });
+
+  describe('The 5 Exceptional Feature Gates', () => {
+    it('gates Ad-Free Experience to Pro and above', () => {
+      expect(isTierFeatureAllowed('free', 'ad_free_experience')).toBe(false);
+      expect(isTierFeatureAllowed('pro', 'ad_free_experience')).toBe(true);
+      expect(isTierFeatureAllowed('platinum', 'ad_free_experience')).toBe(true);
+    });
+
+    it('gates Custom Domain Mapping to Pro and above', () => {
+      expect(isTierFeatureAllowed('free', 'custom_domain')).toBe(false);
+      expect(isTierFeatureAllowed('pro', 'custom_domain')).toBe(true);
+      expect(isTierFeatureAllowed('platinum', 'custom_domain')).toBe(true);
+    });
+
+    it('gates White-Label Emails to Pro and above', () => {
+      expect(isTierFeatureAllowed('free', 'white_label_emails')).toBe(false);
+      expect(isTierFeatureAllowed('pro', 'white_label_emails')).toBe(true);
+      expect(isTierFeatureAllowed('platinum', 'white_label_emails')).toBe(true);
+    });
+
+    it('gates Circle Sponsor Engine strictly to Platinum and Enterprise', () => {
+      expect(isTierFeatureAllowed('free', 'circle_sponsor_engine')).toBe(false);
+      expect(isTierFeatureAllowed('pro', 'circle_sponsor_engine')).toBe(false);
+      expect(isTierFeatureAllowed('platinum', 'circle_sponsor_engine')).toBe(true);
+      expect(isTierFeatureAllowed('enterprise', 'circle_sponsor_engine')).toBe(true);
+    });
+
+    it('gates Direct Accounting ERP Sync strictly to Platinum and Enterprise', () => {
+      expect(isTierFeatureAllowed('free', 'direct_erp_sync')).toBe(false);
+      expect(isTierFeatureAllowed('pro', 'direct_erp_sync')).toBe(false);
+      expect(isTierFeatureAllowed('platinum', 'direct_erp_sync')).toBe(true);
+    });
+
+    it('enforces tier entitlement assertions with informative upgrade errors', () => {
+      // Free circle attempting custom domain mapping
+      expect(() => assertCircleTierEntitlement('free', 'custom_domain')).toThrow(
+        /not included in your circle's Free \/ Starter plan.*upgrade to Pro/i
+      );
+
+      // Pro circle attempting Circle Sponsor Engine
+      expect(() => assertCircleTierEntitlement('pro', 'circle_sponsor_engine')).toThrow(
+        /not included in your circle's Pro Creator plan.*upgrade to Platinum/i
+      );
+
+      // Permitted cases do not throw
+      expect(() => assertCircleTierEntitlement('pro', 'custom_domain')).not.toThrow();
+      expect(() => assertCircleTierEntitlement('platinum', 'circle_sponsor_engine')).not.toThrow();
+      expect(() => assertCircleTierEntitlement('enterprise', 'direct_erp_sync')).not.toThrow();
     });
   });
 
