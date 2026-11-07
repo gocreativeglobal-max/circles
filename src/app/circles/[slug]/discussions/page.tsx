@@ -4,7 +4,11 @@ import { notFound } from 'next/navigation';
 import { Lock, Sliders } from 'lucide-react';
 import { getAuthenticatedUser } from '@/lib/auth/session';
 import { getCircleBySlugOrId } from '@/features/circles/service';
-import { getCircleNavigation, isCapabilityEnabledForCircle } from '@/features/capabilities/service';
+import {
+  getCircleCapabilities,
+  getCircleNavigation,
+  isCapabilityEnabledForCircle,
+} from '@/features/capabilities/service';
 import { listCirclePosts } from '@/features/discussions/service';
 import { canReadCircleContent } from '@/lib/authorization/permissions';
 import { DiscussionsClient } from '@/components/circles/discussions-client';
@@ -16,7 +20,7 @@ export default async function CircleDiscussionsPage({
   searchParams,
 }: {
   params: { slug: string };
-  searchParams: { spaceId?: string };
+  searchParams: { spaceId?: string; view?: string };
 }) {
   const user = await getAuthenticatedUser();
   const circle = await getCircleBySlugOrId(user?.id ?? null, params.slug);
@@ -72,7 +76,14 @@ export default async function CircleDiscussionsPage({
     );
   }
 
-  const navigation = await getCircleNavigation(user?.id ?? null, circle.id, circle.slug);
+  const [navigation, capabilities] = await Promise.all([
+    getCircleNavigation(user?.id ?? null, circle.id, circle.slug),
+    getCircleCapabilities(user?.id ?? null, circle.id),
+  ]);
+
+  const discussionsCap = capabilities.find((c) => c.capability_key === 'discussions');
+  const allowMemberResources = discussionsCap?.settings?.allowMemberResources !== false;
+
   const selectedSpaceId = searchParams.spaceId || null;
   const posts = await listCirclePosts(user?.id ?? null, circle.id, {
     spaceId: selectedSpaceId,
@@ -85,6 +96,8 @@ export default async function CircleDiscussionsPage({
       initialPosts={posts}
       selectedSpaceId={selectedSpaceId}
       currentUserId={user?.id ?? null}
+      initialAllowMemberResources={allowMemberResources}
+      initialResourcesOnly={searchParams.view === 'resources'}
     />
   );
 }

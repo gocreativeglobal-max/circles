@@ -19,6 +19,7 @@ import {
 import { canReadCircleContent } from '@/lib/authorization/permissions';
 
 const RESOURCE_CAPABILITY_KEYS = [
+  'discussions',
   'learning_resources',
   'shared_resources',
   'media_publishing',

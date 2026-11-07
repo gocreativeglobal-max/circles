@@ -57,7 +57,7 @@ async function assertPollCapability(
 
   const capRes = await tx.query<{ enabled: boolean }>(
     `SELECT enabled FROM public.circle_capabilities
-     WHERE circle_id = $1 AND capability_key = 'polls_decisions' AND enabled = true LIMIT 1;`,
+     WHERE circle_id = $1 AND capability_key IN ('polls_decisions', 'discussions') AND enabled = true LIMIT 1;`,
     [circleId]
   );
   if (!capRes.rows[0]?.enabled) {

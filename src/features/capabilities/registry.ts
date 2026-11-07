@@ -13,6 +13,7 @@ export const CAPABILITY_REGISTRY: Record<string, CapabilityDefinition> = {
     dependencies: [],
     default_settings: {
       allowMemberPosts: true,
+      allowMemberResources: true,
       allowReactions: true,
       moderationMode: 'post_publish',
     },

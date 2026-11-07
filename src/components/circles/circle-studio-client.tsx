@@ -1044,6 +1044,19 @@ export function CircleStudioClient({
                   <label className="flex items-center gap-2 text-xs text-stone-800 cursor-pointer">
                     <input
                       type="checkbox"
+                      checked={capSettingsDraft.allowMemberResources !== false}
+                      onChange={(e) =>
+                        setCapSettingsDraft((prev) => ({
+                          ...prev,
+                          allowMemberResources: e.target.checked,
+                        }))
+                      }
+                    />
+                    <span>Allow members to share resources in chat</span>
+                  </label>
+                  <label className="flex items-center gap-2 text-xs text-stone-800 cursor-pointer">
+                    <input
+                      type="checkbox"
                       checked={capSettingsDraft.allowReactions !== false}
                       onChange={(e) =>
                         setCapSettingsDraft((prev) => ({

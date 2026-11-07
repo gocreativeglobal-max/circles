@@ -4,12 +4,15 @@ import React, { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Bookmark,
+  BookOpen,
+  ExternalLink,
   Flag,
   Hash,
   Heart,
   MessageSquare,
   Pin,
   Send,
+  Sliders,
   Trash2,
   X,
   BarChart2,
@@ -31,7 +34,17 @@ interface DiscussionsClientProps {
   initialPosts: PostItem[];
   selectedSpaceId: string | null;
   currentUserId: string | null;
+  initialAllowMemberResources?: boolean;
+  initialResourcesOnly?: boolean;
 }
+
+interface AttachedResourceMeta {
+  title: string;
+  category: string;
+  url?: string | null;
+}
+
+const RESOURCE_CATEGORIES = ['Guide', 'Link', 'Document', 'Template', 'Video'];
 
 function formatShortTime(iso: string) {
   try {
@@ -47,17 +60,42 @@ function formatShortTime(iso: string) {
   }
 }
 
+function parsePostContent(body: string): {
+  resource: AttachedResourceMeta | null;
+  cleanBody: string;
+} {
+  if (body.startsWith('__RESOURCE__:')) {
+    const newlineIdx = body.indexOf('\n');
+    const jsonPart = newlineIdx === -1 ? body.slice(13) : body.slice(13, newlineIdx);
+    const restBody = newlineIdx === -1 ? '' : body.slice(newlineIdx + 1);
+    try {
+      const parsed = JSON.parse(jsonPart) as AttachedResourceMeta;
+      if (parsed && typeof parsed.title === 'string') {
+        return { resource: parsed, cleanBody: restBody };
+      }
+    } catch {
+      // Fallback to normal body
+    }
+  }
+  return { resource: null, cleanBody: body };
+}
+
 export function DiscussionsClient({
   circle,
   spaces,
   initialPosts,
   selectedSpaceId: initialSpaceId,
   currentUserId,
+  initialAllowMemberResources = true,
+  initialResourcesOnly = false,
 }: DiscussionsClientProps) {
   const router = useRouter();
   const [selectedSpaceId, setSelectedSpaceId] = useState<string | null>(initialSpaceId);
   const [posts, setPosts] = useState<PostItem[]>(initialPosts);
   const [savedOnly, setSavedOnly] = useState(false);
+  const [resourcesOnly, setResourcesOnly] = useState(initialResourcesOnly);
+  const [allowMemberResources, setAllowMemberResources] = useState(initialAllowMemberResources);
+  const [adminPopoverOpen, setAdminPopoverOpen] = useState(false);
 
   // Composer state
   const [chatMessage, setChatMessage] = useState('');
@@ -70,6 +108,12 @@ export function DiscussionsClient({
   const [pollOptions, setPollOptions] = useState<string[]>(['', '']);
   const [pollAllowMultiple, setPollAllowMultiple] = useState(false);
   const [votingOptionId, setVotingOptionId] = useState<string | null>(null);
+
+  // Resource composer state
+  const [showResourceCreator, setShowResourceCreator] = useState(false);
+  const [resourceTitle, setResourceTitle] = useState('');
+  const [resourceCategory, setResourceCategory] = useState('Guide');
+  const [resourceUrl, setResourceUrl] = useState('');
 
   // Thread drawer state
   const [activeThreadPostId, setActiveThreadPostId] = useState<string | null>(null);
@@ -94,6 +138,8 @@ export function DiscussionsClient({
     circle.current_user_role === 'owner' ||
     circle.current_user_role === 'admin' ||
     circle.current_user_role === 'moderator';
+  const isAdmin =
+    circle.current_user_role === 'owner' || circle.current_user_role === 'admin';
 
   const isActiveMember =
     circle.current_user_membership_status === 'active' || Boolean(circle.current_user_role);
@@ -105,14 +151,17 @@ export function DiscussionsClient({
     if (targetSpace.posting_policy === 'members') return true;
     if (targetSpace.posting_policy === 'moderators') return canModerate;
     if (targetSpace.posting_policy === 'admins') {
-      return circle.current_user_role === 'owner' || circle.current_user_role === 'admin';
+      return isAdmin;
     }
     return false;
   })();
 
+  const canShareResource = canPostInActiveSpace && (allowMemberResources || canModerate);
+
   const displayedPosts = [...posts]
     .filter((post) => {
       if (savedOnly && !post.viewer_has_saved) return false;
+      if (resourcesOnly && !post.body.startsWith('__RESOURCE__:')) return false;
       if (!selectedSpaceId) return true;
       return post.space_id === selectedSpaceId;
     })
@@ -124,10 +173,24 @@ export function DiscussionsClient({
     feedEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [selectedSpaceId, posts.length]);
 
+  async function handleToggleAllowMemberResources(nextAllowed: boolean) {
+    setAllowMemberResources(nextAllowed);
+    setAdminPopoverOpen(false);
+    await fetch(`/api/circles/${circle.id}/capabilities`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        capabilityKey: 'discussions',
+        enabled: true,
+        settings: { allowMemberResources: nextAllowed },
+      }),
+    });
+  }
+
   async function handleSendMessage(e?: React.FormEvent) {
     if (e) e.preventDefault();
     const trimmed = chatMessage.trim();
-    if (!trimmed && !showPollCreator) return;
+    if (!trimmed && !showPollCreator && !showResourceCreator) return;
 
     const targetSpace = activeSpace || spaces[0] || null;
 
@@ -136,8 +199,37 @@ export function DiscussionsClient({
 
     try {
       let createdPoll: CirclePollItem | null = null;
+      let bodyToSend = trimmed;
+      let titleToSend = trimmed.split('\n')[0].slice(0, 90) || 'Discussion';
 
-      if (showPollCreator) {
+      if (showResourceCreator) {
+        if (resourceTitle.trim().length < 2) {
+          setErrorMessage('Please enter a resource title.');
+          setSubmittingPost(false);
+          return;
+        }
+        const meta: AttachedResourceMeta = {
+          title: resourceTitle.trim(),
+          category: resourceCategory,
+          url: resourceUrl.trim() || null,
+        };
+        bodyToSend = `__RESOURCE__:${JSON.stringify(meta)}\n${trimmed}`;
+        titleToSend = `Resource: ${meta.title}`;
+
+        // Best-effort sync to learning_resources_items table
+        fetch(`/api/circles/${circle.id}/resources`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            capabilityKey: 'shared_resources',
+            category: meta.category.toLowerCase(),
+            title: meta.title,
+            summary: trimmed.slice(0, 500),
+            contentBody: trimmed,
+            externalUrl: meta.url || null,
+          }),
+        }).catch(() => {});
+      } else if (showPollCreator) {
         const validOpts = pollOptions.map((o) => o.trim()).filter(Boolean);
         if (pollQuestion.trim().length < 3 || validOpts.length < 2) {
           setErrorMessage('Poll needs a question and at least 2 options.');
@@ -163,12 +255,9 @@ export function DiscussionsClient({
           return;
         }
         createdPoll = pollData.poll;
+        bodyToSend = trimmed || createdPoll!.question;
+        titleToSend = `Poll: ${createdPoll!.question}`;
       }
-
-      const bodyToSend = trimmed || (createdPoll ? createdPoll.question : '');
-      const titleToSend = createdPoll
-        ? `Poll: ${createdPoll.question}`
-        : bodyToSend.split('\n')[0].slice(0, 90) || 'Discussion';
 
       const res = await fetch(`/api/circles/${circle.id}/posts`, {
         method: 'POST',
@@ -198,6 +287,11 @@ export function DiscussionsClient({
         setShowPollCreator(false);
         setPollQuestion('');
         setPollOptions(['', '']);
+      }
+      if (showResourceCreator) {
+        setShowResourceCreator(false);
+        setResourceTitle('');
+        setResourceUrl('');
       }
       router.refresh();
     } catch {
@@ -357,7 +451,7 @@ export function DiscussionsClient({
     <div className="flex h-[calc(100vh-10rem)] min-h-[540px] w-full overflow-hidden rounded-2xl border border-stone-200/80 bg-white">
       {/* Main Feed Column */}
       <div className="flex flex-1 flex-col min-w-0 bg-white">
-        {/* Header with Space Pills */}
+        {/* Header with Space Pills & Inline Filter Toggles */}
         <header className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200/80 px-5 py-3">
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
             <button
@@ -392,18 +486,58 @@ export function DiscussionsClient({
             })}
           </div>
 
-          <button
-            type="button"
-            onClick={() => setSavedOnly((v) => !v)}
-            className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
-              savedOnly
-                ? 'bg-[#1B4332] text-white'
-                : 'text-stone-500 hover:bg-stone-100 hover:text-stone-900'
-            }`}
-          >
-            <Bookmark className="h-3.5 w-3.5" />
-            <span>Saved</span>
-          </button>
+          <div className="relative flex items-center gap-1.5">
+            {/* Option B: Resources Filter Toggle */}
+            <button
+              type="button"
+              onClick={() => setResourcesOnly((v) => !v)}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                resourcesOnly
+                  ? 'bg-[#1B4332] text-white'
+                  : 'text-stone-500 hover:bg-stone-100 hover:text-stone-900'
+              }`}
+            >
+              <BookOpen className="h-3.5 w-3.5" />
+              <span>Resources</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSavedOnly((v) => !v)}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                savedOnly
+                  ? 'bg-[#1B4332] text-white'
+                  : 'text-stone-500 hover:bg-stone-100 hover:text-stone-900'
+              }`}
+            >
+              <Bookmark className="h-3.5 w-3.5" />
+              <span>Saved</span>
+            </button>
+
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => setAdminPopoverOpen((v) => !v)}
+                title="Chat settings"
+                className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+              >
+                <Sliders className="h-3.5 w-3.5" />
+              </button>
+            )}
+
+            {adminPopoverOpen && (
+              <div className="absolute right-0 top-9 z-30 w-60 rounded-xl border border-stone-200 bg-white p-3 shadow-lg">
+                <label className="flex items-center justify-between gap-2 text-xs font-medium text-stone-800 cursor-pointer">
+                  <span>Allow members to share resources</span>
+                  <input
+                    type="checkbox"
+                    checked={allowMemberResources}
+                    onChange={(e) => handleToggleAllowMemberResources(e.target.checked)}
+                  />
+                </label>
+              </div>
+            )}
+          </div>
         </header>
 
         {/* Pinned Banner */}
@@ -411,16 +545,19 @@ export function DiscussionsClient({
           <div className="flex items-center gap-2 border-b border-stone-100 bg-[#FAF9F6] px-5 py-2 text-xs text-stone-700">
             <Pin className="h-3.5 w-3.5 shrink-0 text-[#1B4332]" />
             <div className="flex flex-1 items-center gap-3 overflow-x-auto no-scrollbar">
-              {pinnedInSpace.map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => handleOpenThread(p.id)}
-                  className="truncate hover:underline font-medium"
-                >
-                  {p.title || p.body.slice(0, 80)}
-                </button>
-              ))}
+              {pinnedInSpace.map((p) => {
+                const { resource, cleanBody } = parsePostContent(p.body);
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => handleOpenThread(p.id)}
+                    className="truncate hover:underline font-medium"
+                  >
+                    {resource ? resource.title : p.title || cleanBody.slice(0, 80)}
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}
@@ -435,8 +572,30 @@ export function DiscussionsClient({
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-1">
           {displayedPosts.length === 0 ? (
             <div className="flex h-full flex-col items-center justify-center py-16 text-center">
-              <MessageSquare className="h-7 w-7 text-stone-300" />
-              <p className="mt-2 text-sm font-medium text-stone-600">No messages yet</p>
+              {resourcesOnly ? (
+                <>
+                  <BookOpen className="h-7 w-7 text-stone-300" />
+                  <p className="mt-2 text-sm font-medium text-stone-600">No resources shared yet</p>
+                  {canShareResource && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowPollCreator(false);
+                        setShowResourceCreator(true);
+                      }}
+                      className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-[#1B4332] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>Share resource</span>
+                    </button>
+                  )}
+                </>
+              ) : (
+                <>
+                  <MessageSquare className="h-7 w-7 text-stone-300" />
+                  <p className="mt-2 text-sm font-medium text-stone-600">No messages yet</p>
+                </>
+              )}
             </div>
           ) : (
             displayedPosts.map((post, idx) => {
@@ -450,9 +609,12 @@ export function DiscussionsClient({
 
               const canEditOrDelete = canModerate || post.author_id === currentUserId;
               const attachedPoll = post.poll ?? null;
+              const { resource: attachedResource, cleanBody } = parsePostContent(post.body);
               const showTitle =
+                !attachedResource &&
+                !attachedPoll &&
                 post.title &&
-                post.title.trim() !== post.body.trim().slice(0, post.title.trim().length);
+                post.title.trim() !== cleanBody.trim().slice(0, post.title.trim().length);
 
               return (
                 <div
@@ -489,13 +651,52 @@ export function DiscussionsClient({
                       </div>
                     )}
 
-                    {showTitle && !attachedPoll && (
+                    {showTitle && (
                       <h4 className="mt-0.5 text-sm font-semibold text-stone-900">{post.title}</h4>
                     )}
 
-                    {post.body && (
+                    {/* Inline Resource Card */}
+                    {attachedResource && (
+                      <div className="mt-2 max-w-lg rounded-xl border border-stone-200 bg-[#FAF9F6] p-3.5">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-2.5 min-w-0">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#F4F3EE] text-[#1B4332]">
+                              <BookOpen className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <span className="text-[10px] font-semibold uppercase tracking-wider text-[#1B4332]">
+                                {attachedResource.category}
+                              </span>
+                              <h4 className="text-sm font-semibold text-stone-900 truncate">
+                                {attachedResource.title}
+                              </h4>
+                            </div>
+                          </div>
+
+                          {attachedResource.url && (
+                            <a
+                              href={attachedResource.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-[#1B4332] px-2.5 py-1 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
+                            >
+                              <span>Open</span>
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          )}
+                        </div>
+
+                        {cleanBody && (
+                          <p className="mt-2 whitespace-pre-line text-xs leading-relaxed text-stone-600">
+                            {cleanBody}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {!attachedResource && cleanBody && (
                       <p className="mt-0.5 whitespace-pre-line text-sm leading-relaxed text-stone-700 break-words">
-                        {post.body}
+                        {cleanBody}
                       </p>
                     )}
 
@@ -681,6 +882,52 @@ export function DiscussionsClient({
             </div>
           )}
 
+          {/* Share Resource Creator */}
+          {showResourceCreator && (
+            <div className="mb-3 rounded-xl border border-stone-200 bg-[#FAF9F6] p-3 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-stone-900">Share Resource</span>
+                <button
+                  type="button"
+                  onClick={() => setShowResourceCreator(false)}
+                  className="text-stone-400 hover:text-stone-700"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <input
+                  type="text"
+                  value={resourceTitle}
+                  onChange={(e) => setResourceTitle(e.target.value)}
+                  placeholder="Resource title *"
+                  className="sm:col-span-2 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-900 focus:border-[#1B4332] focus:outline-none"
+                />
+                <select
+                  value={resourceCategory}
+                  onChange={(e) => setResourceCategory(e.target.value)}
+                  className="rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs text-stone-900 focus:border-[#1B4332] focus:outline-none"
+                >
+                  {RESOURCE_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <input
+                type="url"
+                value={resourceUrl}
+                onChange={(e) => setResourceUrl(e.target.value)}
+                placeholder="Link URL (https://... optional)"
+                className="w-full rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-900 focus:border-[#1B4332] focus:outline-none"
+              />
+            </div>
+          )}
+
+          {/* Poll Creator */}
           {showPollCreator && (
             <div className="mb-3 rounded-xl border border-stone-200 bg-[#FAF9F6] p-3 space-y-2.5">
               <div className="flex items-center justify-between">
@@ -756,7 +1003,10 @@ export function DiscussionsClient({
             <form onSubmit={handleSendMessage} className="flex items-end gap-2">
               <button
                 type="button"
-                onClick={() => setShowPollCreator((v) => !v)}
+                onClick={() => {
+                  setShowResourceCreator(false);
+                  setShowPollCreator((v) => !v);
+                }}
                 title="Create poll"
                 className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition-colors ${
                   showPollCreator
@@ -766,6 +1016,24 @@ export function DiscussionsClient({
               >
                 <BarChart2 className="h-4 w-4" />
               </button>
+
+              {canShareResource && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowPollCreator(false);
+                    setShowResourceCreator((v) => !v);
+                  }}
+                  title="Share resource"
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition-colors ${
+                    showResourceCreator
+                      ? 'border-[#1B4332] bg-[#F4F3EE] text-[#1B4332]'
+                      : 'border-stone-200 text-stone-500 hover:bg-stone-50'
+                  }`}
+                >
+                  <BookOpen className="h-4 w-4" />
+                </button>
+              )}
 
               <textarea
                 rows={1}
@@ -777,13 +1045,20 @@ export function DiscussionsClient({
                     handleSendMessage();
                   }
                 }}
-                placeholder={`Write a message in #${activeSpace?.name || spaces[0]?.name || 'general'}...`}
+                placeholder={
+                  showResourceCreator
+                    ? 'Add notes or summary for this resource...'
+                    : `Write a message in #${activeSpace?.name || spaces[0]?.name || 'general'}...`
+                }
                 className="max-h-32 min-h-[38px] flex-1 resize-none rounded-xl border border-stone-200 bg-[#FAF9F6] px-3.5 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-[#1B4332] focus:bg-white focus:outline-none"
               />
 
               <button
                 type="submit"
-                disabled={submittingPost || (!chatMessage.trim() && !showPollCreator)}
+                disabled={
+                  submittingPost ||
+                  (!chatMessage.trim() && !showPollCreator && !showResourceCreator)
+                }
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#1B4332] text-white transition-colors hover:bg-[#2D6A4F] disabled:opacity-40"
               >
                 <Send className="h-4 w-4" />
@@ -822,7 +1097,8 @@ export function DiscussionsClient({
                 </span>
               </div>
               <p className="mt-1 whitespace-pre-line text-xs leading-relaxed text-stone-700">
-                {activeThreadPost.body}
+                {parsePostContent(activeThreadPost.body).cleanBody ||
+                  parsePostContent(activeThreadPost.body).resource?.title}
               </p>
             </div>
 
