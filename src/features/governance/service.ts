@@ -22,19 +22,19 @@ import { createNotification } from '@/features/notifications/service';
 export const createGovernanceProposalSchema = z.object({
   circleId: z.string().uuid(),
   committeeName: z.string().trim().max(120).nullable().optional(),
-  title: z.string().trim().min(3).max(180),
-  body: z.string().trim().min(5).max(10000),
+  title: z.string().trim().min(1).max(180),
+  body: z.string().trim().min(1).max(10000),
 });
 
 export const decideGovernanceProposalSchema = z.object({
   status: z.enum(['under_review', 'approved', 'rejected', 'implemented', 'archived']),
-  decisionRationale: z.string().trim().min(2).max(2000).optional(),
+  decisionRationale: z.string().trim().min(1).max(2000).optional(),
 });
 
 export const createFundraisingCampaignSchema = z.object({
   circleId: z.string().uuid(),
-  title: z.string().trim().min(3).max(160),
-  description: z.string().trim().min(5).max(6000),
+  title: z.string().trim().min(1).max(160),
+  description: z.string().trim().max(6000).default(''),
   category: z
     .enum(['community_project', 'mutual_aid', 'scholarship', 'charity', 'event_sponsorship'])
     .default('community_project'),
@@ -66,21 +66,21 @@ export const createFundraisingPledgeSchema = z.object({
 
 export const updateFundraisingCampaignSchema = z.object({
   status: z.enum(['active', 'completed', 'closed', 'rejected']).optional(),
-  updateBody: z.string().trim().min(2).max(2000).optional(),
+  updateBody: z.string().trim().min(1).max(2000).optional(),
 });
 
 export const createChallengeSchema = z.object({
   circleId: z.string().uuid(),
-  title: z.string().trim().min(3).max(160),
-  description: z.string().trim().min(5).max(4000),
+  title: z.string().trim().min(1).max(160),
+  description: z.string().trim().min(1).max(4000),
   rules: z.string().trim().max(2000).default(''),
-  rewardBadgeName: z.string().trim().min(2).max(80).default('Challenger'),
+  rewardBadgeName: z.string().trim().min(1).max(80).default('Challenger'),
   rewardPoints: z.number().int().min(0).max(10000).default(50),
   endsAt: z.string().datetime().nullable().optional(),
 });
 
 export const submitChallengeEntrySchema = z.object({
-  submissionText: z.string().trim().min(2).max(4000),
+  submissionText: z.string().trim().min(1).max(4000),
   proofUrl: z.string().url().nullable().optional(),
 });
 
@@ -97,8 +97,8 @@ export const createSupportTicketSchema = z.object({
     .default('general'),
   priority: z.enum(['low', 'normal', 'high', 'urgent']).default('normal'),
   isPrivate: z.boolean().default(true),
-  subject: z.string().trim().min(3).max(180),
-  description: z.string().trim().min(5).max(6000),
+  subject: z.string().trim().min(1).max(180),
+  description: z.string().trim().min(1).max(6000),
 });
 
 export const updateSupportTicketSchema = z.object({

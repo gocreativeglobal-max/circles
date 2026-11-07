@@ -168,8 +168,8 @@ export const createCourseAssignmentSchema = z.object({
   circleId: z.string().uuid(),
   courseId: z.string().uuid(),
   lessonId: z.string().uuid(),
-  title: z.string().trim().min(3).max(180),
-  promptBody: z.string().trim().min(5).max(10000),
+  title: z.string().trim().min(1).max(180),
+  promptBody: z.string().trim().min(1).max(10000),
   dueDate: z.string().datetime().nullable().optional(),
 });
 
@@ -178,7 +178,7 @@ export const submitAssignmentSchema = z.object({
   courseId: z.string().uuid(),
   lessonId: z.string().uuid(),
   assignmentId: z.string().uuid(),
-  submissionBody: z.string().trim().min(3).max(10000),
+  submissionBody: z.string().trim().min(1).max(10000),
   attachmentUrl: z.string().trim().max(1000).nullable().optional(),
   attachmentName: z.string().trim().max(200).nullable().optional(),
   status: z.enum(['draft', 'submitted']).default('submitted'),

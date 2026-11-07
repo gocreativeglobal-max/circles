@@ -28,7 +28,7 @@ export function sanitizeUrl(val?: string | null): string | null {
 
 export const createJobOpportunitySchema = z.object({
   circleId: z.string().uuid(),
-  title: z.string().trim().min(3).max(160),
+  title: z.string().trim().min(1).max(160),
   organizationName: z.string().trim().max(140).default(''),
   opportunityType: z
     .enum(['full_time', 'part_time', 'internship', 'freelance', 'volunteer', 'collaboration'])
@@ -36,14 +36,14 @@ export const createJobOpportunitySchema = z.object({
   workMode: z.enum(['remote', 'on_site', 'hybrid']).default('remote'),
   location: z.string().trim().max(180).nullable().optional(),
   compensationText: z.string().trim().max(180).nullable().optional(),
-  description: z.string().trim().min(5).max(10000),
+  description: z.string().trim().max(10000).default(''),
   requirements: z.string().trim().max(6000).default(''),
   applicationDeadline: z.string().datetime().nullable().optional(),
   linkUrl: z.string().trim().max(2048).nullable().optional(),
 });
 
 export const updateJobOpportunitySchema = z.object({
-  title: z.string().trim().min(3).max(160).optional(),
+  title: z.string().trim().min(1).max(160).optional(),
   organizationName: z.string().trim().max(140).optional(),
   opportunityType: z
     .enum(['full_time', 'part_time', 'internship', 'freelance', 'volunteer', 'collaboration'])
@@ -51,14 +51,14 @@ export const updateJobOpportunitySchema = z.object({
   workMode: z.enum(['remote', 'on_site', 'hybrid']).optional(),
   location: z.string().trim().max(180).nullable().optional(),
   compensationText: z.string().trim().max(180).nullable().optional(),
-  description: z.string().trim().min(5).max(10000).optional(),
+  description: z.string().trim().max(10000).optional(),
   requirements: z.string().trim().max(6000).optional(),
   linkUrl: z.string().trim().max(2048).nullable().optional(),
   status: z.enum(['open', 'closed', 'archived']).optional(),
 });
 
 export const submitJobApplicationSchema = z.object({
-  coverNote: z.string().trim().min(5).max(5000),
+  coverNote: z.string().trim().min(1).max(5000),
   resumeUrl: z.string().trim().max(1000).nullable().optional(),
   portfolioUrl: z.string().trim().max(1000).nullable().optional(),
 });

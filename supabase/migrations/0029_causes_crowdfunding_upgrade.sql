@@ -8,6 +8,8 @@
 -- ============================================================================
 
 ALTER TABLE public.fundraising_campaigns
+  DROP CONSTRAINT IF EXISTS fundraising_campaigns_title_check,
+  DROP CONSTRAINT IF EXISTS fundraising_campaigns_description_check,
   DROP CONSTRAINT IF EXISTS fundraising_campaigns_currency_check,
   DROP CONSTRAINT IF EXISTS fundraising_campaigns_status_check;
 
@@ -18,6 +20,8 @@ ALTER TABLE public.fundraising_campaigns
   ADD COLUMN IF NOT EXISTS beneficiary_name TEXT,
   ADD COLUMN IF NOT EXISTS milestones JSONB NOT NULL DEFAULT '[]'::jsonb,
   ADD COLUMN IF NOT EXISTS updates JSONB NOT NULL DEFAULT '[]'::jsonb,
+  ADD CONSTRAINT fundraising_campaigns_title_check CHECK (char_length(title) BETWEEN 1 AND 160),
+  ADD CONSTRAINT fundraising_campaigns_description_check CHECK (char_length(description) <= 6000),
   ADD CONSTRAINT fundraising_campaigns_currency_check CHECK (char_length(currency) BETWEEN 3 AND 4),
   ADD CONSTRAINT fundraising_campaigns_status_check CHECK (status IN ('pending_approval', 'active', 'completed', 'closed', 'rejected'));
 
