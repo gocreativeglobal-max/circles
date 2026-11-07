@@ -22,7 +22,7 @@ import {
 import {
   BUILT_IN_CUSTOM_FEATURE_TEMPLATES,
   CustomFeatureTemplatePreset,
-} from '@/features/custom-modules/service';
+} from '@/features/custom-modules/presets';
 
 const ICON_OPTIONS = [
   { value: 'sparkles', label: 'Sparkles' },

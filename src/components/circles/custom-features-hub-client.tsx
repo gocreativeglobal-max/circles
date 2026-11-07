@@ -14,7 +14,7 @@ import {
   Wallet,
 } from 'lucide-react';
 import { CircleCustomModuleItem } from '@/types/domain';
-import { CustomFeatureTemplatePreset } from '@/features/custom-modules/service';
+import { CustomFeatureTemplatePreset } from '@/features/custom-modules/presets';
 import { DynamicIcon } from '@/components/ui/icon-map';
 import { CustomFeatureBuilderModal } from './custom-feature-builder-modal';
 
