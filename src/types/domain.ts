@@ -629,27 +629,59 @@ export interface GovernanceProposalItem {
   proposer?: Pick<UserProfile, 'id' | 'username' | 'display_name'>;
 }
 
+export type CauseCategory =
+  | 'community_project'
+  | 'mutual_aid'
+  | 'scholarship'
+  | 'charity'
+  | 'event_sponsorship';
+
+export interface CauseMilestone {
+  title: string;
+  amount: number;
+}
+
+export interface CauseUpdateEntry {
+  id: string;
+  body: string;
+  created_at: string;
+}
+
 export interface FundraisingCampaignItem {
   id: string;
   circle_id: string;
   creator_id: string;
   title: string;
   description: string;
+  category?: CauseCategory;
+  image_url?: string | null;
+  cause_type?: 'official' | 'member';
+  beneficiary_name?: string | null;
+  milestones?: CauseMilestone[];
+  updates?: CauseUpdateEntry[];
   goal_amount: number;
   currency: string;
   deadline: string | null;
-  status: 'active' | 'completed' | 'closed';
+  status: 'pending_approval' | 'active' | 'completed' | 'closed' | 'rejected';
   created_at: string;
   updated_at: string;
   pledged_total?: number;
   pledge_count?: number;
+  creator?: Pick<UserProfile, 'id' | 'username' | 'display_name' | 'avatar_url'>;
+  recent_donations?: FundraisingPledgeItem[];
 }
 
 export interface FundraisingPledgeItem {
   id: string;
   campaign_id: string;
   circle_id: string;
-  pledger_id: string;
+  pledger_id: string | null;
+  donor_name?: string | null;
+  donor_email?: string | null;
+  is_anonymous?: boolean;
+  payment_method?: 'card' | 'wallet' | 'bank_transfer';
+  platform_fee_amount?: number;
+  net_amount?: number;
   pledge_amount: number;
   message: string;
   status: 'pledged' | 'fulfilled_verified' | 'cancelled';

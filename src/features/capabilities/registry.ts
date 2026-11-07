@@ -400,13 +400,19 @@ export const CAPABILITY_REGISTRY: Record<string, CapabilityDefinition> = {
   fundraising_causes: {
     key: 'fundraising_causes',
     name: 'Fundraising & Causes',
-    description: 'Community drives, non-profit pledges, and impact tracking.',
-    version: '1.0.0',
+    description: 'Community drives, member mutual aid, crowdfunding, and impact tracking.',
+    version: '2.0.0',
     category: 'organization_finance',
     default_enabled: false,
     release_stage: 'stable',
     dependencies: ['member_directory'],
-    default_settings: {},
+    default_settings: {
+      defaultCurrency: 'USD',
+      allowMultiCurrency: true,
+      creationPolicy: 'members_with_approval',
+      memberCauseFeePercentage: 0,
+      allowGuestDonations: true,
+    },
     required_permissions: ['fundraising.read'],
     navigation_config: {
       label: 'Causes',

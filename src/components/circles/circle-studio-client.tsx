@@ -1304,6 +1304,96 @@ export function CircleStudioClient({
                 </div>
               )}
 
+              {configCap.capability_key === 'fundraising_causes' && (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-stone-700">
+                      Default Cause Currency
+                    </label>
+                    <select
+                      value={String(capSettingsDraft.defaultCurrency || 'USD')}
+                      onChange={(e) =>
+                        setCapSettingsDraft((prev) => ({
+                          ...prev,
+                          defaultCurrency: e.target.value,
+                        }))
+                      }
+                      className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 p-2 text-xs text-stone-900"
+                    >
+                      {[
+                        'USD',
+                        'NGN',
+                        'GHS',
+                        'KES',
+                        'ZAR',
+                        'EUR',
+                        'GBP',
+                        'CAD',
+                        'UGX',
+                        'TZS',
+                        'RWF',
+                        'ZMW',
+                        'USDT',
+                        'USDC',
+                      ].map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-stone-700">
+                      Who can create Causes?
+                    </label>
+                    <select
+                      value={String(capSettingsDraft.creationPolicy || 'members_with_approval')}
+                      onChange={(e) =>
+                        setCapSettingsDraft((prev) => ({
+                          ...prev,
+                          creationPolicy: e.target.value,
+                        }))
+                      }
+                      className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 p-2 text-xs text-stone-900"
+                    >
+                      <option value="members_with_approval">
+                        Members (Requires Admin Approval) + Official Admin Causes
+                      </option>
+                      <option value="all_members">
+                        All Active Members (Auto-Published) + Official Admin Causes
+                      </option>
+                      <option value="admins_only">
+                        Admins & Moderators Only (Official Causes)
+                      </option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-stone-700">
+                      Community fee on member-created causes (%)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={30}
+                      step={0.5}
+                      value={Number(capSettingsDraft.memberCauseFeePercentage ?? 0)}
+                      onChange={(e) =>
+                        setCapSettingsDraft((prev) => ({
+                          ...prev,
+                          memberCauseFeePercentage: Math.min(
+                            30,
+                            Math.max(0, Number(e.target.value))
+                          ),
+                        }))
+                      }
+                      className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 p-2 text-xs text-stone-900"
+                    />
+                  </div>
+                </div>
+              )}
+
               {configCap.capability_key === 'payments_finances' && (
                 <div className="space-y-2.5">
                   <div>

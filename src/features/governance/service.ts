@@ -35,14 +35,38 @@ export const createFundraisingCampaignSchema = z.object({
   circleId: z.string().uuid(),
   title: z.string().trim().min(3).max(160),
   description: z.string().trim().min(5).max(6000),
+  category: z
+    .enum(['community_project', 'mutual_aid', 'scholarship', 'charity', 'event_sponsorship'])
+    .default('community_project'),
+  imageUrl: z.string().trim().max(2000).nullable().optional(),
+  causeType: z.enum(['official', 'member']).optional(),
+  beneficiaryName: z.string().trim().max(120).nullable().optional(),
+  milestones: z
+    .array(
+      z.object({
+        title: z.string().trim().min(1).max(120),
+        amount: z.number().nonnegative(),
+      })
+    )
+    .max(10)
+    .default([]),
   goalAmount: z.number().positive().max(100000000),
-  currency: z.string().trim().length(3).default('USD'),
-  deadline: z.string().datetime().nullable().optional(),
+  currency: z.string().trim().min(3).max(4).default('USD'),
+  deadline: z.string().nullable().optional(),
 });
 
 export const createFundraisingPledgeSchema = z.object({
   pledgeAmount: z.number().positive().max(10000000),
   message: z.string().trim().max(500).default(''),
+  donorName: z.string().trim().max(120).optional(),
+  donorEmail: z.string().trim().max(200).optional(),
+  isAnonymous: z.boolean().default(false),
+  paymentMethod: z.enum(['card', 'wallet', 'bank_transfer']).default('card'),
+});
+
+export const updateFundraisingCampaignSchema = z.object({
+  status: z.enum(['active', 'completed', 'closed', 'rejected']).optional(),
+  updateBody: z.string().trim().min(2).max(2000).optional(),
 });
 
 export const createChallengeSchema = z.object({
@@ -228,7 +252,7 @@ export async function listGovernanceProposals(
 }
 
 // ============================================================================
-// 2. FUNDRAISING CAMPAIGNS & COMMUNITY PLEDGES (INTENTIONS)
+// 2. FUNDRAISING CAMPAIGNS, MEMBER CAUSES & ON-PLATFORM DONATIONS
 // ============================================================================
 
 export async function createFundraisingCampaign(
@@ -238,8 +262,8 @@ export async function createFundraisingCampaign(
   const parsed = createFundraisingCampaignSchema.parse(input);
 
   return withRlsTransaction(actorUserId, async (tx) => {
-    const capRes = await tx.query<{ enabled: boolean }>(
-      `SELECT enabled FROM public.circle_capabilities
+    const capRes = await tx.query<{ enabled: boolean; settings: Record<string, unknown> }>(
+      `SELECT enabled, settings FROM public.circle_capabilities
        WHERE circle_id = $1 AND capability_key = 'fundraising_causes' AND enabled = true LIMIT 1;`,
       [parsed.circleId]
     );
@@ -247,22 +271,42 @@ export async function createFundraisingCampaign(
       throw new CapabilityDisabledError('fundraising_causes');
     }
 
+    const capSettings = capRes.rows[0].settings ?? {};
+    const creationPolicy = String(capSettings.creationPolicy || 'members_with_approval');
+    const defaultCurrency = String(capSettings.defaultCurrency || 'USD').toUpperCase();
+
     const memRes = await tx.query<{ role: CircleRole; status: MembershipStatus }>(
       `SELECT role, status FROM public.circle_memberships
        WHERE circle_id = $1 AND user_id = $2 LIMIT 1;`,
       [parsed.circleId, actorUserId]
     );
     const membership = memRes.rows[0];
-    if (!membership || membership.status !== 'active' || !['owner', 'admin'].includes(membership.role)) {
+    if (!membership || membership.status !== 'active') {
+      throw new ForbiddenError('Only active Circle members can create a cause.');
+    }
+
+    const isStaff = ['owner', 'admin', 'moderator'].includes(membership.role);
+    if (!isStaff && creationPolicy === 'admins_only') {
       throw new ForbiddenError(
-        'Only Circle administrators or owners can launch fundraising campaigns.'
+        'Only Circle administrators or moderators can launch fundraising causes in this community.'
       );
     }
 
+    const causeType: 'official' | 'member' = isStaff
+      ? parsed.causeType ?? 'official'
+      : 'member';
+
+    const initialStatus =
+      isStaff || creationPolicy === 'all_members' ? 'active' : 'pending_approval';
+
+    const currencyCode = (parsed.currency || defaultCurrency).toUpperCase();
+
     const res = await tx.query<FundraisingCampaignItem>(
       `INSERT INTO public.fundraising_campaigns (
-         id, circle_id, creator_id, title, description, goal_amount, currency, deadline, status
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'active')
+         id, circle_id, creator_id, title, description, category, image_url,
+         cause_type, beneficiary_name, milestones, updates,
+         goal_amount, currency, deadline, status
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, '[]'::jsonb, $11, $12, $13, $14)
        RETURNING *;`,
       [
         crypto.randomUUID(),
@@ -270,23 +314,31 @@ export async function createFundraisingCampaign(
         actorUserId,
         parsed.title,
         parsed.description,
+        parsed.category,
+        parsed.imageUrl ?? null,
+        causeType,
+        parsed.beneficiaryName ?? null,
+        JSON.stringify(parsed.milestones ?? []),
         parsed.goalAmount,
-        parsed.currency.toUpperCase(),
-        parsed.deadline ?? null,
+        currencyCode,
+        parsed.deadline ? new Date(parsed.deadline).toISOString() : null,
+        initialStatus,
       ]
     );
 
+    const row = res.rows[0];
     return {
-      ...res.rows[0],
-      goal_amount: Number(res.rows[0].goal_amount),
+      ...row,
+      goal_amount: Number(row.goal_amount),
       pledged_total: 0,
       pledge_count: 0,
+      recent_donations: [],
     };
   });
 }
 
 export async function createFundraisingPledge(
-  actorUserId: string,
+  actorUserId: string | null,
   circleId: string,
   campaignId: string,
   input: z.input<typeof createFundraisingPledgeSchema>
@@ -294,8 +346,8 @@ export async function createFundraisingPledge(
   const parsed = createFundraisingPledgeSchema.parse(input);
 
   return withRlsTransaction(actorUserId, async (tx) => {
-    const capRes = await tx.query<{ enabled: boolean }>(
-      `SELECT enabled FROM public.circle_capabilities
+    const capRes = await tx.query<{ enabled: boolean; settings: Record<string, unknown> }>(
+      `SELECT enabled, settings FROM public.circle_capabilities
        WHERE circle_id = $1 AND capability_key = 'fundraising_causes' AND enabled = true LIMIT 1;`,
       [circleId]
     );
@@ -303,24 +355,208 @@ export async function createFundraisingPledge(
       throw new CapabilityDisabledError('fundraising_causes');
     }
 
+    const capSettings = capRes.rows[0].settings ?? {};
+    const feePct = Math.min(
+      30,
+      Math.max(0, Number(capSettings.memberCauseFeePercentage ?? 0))
+    );
+
+    const campRes = await tx.query<{
+      id: string;
+      creator_id: string;
+      title: string;
+      currency: string;
+      cause_type: 'official' | 'member';
+      status: string;
+    }>(
+      `SELECT id, creator_id, title, currency, COALESCE(cause_type, 'official') AS cause_type, status
+       FROM public.fundraising_campaigns
+       WHERE id = $1 AND circle_id = $2
+       LIMIT 1;`,
+      [campaignId, circleId]
+    );
+
+    const campaign = campRes.rows[0];
+    if (!campaign) {
+      throw new NotFoundError('Cause not found.');
+    }
+    if (campaign.status !== 'active') {
+      throw new ConflictError('This cause is not currently accepting donations.');
+    }
+
+    if (parsed.paymentMethod === 'wallet' && !actorUserId) {
+      throw new ForbiddenError('Sign in to donate using your Member Wallet.');
+    }
+
+    // Calculate fee & net settlement:
+    // Official causes route 100% to Circle Treasury; Member causes credit the creator's Member Wallet (minus optional admin commission)
+    const isMemberCause = campaign.cause_type === 'member';
+    const platformFeeAmount = isMemberCause
+      ? Math.round(parsed.pledgeAmount * (feePct / 100) * 100) / 100
+      : 0;
+    const netAmount = Math.round((parsed.pledgeAmount - platformFeeAmount) * 100) / 100;
+
+    // If paying with Member Wallet, check balance and debit donor's wallet
+    if (parsed.paymentMethod === 'wallet' && actorUserId) {
+      const balRes = await tx.query<{ balance: string | number }>(
+        `SELECT COALESCE(SUM(
+           CASE WHEN tx_type IN ('deposit', 'sale_credit', 'refund') THEN amount
+                ELSE -amount END
+         ), 0) AS balance
+         FROM public.member_wallet_transactions
+         WHERE circle_id = $1 AND user_id = $2 AND currency = $3 AND status = 'completed';`,
+        [circleId, actorUserId, campaign.currency]
+      );
+      const currentBalance = Number(balRes.rows[0]?.balance ?? 0);
+      if (currentBalance < parsed.pledgeAmount) {
+        throw new ConflictError(
+          `Insufficient ${campaign.currency} wallet balance (${campaign.currency} ${currentBalance.toFixed(2)} available). Please top up your wallet or donate with Card / Bank Transfer.`
+        );
+      }
+
+      await tx.query(
+        `INSERT INTO public.member_wallet_transactions (
+           id, circle_id, user_id, tx_type, amount, currency, description, status
+         ) VALUES ($1, $2, $3, 'purchase_debit', $4, $5, $6, 'completed');`,
+        [
+          crypto.randomUUID(),
+          circleId,
+          actorUserId,
+          parsed.pledgeAmount,
+          campaign.currency,
+          `Donation to cause: ${campaign.title}`,
+        ]
+      );
+    }
+
+    // Credit Member Wallet if this is a Member-Submitted Cause
+    if (isMemberCause && netAmount > 0) {
+      await tx.query(
+        `INSERT INTO public.member_wallet_transactions (
+           id, circle_id, user_id, tx_type, amount, currency, description, status
+         ) VALUES ($1, $2, $3, 'sale_credit', $4, $5, $6, 'completed');`,
+        [
+          crypto.randomUUID(),
+          circleId,
+          campaign.creator_id,
+          netAmount,
+          campaign.currency,
+          `Cause donation received: ${campaign.title}`,
+        ]
+      );
+    }
+
     const res = await tx.query<FundraisingPledgeItem>(
       `INSERT INTO public.fundraising_pledges (
-         id, campaign_id, circle_id, pledger_id, pledge_amount, message, status
-       ) VALUES ($1, $2, $3, $4, $5, $6, 'pledged')
+         id, campaign_id, circle_id, pledger_id, donor_name, donor_email,
+         is_anonymous, payment_method, platform_fee_amount, net_amount,
+         pledge_amount, message, status
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'fulfilled_verified')
        RETURNING *;`,
       [
         crypto.randomUUID(),
         campaignId,
         circleId,
-        actorUserId,
+        actorUserId ?? null,
+        parsed.donorName ?? null,
+        parsed.donorEmail ?? null,
+        parsed.isAnonymous,
+        parsed.paymentMethod,
+        platformFeeAmount,
+        netAmount,
         parsed.pledgeAmount,
         parsed.message,
       ]
     );
 
+    if (actorUserId !== campaign.creator_id) {
+      await createNotification({
+        recipientId: campaign.creator_id,
+        actorId: actorUserId,
+        circleId,
+        eventType: 'challenge_reward',
+        title: `New donation to "${campaign.title}"`,
+        body: `${parsed.isAnonymous ? 'An anonymous supporter' : parsed.donorName || 'A supporter'} donated ${campaign.currency} ${parsed.pledgeAmount.toLocaleString()}.`,
+        linkUrl: `/circles/${circleId}/community`,
+      }).catch(() => {});
+    }
+
     return {
       ...res.rows[0],
       pledge_amount: Number(res.rows[0].pledge_amount),
+      platform_fee_amount: Number(res.rows[0].platform_fee_amount ?? 0),
+      net_amount: Number(res.rows[0].net_amount ?? res.rows[0].pledge_amount),
+    };
+  });
+}
+
+export async function updateFundraisingCampaign(
+  actorUserId: string,
+  circleId: string,
+  campaignId: string,
+  input: z.input<typeof updateFundraisingCampaignSchema>
+): Promise<FundraisingCampaignItem> {
+  const parsed = updateFundraisingCampaignSchema.parse(input);
+
+  return withRlsTransaction(actorUserId, async (tx) => {
+    const campRes = await tx.query<FundraisingCampaignItem>(
+      `SELECT * FROM public.fundraising_campaigns WHERE id = $1 AND circle_id = $2 LIMIT 1;`,
+      [campaignId, circleId]
+    );
+    const campaign = campRes.rows[0];
+    if (!campaign) {
+      throw new NotFoundError('Cause not found.');
+    }
+
+    const memRes = await tx.query<{ role: CircleRole; status: MembershipStatus }>(
+      `SELECT role, status FROM public.circle_memberships
+       WHERE circle_id = $1 AND user_id = $2 LIMIT 1;`,
+      [circleId, actorUserId]
+    );
+    const membership = memRes.rows[0];
+    const isStaff =
+      membership?.status === 'active' &&
+      ['owner', 'admin', 'moderator'].includes(membership.role);
+    const isCreator = campaign.creator_id === actorUserId;
+
+    if (!isStaff && !isCreator) {
+      throw new ForbiddenError('You do not have permission to update this cause.');
+    }
+
+    // Only staff can approve a pending_approval cause or reject it
+    if (
+      parsed.status &&
+      (campaign.status === 'pending_approval' || parsed.status === 'rejected') &&
+      !isStaff
+    ) {
+      throw new ForbiddenError('Only Circle administrators can approve or reject submitted causes.');
+    }
+
+    const currentUpdates = Array.isArray(campaign.updates) ? campaign.updates : [];
+    const nextUpdates = parsed.updateBody
+      ? [
+          {
+            id: crypto.randomUUID(),
+            body: parsed.updateBody,
+            created_at: new Date().toISOString(),
+          },
+          ...currentUpdates,
+        ]
+      : currentUpdates;
+
+    const updated = await tx.query<FundraisingCampaignItem>(
+      `UPDATE public.fundraising_campaigns
+       SET status = COALESCE($1, status),
+           updates = $2::jsonb,
+           updated_at = NOW()
+       WHERE id = $3 AND circle_id = $4
+       RETURNING *;`,
+      [parsed.status ?? null, JSON.stringify(nextUpdates), campaignId, circleId]
+    );
+
+    return {
+      ...updated.rows[0],
+      goal_amount: Number(updated.rows[0].goal_amount),
     };
   });
 }
@@ -339,13 +575,31 @@ export async function listFundraisingCampaigns(
       throw new CapabilityDisabledError('fundraising_causes');
     }
 
+    let isStaff = false;
+    if (actorUserId) {
+      const memRes = await tx.query<{ role: CircleRole; status: MembershipStatus }>(
+        `SELECT role, status FROM public.circle_memberships
+         WHERE circle_id = $1 AND user_id = $2 LIMIT 1;`,
+        [circleId, actorUserId]
+      );
+      const mem = memRes.rows[0];
+      isStaff =
+        mem?.status === 'active' && ['owner', 'admin', 'moderator'].includes(mem.role);
+    }
+
     const res = await tx.query<
       FundraisingCampaignItem & {
         pledged_total: string | number;
         pledge_count: number;
+        creator_username: string;
+        creator_display_name: string;
+        creator_avatar_url: string | null;
       }
     >(
       `SELECT c.*,
+         COALESCE(u.username, 'member') AS creator_username,
+         COALESCE(u.display_name, 'Community Member') AS creator_display_name,
+         u.avatar_url AS creator_avatar_url,
          COALESCE(
            (SELECT SUM(p.pledge_amount) FROM public.fundraising_pledges p
             WHERE p.campaign_id = c.id AND p.status IN ('pledged', 'fulfilled_verified')),
@@ -354,26 +608,88 @@ export async function listFundraisingCampaigns(
          (SELECT COUNT(*)::int FROM public.fundraising_pledges p
           WHERE p.campaign_id = c.id AND p.status IN ('pledged', 'fulfilled_verified')) AS pledge_count
        FROM public.fundraising_campaigns c
+       LEFT JOIN public.profiles u ON u.id = c.creator_id
        WHERE c.circle_id = $1
        ORDER BY c.created_at DESC;`,
       [circleId]
     );
 
-    return res.rows.map((r) => ({
-      id: r.id,
-      circle_id: r.circle_id,
-      creator_id: r.creator_id,
-      title: r.title,
-      description: r.description,
-      goal_amount: Number(r.goal_amount),
-      currency: r.currency,
-      deadline: r.deadline,
-      status: r.status,
-      created_at: r.created_at,
-      updated_at: r.updated_at,
-      pledged_total: Number(r.pledged_total ?? 0),
-      pledge_count: Number(r.pledge_count ?? 0),
-    }));
+    const pledgesRes = await tx.query<
+      FundraisingPledgeItem & {
+        pledger_username: string | null;
+        pledger_display_name: string | null;
+      }
+    >(
+      `SELECT p.*,
+         u.username AS pledger_username,
+         u.display_name AS pledger_display_name
+       FROM public.fundraising_pledges p
+       LEFT JOIN public.profiles u ON u.id = p.pledger_id
+       WHERE p.circle_id = $1 AND p.status IN ('pledged', 'fulfilled_verified')
+       ORDER BY p.created_at DESC
+       LIMIT 200;`,
+      [circleId]
+    );
+
+    const donationsByCampaign = new Map<string, FundraisingPledgeItem[]>();
+    for (const p of pledgesRes.rows) {
+      const list = donationsByCampaign.get(p.campaign_id) ?? [];
+      const isAnon = Boolean(p.is_anonymous);
+      list.push({
+        id: p.id,
+        campaign_id: p.campaign_id,
+        circle_id: p.circle_id,
+        pledger_id: isAnon ? null : p.pledger_id,
+        donor_name: isAnon
+          ? 'Anonymous Supporter'
+          : p.donor_name || p.pledger_display_name || 'Supporter',
+        is_anonymous: isAnon,
+        payment_method: p.payment_method,
+        pledge_amount: Number(p.pledge_amount),
+        message: p.message,
+        status: p.status,
+        created_at: p.created_at,
+        updated_at: p.updated_at,
+      });
+      donationsByCampaign.set(p.campaign_id, list);
+    }
+
+    return res.rows
+      .filter(
+        (r) =>
+          r.status === 'active' ||
+          r.status === 'completed' ||
+          isStaff ||
+          (actorUserId && r.creator_id === actorUserId)
+      )
+      .map((r) => ({
+        id: r.id,
+        circle_id: r.circle_id,
+        creator_id: r.creator_id,
+        title: r.title,
+        description: r.description,
+        category: r.category ?? 'community_project',
+        image_url: r.image_url ?? null,
+        cause_type: r.cause_type ?? 'official',
+        beneficiary_name: r.beneficiary_name ?? null,
+        milestones: Array.isArray(r.milestones) ? r.milestones : [],
+        updates: Array.isArray(r.updates) ? r.updates : [],
+        goal_amount: Number(r.goal_amount),
+        currency: r.currency,
+        deadline: r.deadline,
+        status: r.status,
+        created_at: r.created_at,
+        updated_at: r.updated_at,
+        pledged_total: Number(r.pledged_total ?? 0),
+        pledge_count: Number(r.pledge_count ?? 0),
+        creator: {
+          id: r.creator_id,
+          username: r.creator_username,
+          display_name: r.creator_display_name,
+          avatar_url: r.creator_avatar_url,
+        },
+        recent_donations: (donationsByCampaign.get(r.id) ?? []).slice(0, 15),
+      }));
   });
 }
 

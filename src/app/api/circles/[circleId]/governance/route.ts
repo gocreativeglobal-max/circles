@@ -12,6 +12,7 @@ import {
   listSupportTickets,
   reviewChallengeSubmission,
   submitChallengeEntry,
+  updateFundraisingCampaign,
   updateSupportTicket,
 } from '@/features/governance/service';
 import { handleApiError, resolveApiUser } from '@/lib/auth/api-helpers';
@@ -75,9 +76,31 @@ export async function POST(
 ) {
   try {
     const user = await resolveApiUser(req);
-    if (!user) throw new UnauthorizedError();
-
     const body = await req.json();
+
+    if (
+      body.action === 'create_pledge' ||
+      body.action === 'record_pledge' ||
+      body.action === 'donate'
+    ) {
+      if (!body.campaignId) throw new ValidationError('campaignId is required.');
+      const pledge = await createFundraisingPledge(
+        user?.id ?? null,
+        params.circleId,
+        String(body.campaignId),
+        {
+          pledgeAmount: Number(body.pledgeAmount ?? body.amount),
+          message: body.message || '',
+          donorName: body.donorName || user?.display_name || undefined,
+          donorEmail: body.donorEmail || user?.email || undefined,
+          isAnonymous: Boolean(body.isAnonymous),
+          paymentMethod: body.paymentMethod || 'card',
+        }
+      );
+      return NextResponse.json({ pledge }, { status: 201 });
+    }
+
+    if (!user) throw new UnauthorizedError();
 
     if (body.action === 'create_proposal') {
       const proposal = await createGovernanceProposal(user.id, {
@@ -93,20 +116,6 @@ export async function POST(
         circleId: params.circleId,
       });
       return NextResponse.json({ campaign }, { status: 201 });
-    }
-
-    if (body.action === 'create_pledge') {
-      if (!body.campaignId) throw new ValidationError('campaignId is required.');
-      const pledge = await createFundraisingPledge(
-        user.id,
-        params.circleId,
-        String(body.campaignId),
-        {
-          pledgeAmount: Number(body.pledgeAmount),
-          message: body.message,
-        }
-      );
-      return NextResponse.json({ pledge }, { status: 201 });
     }
 
     if (body.action === 'create_challenge') {
@@ -182,6 +191,20 @@ export async function PATCH(
         }
       );
       return NextResponse.json({ submission });
+    }
+
+    if (body.action === 'update_campaign') {
+      if (!body.campaignId) throw new ValidationError('campaignId is required.');
+      const campaign = await updateFundraisingCampaign(
+        user.id,
+        params.circleId,
+        String(body.campaignId),
+        {
+          status: body.status,
+          updateBody: body.updateBody,
+        }
+      );
+      return NextResponse.json({ campaign });
     }
 
     if (body.action === 'update_ticket') {

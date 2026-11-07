@@ -3,6 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 import { Lock } from 'lucide-react';
 import { getAuthenticatedUser } from '@/lib/auth/session';
 import { getCircleBySlugOrId } from '@/features/circles/service';
+import { getCircleCapabilities } from '@/features/capabilities/service';
 import { listFundraisingCampaigns } from '@/features/governance/service';
 import { canReadCircleContent } from '@/lib/authorization/permissions';
 import { CommunityHubBoard } from '@/components/circles/community-hub-board';
@@ -48,9 +49,24 @@ export default async function CircleCommunityHubPage({
   }
 
   let campaigns: FundraisingCampaignItem[] = [];
+  let causeSettings: Record<string, unknown> = {
+    defaultCurrency: 'USD',
+    allowMultiCurrency: true,
+    creationPolicy: 'members_with_approval',
+    memberCauseFeePercentage: 0,
+    allowGuestDonations: true,
+  };
 
   try {
-    campaigns = await listFundraisingCampaigns(user?.id ?? null, circle.id);
+    const [campList, caps] = await Promise.all([
+      listFundraisingCampaigns(user?.id ?? null, circle.id),
+      getCircleCapabilities(user?.id ?? null, circle.id),
+    ]);
+    campaigns = campList;
+    const causeCap = caps.find((c) => c.capability_key === 'fundraising_causes');
+    if (causeCap?.settings) {
+      causeSettings = { ...causeSettings, ...causeCap.settings };
+    }
   } catch {
     campaigns = [];
   }
@@ -65,7 +81,11 @@ export default async function CircleCommunityHubPage({
   return (
     <CommunityHubBoard
       circleId={circle.id}
+      circleName={circle.name}
       initialCampaigns={campaigns}
+      initialSettings={causeSettings}
+      currentUserId={user?.id ?? null}
+      currentUserName={user?.display_name ?? null}
       isMember={isMember}
       isStaff={isStaff}
     />
