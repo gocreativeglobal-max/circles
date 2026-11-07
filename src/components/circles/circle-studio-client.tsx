@@ -628,12 +628,24 @@ export function CircleStudioClient({
       {/* TAB 2: FEATURES / CAPABILITIES */}
       {activeTab === 'capabilities' && (
         <div className="rounded-2xl border border-stone-200/80 bg-white divide-y divide-stone-100">
-          {capabilities.map((cap) => {
-            const def = cap.definition;
-            if (!def) return null;
-            const isPlanned = def.release_stage === 'planned';
+          {capabilities
+            .filter(
+              (cap) =>
+                ![
+                  'governance_committees',
+                  'challenges_rewards',
+                  'help_desk',
+                  'polls_decisions',
+                  'shared_resources',
+                  'media_publishing',
+                ].includes(cap.capability_key)
+            )
+            .map((cap) => {
+              const def = cap.definition;
+              if (!def) return null;
+              const isPlanned = def.release_stage === 'planned';
 
-            return (
+              return (
               <div
                 key={cap.capability_key}
                 className="flex flex-col justify-between gap-3 p-4 sm:flex-row sm:items-center"
@@ -713,9 +725,8 @@ export function CircleStudioClient({
               >
                 <option value="discussions">Discussions</option>
                 <option value="events">Events</option>
-                <option value="learning_resources">Resources</option>
+                <option value="learning_resources">Courses</option>
                 <option value="marketplace">Marketplace</option>
-                <option value="help_desk">Help Desk</option>
                 <option value="projects_collaboration">Projects</option>
               </select>
 

@@ -95,8 +95,6 @@ export const CIRCLE_TEMPLATES: Record<string, CircleTemplateSpec> = {
       'spaces',
       'member_directory',
       'events',
-      'help_desk',
-      'shared_resources',
     ],
     suggestedSpaces: [
       {
@@ -120,7 +118,7 @@ export const CIRCLE_TEMPLATES: Record<string, CircleTemplateSpec> = {
         slug: 'requests',
         description: 'Ask for a hand, borrow tools, or coordinate local support.',
         icon: 'life-buoy',
-        capabilityKey: 'help_desk',
+        capabilityKey: 'discussions',
         postingPolicy: 'members',
       },
       {
@@ -148,7 +146,6 @@ export const CIRCLE_TEMPLATES: Record<string, CircleTemplateSpec> = {
       'member_directory',
       'marketplace',
       'events',
-      'shared_resources',
     ],
     suggestedSpaces: [
       {
@@ -186,7 +183,7 @@ export const CIRCLE_TEMPLATES: Record<string, CircleTemplateSpec> = {
       'Gather supporters and collaborators around discussions, behind-the-scenes updates, and creative feedback spaces.',
     defaultVisibility: 'public',
     defaultMembershipPolicy: 'open',
-    enabledCapabilities: ['discussions', 'spaces', 'member_directory', 'events', 'polls_decisions'],
+    enabledCapabilities: ['discussions', 'spaces', 'member_directory', 'events'],
     suggestedSpaces: [
       {
         name: 'Studio Releases',
@@ -209,7 +206,7 @@ export const CIRCLE_TEMPLATES: Record<string, CircleTemplateSpec> = {
         slug: 'feedback',
         description: 'Share drafts and vote on upcoming topics.',
         icon: 'bar-chart-2',
-        capabilityKey: 'polls_decisions',
+        capabilityKey: 'discussions',
         postingPolicy: 'members',
       },
     ],
@@ -220,7 +217,7 @@ export const CIRCLE_TEMPLATES: Record<string, CircleTemplateSpec> = {
     version: 1,
     category: 'learning',
     summary:
-      'Run structured study groups, curriculum spaces, Q&A help desks, and shared resource libraries.',
+      'Run structured study groups, curriculum spaces, Q&A discussions, and shared resource libraries.',
     defaultVisibility: 'public',
     defaultMembershipPolicy: 'open',
     enabledCapabilities: [
@@ -228,8 +225,6 @@ export const CIRCLE_TEMPLATES: Record<string, CircleTemplateSpec> = {
       'spaces',
       'member_directory',
       'learning_resources',
-      'shared_resources',
-      'help_desk',
     ],
     suggestedSpaces: [
       {
@@ -253,7 +248,7 @@ export const CIRCLE_TEMPLATES: Record<string, CircleTemplateSpec> = {
         slug: 'help-desk',
         description: 'Unblock technical or conceptual questions together.',
         icon: 'life-buoy',
-        capabilityKey: 'help_desk',
+        capabilityKey: 'discussions',
         postingPolicy: 'members',
       },
     ],
@@ -309,8 +304,6 @@ export const CIRCLE_TEMPLATES: Record<string, CircleTemplateSpec> = {
       'spaces',
       'member_directory',
       'projects_collaboration',
-      'shared_resources',
-      'polls_decisions',
     ],
     suggestedSpaces: [
       {
@@ -345,7 +338,6 @@ export const CIRCLE_TEMPLATES: Record<string, CircleTemplateSpec> = {
       'spaces',
       'member_directory',
       'events',
-      'shared_resources',
     ],
     suggestedSpaces: [
       {

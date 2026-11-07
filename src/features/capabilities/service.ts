@@ -277,9 +277,21 @@ export async function getCircleNavigation(
     );
 
     // Filter out spaces attached to a disabled capability (preserving data while hiding navigation)
+    const discussionSubKeys = new Set([
+      'discussions',
+      'polls_decisions',
+      'shared_resources',
+      'media_publishing',
+      'help_desk',
+      'governance_committees',
+      'challenges_rewards',
+    ]);
     const visibleSpaces = enabledKeys.has('spaces')
       ? spacesRes.rows.filter(
-          (sp) => !sp.capability_key || enabledKeys.has(sp.capability_key)
+          (sp) =>
+            !sp.capability_key ||
+            enabledKeys.has(sp.capability_key) ||
+            (discussionSubKeys.has(sp.capability_key) && enabledKeys.has('discussions'))
         )
       : [];
 
@@ -315,10 +327,7 @@ export async function getCircleNavigation(
       'marketplace',
       'learning_resources',
       'projects_collaboration',
-      'governance_committees',
       'fundraising_causes',
-      'challenges_rewards',
-      'help_desk',
     ];
 
     let order = 1;

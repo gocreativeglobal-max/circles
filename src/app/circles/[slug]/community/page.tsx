@@ -1,22 +1,12 @@
 import React from 'react';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { Lock } from 'lucide-react';
 import { getAuthenticatedUser } from '@/lib/auth/session';
 import { getCircleBySlugOrId } from '@/features/circles/service';
-import {
-  listCommunityChallenges,
-  listFundraisingCampaigns,
-  listGovernanceProposals,
-  listSupportTickets,
-} from '@/features/governance/service';
+import { listFundraisingCampaigns } from '@/features/governance/service';
 import { canReadCircleContent } from '@/lib/authorization/permissions';
 import { CommunityHubBoard } from '@/components/circles/community-hub-board';
-import {
-  CommunityChallengeItem,
-  FundraisingCampaignItem,
-  GovernanceProposalItem,
-  SupportTicketItem,
-} from '@/types/domain';
+import { FundraisingCampaignItem } from '@/types/domain';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +17,11 @@ export default async function CircleCommunityHubPage({
   params: { slug: string };
   searchParams?: { tab?: string };
 }) {
+  const tabParam = searchParams?.tab;
+  if (tabParam === 'governance' || tabParam === 'challenges' || tabParam === 'support') {
+    redirect(`/circles/${params.slug}/discussions`);
+  }
+
   const user = await getAuthenticatedUser();
   const circle = await getCircleBySlugOrId(user?.id ?? null, params.slug);
   if (!circle) {
@@ -44,48 +39,21 @@ export default async function CircleCommunityHubPage({
     return (
       <div className="rounded-2xl border border-amber-200 bg-white p-10 text-center shadow-sm">
         <Lock className="mx-auto h-8 w-8 text-amber-600" />
-        <h2 className="mt-3 text-lg font-bold text-stone-900">Members-Only Community Hub</h2>
+        <h2 className="mt-3 text-lg font-bold text-stone-900">Members-Only Causes</h2>
         <p className="mt-1 text-sm text-stone-600">
-          Join this Circle to view governance proposals, causes, challenges, and support.
+          Join this Circle to view community causes and fundraising drives.
         </p>
       </div>
     );
   }
 
-  let proposals: GovernanceProposalItem[] = [];
   let campaigns: FundraisingCampaignItem[] = [];
-  let challenges: CommunityChallengeItem[] = [];
-  let tickets: SupportTicketItem[] = [];
 
-  try {
-    proposals = await listGovernanceProposals(user?.id ?? null, circle.id);
-  } catch {
-    proposals = [];
-  }
   try {
     campaigns = await listFundraisingCampaigns(user?.id ?? null, circle.id);
   } catch {
     campaigns = [];
   }
-  try {
-    const chData = await listCommunityChallenges(user?.id ?? null, circle.id);
-    challenges = chData.challenges;
-  } catch {
-    challenges = [];
-  }
-  if (user) {
-    try {
-      tickets = await listSupportTickets(user.id, circle.id);
-    } catch {
-      tickets = [];
-    }
-  }
-
-  const tabParam = searchParams?.tab;
-  const initialTab =
-    tabParam === 'causes' || tabParam === 'challenges' || tabParam === 'support'
-      ? tabParam
-      : 'governance';
 
   const isMember = circle.current_user_membership_status === 'active';
   const isStaff =
@@ -97,11 +65,7 @@ export default async function CircleCommunityHubPage({
   return (
     <CommunityHubBoard
       circleId={circle.id}
-      initialTab={initialTab}
-      initialProposals={proposals}
       initialCampaigns={campaigns}
-      initialChallenges={challenges}
-      initialTickets={tickets}
       isMember={isMember}
       isStaff={isStaff}
     />
