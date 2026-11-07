@@ -8,9 +8,8 @@ import {
   ChevronRight,
   Clock,
   Globe,
-  LayoutGrid,
+  Lock,
   MapPin,
-  Radio,
   Video,
   X,
 } from 'lucide-react';
@@ -27,11 +26,45 @@ export interface EventCreationWizardModalProps {
   onClose: () => void;
   circleId: string;
   circleSlug?: string;
-  spaces: CircleSpace[];
+  spaces?: CircleSpace[];
   members: CircleMembership[];
   currentUserId?: string | null;
   onEventCreated: (event: CircleEventItem) => void;
 }
+
+export type MeetingChannelType = 'google_meet' | 'zoom' | 'teams' | 'youtube' | 'custom';
+
+const MEETING_CHANNELS: {
+  id: MeetingChannelType;
+  label: string;
+  placeholder: string;
+}[] = [
+  {
+    id: 'google_meet',
+    label: 'Google Meet',
+    placeholder: 'https://meet.google.com/abc-defg-hij',
+  },
+  {
+    id: 'zoom',
+    label: 'Zoom',
+    placeholder: 'https://zoom.us/j/1234567890',
+  },
+  {
+    id: 'teams',
+    label: 'Microsoft Teams',
+    placeholder: 'https://teams.microsoft.com/l/meetup-join/...',
+  },
+  {
+    id: 'youtube',
+    label: 'YouTube Live',
+    placeholder: 'https://youtube.com/live/...',
+  },
+  {
+    id: 'custom',
+    label: 'Other / Custom Link',
+    placeholder: 'https://...',
+  },
+];
 
 const WEEKDAYS = [
   { key: 'Mon', label: 'M' },
@@ -48,7 +81,6 @@ export function EventCreationWizardModal({
   onClose,
   circleId,
   circleSlug: _circleSlug = 'community',
-  spaces = [],
   members = [],
   currentUserId,
   onEventCreated,
@@ -59,12 +91,9 @@ export function EventCreationWizardModal({
 
   // Step 1: Details
   const [title, setTitle] = useState('');
-  const [spaceId, setSpaceId] = useState('');
   const [hostId, setHostId] = useState(currentUserId || '');
   const [description, setDescription] = useState('');
   const [coverImageUrl, setCoverImageUrl] = useState('');
-  const [topics, setTopics] = useState<string[]>([]);
-  const [topicInput, setTopicInput] = useState('');
 
   // Step 2: Date & Repeat
   const now = Date.now();
@@ -79,35 +108,14 @@ export function EventCreationWizardModal({
   const [repeatOccurrences, setRepeatOccurrences] = useState<number>(10);
 
   // Step 3: Location & Access
-  const [locationType, setLocationType] = useState<'live_room' | 'zoom' | 'in_person' | 'online'>('live_room');
-  const [liveRoomDefaultView, setLiveRoomDefaultView] = useState<'gallery' | 'speaker'>('gallery');
+  const [locationType, setLocationType] = useState<'online' | 'in_person' | 'hybrid'>('online');
+  const [meetingChannel, setMeetingChannel] = useState<MeetingChannelType>('google_meet');
   const [venueText, setVenueText] = useState('');
   const [meetingUrl, setMeetingUrl] = useState('');
-  const [visibility, setVisibility] = useState<'community' | 'space_members' | 'secret'>('community');
-
-  // Host Controls
-  const [recordLive, setRecordLive] = useState(false);
-  const [autoPostRecording, setAutoPostRecording] = useState(false);
-  const [muteOnEntry, setMuteOnEntry] = useState(false);
-  const [hideAttendees, setHideAttendees] = useState(false);
-  const [disableChat, setDisableChat] = useState(false);
-  const [disableLiveLinkSharing, setDisableLiveLinkSharing] = useState(false);
+  const [visibility, setVisibility] = useState<'community' | 'secret'>('community');
   const [hideLocationFromNonAttendees, setHideLocationFromNonAttendees] = useState(false);
 
   if (!isOpen) return null;
-
-  function handleAddTopic(val: string) {
-    const clean = val.trim().replace(/^#/, '');
-    if (!clean || topics.length >= 5) return;
-    if (!topics.some((t) => t.toLowerCase() === clean.toLowerCase())) {
-      setTopics([...topics, clean]);
-    }
-    setTopicInput('');
-  }
-
-  function handleRemoveTopic(index: number) {
-    setTopics(topics.filter((_, i) => i !== index));
-  }
 
   function toggleWeekday(day: string) {
     if (repeatDays.includes(day)) {
@@ -118,6 +126,9 @@ export function EventCreationWizardModal({
       setRepeatDays([...repeatDays, day]);
     }
   }
+
+  const activeChannelConfig =
+    MEETING_CHANNELS.find((c) => c.id === meetingChannel) || MEETING_CHANNELS[0];
 
   async function handlePublishEvent(e?: React.FormEvent) {
     if (e) e.preventDefault();
@@ -130,31 +141,28 @@ export function EventCreationWizardModal({
     setLoading(true);
     setError(null);
     try {
+      const resolvedLocationType =
+        locationType === 'online' && meetingChannel === 'zoom' ? 'zoom' : locationType;
+
       const payload = {
         title: title.trim(),
         description: description.trim(),
         coverImageUrl: coverImageUrl.trim() ? coverImageUrl.trim() : null,
-        topics,
+        topics: [],
         hostId: hostId || null,
-        spaceId: spaceId || null,
+        spaceId: null,
         startsAt: new Date(startsAt).toISOString(),
         endsAt: new Date(endsAt).toISOString(),
         repeatFrequency,
-        locationType,
-        liveRoomDefaultView,
+        locationType: resolvedLocationType,
         venueText: venueText.trim(),
         meetingUrl: meetingUrl.trim() ? meetingUrl.trim() : null,
         visibility,
         capacity: null,
         registrationClosesAt: null,
         hostControls: {
-          record_live: recordLive,
-          auto_post_recording: autoPostRecording,
-          mute_on_entry: muteOnEntry,
-          hide_attendees: hideAttendees,
-          disable_chat: disableChat,
-          disable_live_link_sharing: disableLiveLinkSharing,
           hide_location_from_non_attendees: hideLocationFromNonAttendees,
+          meeting_channel: meetingChannel,
           repeat_days: repeatDays,
           repeat_ends: repeatEnds,
           repeat_end_date: repeatEndDate,
@@ -203,7 +211,7 @@ export function EventCreationWizardModal({
                 <p className="text-xs text-stone-500">
                   {step === 1 && 'Step 1 of 3: Event Details & Host'}
                   {step === 2 && 'Step 2 of 3: Date, Time & Repeat'}
-                  {step === 3 && 'Step 3 of 3: Location & Access Controls'}
+                  {step === 3 && 'Step 3 of 3: Location & Meeting Channel'}
                 </p>
               </div>
             </div>
@@ -277,28 +285,6 @@ export function EventCreationWizardModal({
                 />
               </div>
 
-              {/* Space Selection */}
-              <div>
-                <label className="block text-xs font-bold text-stone-800 mb-1.5">
-                  Space
-                </label>
-                <select
-                  value={spaceId}
-                  onChange={(e) => setSpaceId(e.target.value)}
-                  className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-2.5 text-xs text-stone-800 focus:border-emerald-700 focus:outline-hidden focus:ring-2 focus:ring-emerald-700/20"
-                >
-                  <option value="">General Community (All Spaces)</option>
-                  {spaces.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      #{s.name} ({s.visibility === 'staff_only' ? 'Staff Space' : s.visibility === 'members' ? 'Members Space' : 'Open Space'})
-                    </option>
-                  ))}
-                </select>
-                <p className="mt-1 text-[11px] text-stone-500">
-                  Choose which space this event is listed in.
-                </p>
-              </div>
-
               {/* Host Selector */}
               <div>
                 <label className="block text-xs font-bold text-stone-800 mb-1.5">
@@ -315,56 +301,6 @@ export function EventCreationWizardModal({
                     </option>
                   ))}
                 </select>
-              </div>
-
-              {/* Topics (Up to 5) */}
-              <div>
-                <label className="block text-xs font-bold text-stone-800 mb-1.5">
-                  Topics <span className="font-normal text-stone-500">(Choose up to 5)</span>
-                </label>
-                <div className="flex flex-wrap items-center gap-1.5 mb-2">
-                  {topics.map((t, idx) => (
-                    <span
-                      key={t}
-                      className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800 border border-emerald-200"
-                    >
-                      #{t}
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveTopic(idx)}
-                        className="hover:text-rose-600 ml-0.5"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
-                  {topics.length < 5 && (
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="text"
-                        value={topicInput}
-                        onChange={(e) => setTopicInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleAddTopic(topicInput);
-                          }
-                        }}
-                        placeholder="Add topic (Press Enter)"
-                        className="rounded-full border border-stone-300 bg-white px-3 py-1 text-xs text-stone-800 placeholder:text-stone-400 focus:border-emerald-700 focus:outline-hidden"
-                      />
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleAddTopic(topicInput)}
-                        className="rounded-full text-xs h-7 px-2.5"
-                      >
-                        Add
-                      </Button>
-                    </div>
-                  )}
-                </div>
               </div>
 
               {/* Description */}
@@ -559,39 +495,32 @@ export function EventCreationWizardModal({
           {/* ============================================================== */}
           {step === 3 && (
             <div className="space-y-6 animate-in fade-in-50">
-              {/* Location Type Selection Cards */}
+              {/* Location Mode Selection Cards */}
               <div>
                 <label className="block text-xs font-bold text-stone-800 mb-2">
-                  Location <span className="text-rose-600">*</span>
+                  Event Format <span className="text-rose-600">*</span>
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {[
                     {
-                      id: 'live_room',
-                      title: 'Live Room',
-                      badge: 'Native Room',
-                      desc: 'Interactive audio/video room inside Circles',
-                      icon: Radio,
-                    },
-                    {
-                      id: 'zoom',
-                      title: 'Zoom',
-                      badge: 'Video Call',
-                      desc: 'External Zoom meeting link',
+                      id: 'online',
+                      title: 'Online Meeting',
+                      badge: 'Virtual',
+                      desc: 'Google Meet, Zoom, Teams, YouTube, or custom link',
                       icon: Video,
                     },
                     {
                       id: 'in_person',
                       title: 'In-Person',
-                      badge: 'Physical Venue',
-                      desc: 'Venue address or campus hall',
+                      badge: 'Physical',
+                      desc: 'Physical venue address, building, or room',
                       icon: MapPin,
                     },
                     {
-                      id: 'online',
-                      title: 'Custom Link',
-                      badge: 'Webinar / Stream',
-                      desc: 'External link, YouTube Live, or stream',
+                      id: 'hybrid',
+                      title: 'Hybrid',
+                      badge: 'Both',
+                      desc: 'In-person venue plus a virtual meeting link',
                       icon: Globe,
                     },
                   ].map((loc) => {
@@ -602,7 +531,7 @@ export function EventCreationWizardModal({
                         key={loc.id}
                         type="button"
                         onClick={() =>
-                          setLocationType(loc.id as 'live_room' | 'zoom' | 'in_person' | 'online')
+                          setLocationType(loc.id as 'online' | 'in_person' | 'hybrid')
                         }
                         className={`text-left p-3.5 rounded-2xl border transition-all ${
                           active
@@ -621,9 +550,6 @@ export function EventCreationWizardModal({
                             </div>
                             <span className="text-xs font-bold text-stone-900">{loc.title}</span>
                           </div>
-                          <span className="text-[10px] font-mono text-stone-500 uppercase">
-                            {loc.badge}
-                          </span>
                         </div>
                         <p className="text-[11px] text-stone-500 leading-snug">{loc.desc}</p>
                       </button>
@@ -632,57 +558,51 @@ export function EventCreationWizardModal({
                 </div>
               </div>
 
-              {/* Conditional inputs for Location */}
-              {locationType === 'live_room' && (
-                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4 space-y-3 animate-in fade-in-50">
-                  <label className="block text-xs font-bold text-stone-800">
-                    Default View
-                  </label>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setLiveRoomDefaultView('gallery')}
-                      className={`flex items-center gap-2 rounded-xl p-2.5 text-xs font-medium border ${
-                        liveRoomDefaultView === 'gallery'
-                          ? 'border-emerald-700 bg-white text-emerald-900 shadow-xs ring-1 ring-emerald-700'
-                          : 'border-stone-200 bg-white text-stone-700'
-                      }`}
-                    >
-                      <LayoutGrid className="h-4 w-4 text-emerald-700" />
-                      <span>Gallery View</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setLiveRoomDefaultView('speaker')}
-                      className={`flex items-center gap-2 rounded-xl p-2.5 text-xs font-medium border ${
-                        liveRoomDefaultView === 'speaker'
-                          ? 'border-emerald-700 bg-white text-emerald-900 shadow-xs ring-1 ring-emerald-700'
-                          : 'border-stone-200 bg-white text-stone-700'
-                      }`}
-                    >
-                      <Radio className="h-4 w-4 text-emerald-700" />
-                      <span>Speaker View</span>
-                    </button>
+              {/* Online Meeting Platform & Link */}
+              {(locationType === 'online' || locationType === 'hybrid') && (
+                <div className="rounded-2xl border border-stone-200 bg-stone-50/70 p-4 space-y-4 animate-in fade-in-50">
+                  <div>
+                    <label className="block text-xs font-bold text-stone-800 mb-2">
+                      Meeting Channel / Platform
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {MEETING_CHANNELS.map((ch) => {
+                        const active = meetingChannel === ch.id;
+                        return (
+                          <button
+                            key={ch.id}
+                            type="button"
+                            onClick={() => setMeetingChannel(ch.id)}
+                            className={`rounded-xl px-3 py-1.5 text-xs font-semibold border transition-all ${
+                              active
+                                ? 'border-emerald-700 bg-emerald-800 text-white shadow-xs'
+                                : 'border-stone-200 bg-white text-stone-700 hover:border-stone-300'
+                            }`}
+                          >
+                            {ch.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-stone-800 mb-1.5">
+                      {activeChannelConfig.label} Link <span className="text-rose-600">*</span>
+                    </label>
+                    <input
+                      type="url"
+                      value={meetingUrl}
+                      onChange={(e) => setMeetingUrl(e.target.value)}
+                      placeholder={activeChannelConfig.placeholder}
+                      className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-2.5 text-xs text-stone-800 focus:border-emerald-700 focus:outline-hidden focus:ring-2 focus:ring-emerald-700/20"
+                    />
                   </div>
                 </div>
               )}
 
-              {(locationType === 'zoom' || locationType === 'online') && (
-                <div>
-                  <label className="block text-xs font-bold text-stone-800 mb-1.5">
-                    Meeting URL <span className="text-rose-600">*</span>
-                  </label>
-                  <input
-                    type="url"
-                    value={meetingUrl}
-                    onChange={(e) => setMeetingUrl(e.target.value)}
-                    placeholder="https://zoom.us/j/123456789 or stream URL"
-                    className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-2.5 text-xs text-stone-800 focus:border-emerald-700 focus:outline-hidden focus:ring-2 focus:ring-emerald-700/20"
-                  />
-                </div>
-              )}
-
-              {locationType === 'in_person' && (
+              {/* Physical Venue Input */}
+              {(locationType === 'in_person' || locationType === 'hybrid') && (
                 <div>
                   <label className="block text-xs font-bold text-stone-800 mb-1.5">
                     Venue / Physical Location <span className="text-rose-600">*</span>
@@ -705,89 +625,34 @@ export function EventCreationWizardModal({
                 <select
                   value={visibility}
                   onChange={(e) =>
-                    setVisibility(e.target.value as 'community' | 'space_members' | 'secret')
+                    setVisibility(e.target.value as 'community' | 'secret')
                   }
                   className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-2.5 text-xs text-stone-800 focus:border-emerald-700 focus:outline-hidden focus:ring-2 focus:ring-emerald-700/20"
                 >
-                  <option value="community">Community (All circle members)</option>
-                  <option value="space_members">Space Members Only</option>
-                  <option value="secret">Secret (Invite-only)</option>
+                  <option value="community">Community (Open to all circle members)</option>
+                  <option value="secret">Private / Invite-only</option>
                 </select>
               </div>
 
-              {/* Host Controls Toggle List */}
-              <div className="border-t border-stone-200/80 pt-4 space-y-3">
-                <label className="block text-xs font-bold text-stone-800 mb-2">
-                  Host Controls
-                </label>
-
-                {[
-                  {
-                    id: 'recordLive',
-                    label: 'Record this live',
-                    desc: 'Automatically capture session for on-demand playback',
-                    checked: recordLive,
-                    onChange: setRecordLive,
-                  },
-                  {
-                    id: 'autoPostRecording',
-                    label: 'Automatically post recording to event page',
-                    desc: 'Publishes replay video as soon as processing completes',
-                    checked: autoPostRecording,
-                    onChange: setAutoPostRecording,
-                  },
-                  {
-                    id: 'muteOnEntry',
-                    label: 'Mute participants upon entry',
-                    desc: 'Keeps background noise down in large sessions',
-                    checked: muteOnEntry,
-                    onChange: setMuteOnEntry,
-                  },
-                  {
-                    id: 'hideAttendees',
-                    label: 'Hide participants list',
-                    desc: 'Only hosts and moderators can view the live roster',
-                    checked: hideAttendees,
-                    onChange: setHideAttendees,
-                  },
-                  {
-                    id: 'disableChat',
-                    label: 'Disable chat',
-                    desc: 'Turn off live textual messaging during this broadcast',
-                    checked: disableChat,
-                    onChange: setDisableChat,
-                  },
-                  {
-                    id: 'disableLiveLinkSharing',
-                    label: 'Disable live link sharing',
-                    desc: 'Prevents guests from sharing room link outside the circle',
-                    checked: disableLiveLinkSharing,
-                    onChange: setDisableLiveLinkSharing,
-                  },
-                  {
-                    id: 'hideLocation',
-                    label: 'Hide location from non-attendees',
-                    desc: 'Only confirmed RSVPs will receive live room link or venue address',
-                    checked: hideLocationFromNonAttendees,
-                    onChange: setHideLocationFromNonAttendees,
-                  },
-                ].map((ctrl) => (
-                  <label
-                    key={ctrl.id}
-                    className="flex items-start gap-3 rounded-2xl border border-stone-200 p-3 hover:bg-stone-50 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={ctrl.checked}
-                      onChange={(e) => ctrl.onChange(e.target.checked)}
-                      className="mt-0.5 rounded-md border-stone-300 text-emerald-800 focus:ring-emerald-700"
-                    />
-                    <div>
-                      <div className="text-xs font-bold text-stone-800">{ctrl.label}</div>
-                      <div className="text-[11px] text-stone-500">{ctrl.desc}</div>
+              {/* Privacy Option */}
+              <div className="border-t border-stone-200/80 pt-4">
+                <label className="flex items-start gap-3 rounded-2xl border border-stone-200 p-3.5 hover:bg-stone-50 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hideLocationFromNonAttendees}
+                    onChange={(e) => setHideLocationFromNonAttendees(e.target.checked)}
+                    className="mt-0.5 rounded-md border-stone-300 text-emerald-800 focus:ring-emerald-700"
+                  />
+                  <div>
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-stone-800">
+                      <Lock className="h-3.5 w-3.5 text-emerald-700" />
+                      <span>Hide meeting link or venue address until member RSVPs</span>
                     </div>
-                  </label>
-                ))}
+                    <div className="text-[11px] text-stone-500 mt-0.5">
+                      Only confirmed attendees who RSVP &quot;Going&quot; will see the join link or location details.
+                    </div>
+                  </div>
+                </label>
               </div>
             </div>
           )}

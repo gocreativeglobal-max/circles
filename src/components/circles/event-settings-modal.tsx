@@ -3,7 +3,9 @@
 import React, { useEffect, useState } from 'react';
 import {
   AlertCircle,
+  Bell,
   Calendar as CalendarIcon,
+  Lock,
   Search,
   Sliders,
   Trash2,
@@ -19,6 +21,7 @@ import {
 } from '@/types/domain';
 import { Button } from '@/components/ui/button';
 import { ImageUploader } from '@/components/ui/image-uploader';
+import { MeetingChannelType } from './event-creation-wizard-modal';
 
 export interface EventSettingsModalProps {
   isOpen: boolean;
@@ -26,12 +29,44 @@ export interface EventSettingsModalProps {
   circleId: string;
   circleSlug?: string;
   event: CircleEventItem;
-  spaces: CircleSpace[];
+  spaces?: CircleSpace[];
   members: CircleMembership[];
   currentUserId?: string | null;
   onEventUpdated: (event: CircleEventItem) => void;
   onEventCancelled?: (event: CircleEventItem) => void;
 }
+
+const MEETING_CHANNELS: {
+  id: MeetingChannelType;
+  label: string;
+  placeholder: string;
+}[] = [
+  {
+    id: 'google_meet',
+    label: 'Google Meet',
+    placeholder: 'https://meet.google.com/abc-defg-hij',
+  },
+  {
+    id: 'zoom',
+    label: 'Zoom',
+    placeholder: 'https://zoom.us/j/1234567890',
+  },
+  {
+    id: 'teams',
+    label: 'Microsoft Teams',
+    placeholder: 'https://teams.microsoft.com/l/meetup-join/...',
+  },
+  {
+    id: 'youtube',
+    label: 'YouTube Live',
+    placeholder: 'https://youtube.com/live/...',
+  },
+  {
+    id: 'custom',
+    label: 'Other / Custom Link',
+    placeholder: 'https://...',
+  },
+];
 
 const WEEKDAYS = [
   { key: 'Mon', label: 'M' },
@@ -43,32 +78,44 @@ const WEEKDAYS = [
   { key: 'Sun', label: 'S' },
 ];
 
+function inferMeetingChannel(ev: CircleEventItem): MeetingChannelType {
+  const controls = (ev.host_controls || {}) as Record<string, unknown>;
+  if (typeof controls.meeting_channel === 'string') {
+    const ch = controls.meeting_channel as MeetingChannelType;
+    if (['google_meet', 'zoom', 'teams', 'youtube', 'custom'].includes(ch)) {
+      return ch;
+    }
+  }
+  const url = (ev.meeting_url || '').toLowerCase();
+  if (url.includes('meet.google.com')) return 'google_meet';
+  if (url.includes('zoom.us') || ev.location_type === 'zoom') return 'zoom';
+  if (url.includes('teams.microsoft.com') || url.includes('teams.live.com')) return 'teams';
+  if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
+  return 'google_meet';
+}
+
 export function EventSettingsModal({
   isOpen,
   onClose,
   circleId,
   circleSlug: _circleSlug = 'community',
   event,
-  spaces = [],
   members = [],
   currentUserId,
   onEventUpdated,
   onEventCancelled,
 }: EventSettingsModalProps) {
-  const [activeTab, setActiveTab] = useState<'details' | 'attendees' | 'host_controls'>('details');
+  const [activeTab, setActiveTab] = useState<'details' | 'attendees' | 'registration'>('details');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const controls = (event.host_controls || {}) as Record<string, unknown>;
+
   // Tab 1: Details & Schedule
   const [title, setTitle] = useState(event.title);
-  const [spaceId, setSpaceId] = useState(event.space_id || '');
   const [hostId, setHostId] = useState(event.host_id || event.organizer_id || currentUserId || '');
   const [description, setDescription] = useState(event.description || '');
   const [coverImageUrl, setCoverImageUrl] = useState(event.cover_image_url || '');
-  const [topics, setTopics] = useState<string[]>(event.topics || []);
-  const [topicInput, setTopicInput] = useState('');
-
-  const controls = (event.host_controls || {}) as Record<string, unknown>;
 
   const [startsAt, setStartsAt] = useState(() =>
     new Date(event.starts_at).toISOString().slice(0, 16)
@@ -83,22 +130,20 @@ export function EventSettingsModal({
     Array.isArray(controls.repeat_days) ? (controls.repeat_days as string[]) : ['Sun']
   );
 
-  const [locationType, setLocationType] = useState<'live_room' | 'zoom' | 'in_person' | 'online'>(
-    event.location_type === 'zoom'
-      ? 'zoom'
-      : event.location_type === 'in_person'
+  const [locationType, setLocationType] = useState<'online' | 'in_person' | 'hybrid'>(
+    event.location_type === 'in_person'
       ? 'in_person'
-      : event.location_type === 'online'
-      ? 'online'
-      : 'live_room'
+      : event.location_type === 'hybrid'
+      ? 'hybrid'
+      : 'online'
   );
-  const [liveRoomDefaultView, setLiveRoomDefaultView] = useState<'gallery' | 'speaker'>(
-    event.live_room_default_view || 'gallery'
+  const [meetingChannel, setMeetingChannel] = useState<MeetingChannelType>(() =>
+    inferMeetingChannel(event)
   );
   const [venueText, setVenueText] = useState(event.venue_text || '');
   const [meetingUrl, setMeetingUrl] = useState(event.meeting_url || '');
-  const [visibility, setVisibility] = useState<'community' | 'space_members' | 'secret'>(
-    event.visibility || 'community'
+  const [visibility, setVisibility] = useState<'community' | 'secret'>(
+    event.visibility === 'secret' ? 'secret' : 'community'
   );
 
   // Tab 2: Attendees
@@ -107,15 +152,7 @@ export function EventSettingsModal({
   const [rosterSearch, setRosterSearch] = useState('');
   const [rosterFilter, setRosterFilter] = useState<'all' | 'going' | 'attended'>('all');
 
-  // Tab 3: Host Controls
-  const [recordLive, setRecordLive] = useState(Boolean(controls.record_live));
-  const [autoPostRecording, setAutoPostRecording] = useState(Boolean(controls.auto_post_recording));
-  const [muteOnEntry, setMuteOnEntry] = useState(Boolean(controls.mute_on_entry));
-  const [hideAttendees, setHideAttendees] = useState(Boolean(controls.hide_attendees));
-  const [disableChat, setDisableChat] = useState(Boolean(controls.disable_chat));
-  const [disableLiveLinkSharing, setDisableLiveLinkSharing] = useState(
-    Boolean(controls.disable_live_link_sharing)
-  );
+  // Tab 3: Registration, Privacy & Reminders
   const [hideLocationFromNonAttendees, setHideLocationFromNonAttendees] = useState(
     Boolean(controls.hide_location_from_non_attendees)
   );
@@ -150,19 +187,6 @@ export function EventSettingsModal({
   }, [isOpen, circleId, event.id]);
 
   if (!isOpen) return null;
-
-  function handleAddTopic(val: string) {
-    const clean = val.trim().replace(/^#/, '');
-    if (!clean || topics.length >= 5) return;
-    if (!topics.some((t) => t.toLowerCase() === clean.toLowerCase())) {
-      setTopics([...topics, clean]);
-    }
-    setTopicInput('');
-  }
-
-  function handleRemoveTopic(index: number) {
-    setTopics(topics.filter((_, i) => i !== index));
-  }
 
   function toggleWeekday(day: string) {
     if (repeatDays.includes(day)) {
@@ -214,19 +238,21 @@ export function EventSettingsModal({
     setError(null);
     try {
       const parsedCapacity = capacity.trim() ? parseInt(capacity.trim(), 10) : null;
+      const resolvedLocationType =
+        locationType === 'online' && meetingChannel === 'zoom' ? 'zoom' : locationType;
+
       const payload = {
         eventId: event.id,
         title: title.trim(),
         description: description.trim(),
         coverImageUrl: coverImageUrl.trim() ? coverImageUrl.trim() : null,
-        topics,
+        topics: [],
         hostId: hostId || null,
-        spaceId: spaceId || null,
+        spaceId: null,
         startsAt: new Date(startsAt).toISOString(),
         endsAt: new Date(endsAt).toISOString(),
         repeatFrequency,
-        locationType,
-        liveRoomDefaultView,
+        locationType: resolvedLocationType,
         venueText: venueText.trim(),
         meetingUrl: meetingUrl.trim() ? meetingUrl.trim() : null,
         visibility,
@@ -234,12 +260,7 @@ export function EventSettingsModal({
         status: eventStatus,
         hostControls: {
           ...event.host_controls,
-          record_live: recordLive,
-          auto_post_recording: autoPostRecording,
-          mute_on_entry: muteOnEntry,
-          hide_attendees: hideAttendees,
-          disable_chat: disableChat,
-          disable_live_link_sharing: disableLiveLinkSharing,
+          meeting_channel: meetingChannel,
           hide_location_from_non_attendees: hideLocationFromNonAttendees,
           repeat_days: repeatDays,
           remind_24h: remind24h,
@@ -307,6 +328,9 @@ export function EventSettingsModal({
     return true;
   });
 
+  const activeChannelConfig =
+    MEETING_CHANNELS.find((c) => c.id === meetingChannel) || MEETING_CHANNELS[0];
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-2 sm:p-4 backdrop-blur-xs animate-in fade-in">
       <div className="relative flex flex-col max-h-[92vh] w-full max-w-3xl rounded-3xl border border-stone-200 bg-white shadow-2xl overflow-hidden">
@@ -335,7 +359,7 @@ export function EventSettingsModal({
                   </span>
                 </div>
                 <p className="text-xs text-stone-500">
-                  Manage schedule, attendee roster, check-in, and host controls.
+                  Manage event schedule, meeting channel, attendee roster, and reminders.
                 </p>
               </div>
             </div>
@@ -353,7 +377,7 @@ export function EventSettingsModal({
             {[
               { id: 'details', label: 'Details & Schedule', icon: CalendarIcon },
               { id: 'attendees', label: `Attendees & Check-in (${rosterRsvps.length})`, icon: Users },
-              { id: 'host_controls', label: 'Host Controls & Limits', icon: Sliders },
+              { id: 'registration', label: 'Registration & Reminders', icon: Bell },
             ].map((tab) => {
               const Icon = tab.icon;
               const active = activeTab === tab.id;
@@ -361,7 +385,7 @@ export function EventSettingsModal({
                 <button
                   key={tab.id}
                   type="button"
-                  onClick={() => setActiveTab(tab.id as 'details' | 'attendees' | 'host_controls')}
+                  onClick={() => setActiveTab(tab.id as 'details' | 'attendees' | 'registration')}
                   className={`flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all ${
                     active
                       ? 'bg-emerald-800 text-white shadow-xs'
@@ -406,38 +430,19 @@ export function EventSettingsModal({
                 />
               </div>
 
-              {/* Title */}
-              <div>
-                <label className="block text-xs font-bold text-stone-800 mb-1.5">
-                  Title <span className="text-rose-600">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-2.5 text-xs text-stone-800 focus:border-emerald-700 focus:outline-hidden focus:ring-2 focus:ring-emerald-700/20"
-                />
-              </div>
-
-              {/* Space & Host Grid */}
+              {/* Title & Host */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-stone-800 mb-1.5">
-                    Space
+                    Title <span className="text-rose-600">*</span>
                   </label>
-                  <select
-                    value={spaceId}
-                    onChange={(e) => setSpaceId(e.target.value)}
-                    className="w-full rounded-2xl border border-stone-300 bg-white px-3.5 py-2.5 text-xs text-stone-800 focus:border-emerald-700 focus:outline-hidden"
-                  >
-                    <option value="">General Community</option>
-                    {spaces.map((s) => (
-                      <option key={s.id} value={s.id}>
-                        #{s.name}
-                      </option>
-                    ))}
-                  </select>
+                  <input
+                    type="text"
+                    required
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-2.5 text-xs text-stone-800 focus:border-emerald-700 focus:outline-hidden focus:ring-2 focus:ring-emerald-700/20"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-bold text-stone-800 mb-1.5">
@@ -454,56 +459,6 @@ export function EventSettingsModal({
                       </option>
                     ))}
                   </select>
-                </div>
-              </div>
-
-              {/* Topics */}
-              <div>
-                <label className="block text-xs font-bold text-stone-800 mb-1.5">
-                  Topics
-                </label>
-                <div className="flex flex-wrap items-center gap-1.5 mb-2">
-                  {topics.map((t, idx) => (
-                    <span
-                      key={t}
-                      className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-800 border border-emerald-200"
-                    >
-                      #{t}
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveTopic(idx)}
-                        className="hover:text-rose-600"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
-                  {topics.length < 5 && (
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="text"
-                        value={topicInput}
-                        onChange={(e) => setTopicInput(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleAddTopic(topicInput);
-                          }
-                        }}
-                        placeholder="Add topic"
-                        className="rounded-full border border-stone-300 px-3 py-1 text-xs text-stone-800"
-                      />
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleAddTopic(topicInput)}
-                        className="rounded-full text-xs h-7 px-2.5"
-                      >
-                        Add
-                      </Button>
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -597,27 +552,26 @@ export function EventSettingsModal({
                 </div>
               </div>
 
-              {/* Location & Visibility */}
+              {/* Location & Meeting Channel */}
               <div className="border-t border-stone-200/80 pt-4 space-y-4">
                 <h4 className="text-xs font-bold text-stone-800 uppercase tracking-wider">
-                  Location &amp; Access
+                  Location &amp; Meeting Channel
                 </h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-semibold text-stone-700 mb-1">
-                      Location Type
+                      Event Format
                     </label>
                     <select
                       value={locationType}
                       onChange={(e) =>
-                        setLocationType(e.target.value as 'live_room' | 'zoom' | 'in_person' | 'online')
+                        setLocationType(e.target.value as 'online' | 'in_person' | 'hybrid')
                       }
                       className="w-full rounded-2xl border border-stone-300 bg-white px-3 py-2 text-xs text-stone-800"
                     >
-                      <option value="live_room">Live Room (Circles Native)</option>
-                      <option value="zoom">Zoom</option>
-                      <option value="in_person">In-Person</option>
-                      <option value="online">Online / Custom URL</option>
+                      <option value="online">Online Meeting (Google Meet, Zoom, etc.)</option>
+                      <option value="in_person">In-Person Venue</option>
+                      <option value="hybrid">Hybrid (In-Person + Online Link)</option>
                     </select>
                   </div>
                   <div>
@@ -627,51 +581,59 @@ export function EventSettingsModal({
                     <select
                       value={visibility}
                       onChange={(e) =>
-                        setVisibility(e.target.value as 'community' | 'space_members' | 'secret')
+                        setVisibility(e.target.value as 'community' | 'secret')
                       }
                       className="w-full rounded-2xl border border-stone-300 bg-white px-3 py-2 text-xs text-stone-800"
                     >
-                      <option value="community">Community</option>
-                      <option value="space_members">Space Members Only</option>
-                      <option value="secret">Secret (Invite-only)</option>
+                      <option value="community">Community (Open to all members)</option>
+                      <option value="secret">Private / Invite-only</option>
                     </select>
                   </div>
                 </div>
 
-                {locationType === 'live_room' && (
-                  <div>
-                    <label className="block text-xs font-semibold text-stone-700 mb-1">
-                      Default View
-                    </label>
-                    <select
-                      value={liveRoomDefaultView}
-                      onChange={(e) =>
-                        setLiveRoomDefaultView(e.target.value as 'gallery' | 'speaker')
-                      }
-                      className="w-full rounded-2xl border border-stone-300 bg-white px-3 py-2 text-xs text-stone-800"
-                    >
-                      <option value="gallery">Gallery View</option>
-                      <option value="speaker">Speaker View</option>
-                    </select>
+                {(locationType === 'online' || locationType === 'hybrid') && (
+                  <div className="rounded-2xl border border-stone-200 bg-stone-50/70 p-4 space-y-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-stone-700 mb-1.5">
+                        Meeting Platform
+                      </label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {MEETING_CHANNELS.map((ch) => {
+                          const active = meetingChannel === ch.id;
+                          return (
+                            <button
+                              key={ch.id}
+                              type="button"
+                              onClick={() => setMeetingChannel(ch.id)}
+                              className={`rounded-xl px-2.5 py-1 text-xs font-semibold border transition-all ${
+                                active
+                                  ? 'border-emerald-700 bg-emerald-800 text-white'
+                                  : 'border-stone-200 bg-white text-stone-700 hover:border-stone-300'
+                              }`}
+                            >
+                              {ch.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-stone-700 mb-1">
+                        {activeChannelConfig.label} Link URL
+                      </label>
+                      <input
+                        type="url"
+                        value={meetingUrl}
+                        onChange={(e) => setMeetingUrl(e.target.value)}
+                        placeholder={activeChannelConfig.placeholder}
+                        className="w-full rounded-2xl border border-stone-300 bg-white px-3 py-2 text-xs text-stone-800"
+                      />
+                    </div>
                   </div>
                 )}
 
-                {(locationType === 'zoom' || locationType === 'online') && (
-                  <div>
-                    <label className="block text-xs font-semibold text-stone-700 mb-1">
-                      Meeting Link URL
-                    </label>
-                    <input
-                      type="url"
-                      value={meetingUrl}
-                      onChange={(e) => setMeetingUrl(e.target.value)}
-                      placeholder="https://zoom.us/j/..."
-                      className="w-full rounded-2xl border border-stone-300 bg-white px-3 py-2 text-xs text-stone-800"
-                    />
-                  </div>
-                )}
-
-                {locationType === 'in_person' && (
+                {(locationType === 'in_person' || locationType === 'hybrid') && (
                   <div>
                     <label className="block text-xs font-semibold text-stone-700 mb-1">
                       Venue Address / Room
@@ -801,83 +763,32 @@ export function EventSettingsModal({
           )}
 
           {/* ============================================================== */}
-          {/* TAB 3: HOST CONTROLS & STATUS                                  */}
+          {/* TAB 3: REGISTRATION & REMINDERS                                */}
           {/* ============================================================== */}
-          {activeTab === 'host_controls' && (
+          {activeTab === 'registration' && (
             <div className="space-y-5 animate-in fade-in-50">
+              {/* Location Privacy */}
               <div>
                 <h4 className="text-xs font-bold text-stone-800 uppercase tracking-wider mb-2">
-                  Live Room Controls
+                  Access &amp; Privacy
                 </h4>
-                <div className="space-y-2">
-                  {[
-                    {
-                      id: 'recordLive',
-                      label: 'Record this live',
-                      desc: 'Capture session recording for members to re-watch',
-                      checked: recordLive,
-                      onChange: setRecordLive,
-                    },
-                    {
-                      id: 'autoPostRecording',
-                      label: 'Automatically post recording to event page',
-                      desc: 'Publishes replay video as soon as processing completes',
-                      checked: autoPostRecording,
-                      onChange: setAutoPostRecording,
-                    },
-                    {
-                      id: 'muteOnEntry',
-                      label: 'Mute participants upon entry',
-                      desc: 'Minimizes microphone feedback in large audiences',
-                      checked: muteOnEntry,
-                      onChange: setMuteOnEntry,
-                    },
-                    {
-                      id: 'hideAttendees',
-                      label: 'Hide participants list',
-                      desc: 'Only hosts and moderators can view the live roster',
-                      checked: hideAttendees,
-                      onChange: setHideAttendees,
-                    },
-                    {
-                      id: 'disableChat',
-                      label: 'Disable chat',
-                      desc: 'Turn off live textual messaging during this broadcast',
-                      checked: disableChat,
-                      onChange: setDisableChat,
-                    },
-                    {
-                      id: 'disableLiveLinkSharing',
-                      label: 'Disable live link sharing',
-                      desc: 'Prevents guests from sharing room link outside the circle',
-                      checked: disableLiveLinkSharing,
-                      onChange: setDisableLiveLinkSharing,
-                    },
-                    {
-                      id: 'hideLocationFromNonAttendees',
-                      label: 'Hide location from non-attendees',
-                      desc: 'Only guests who have clicked RSVP will see the link/address',
-                      checked: hideLocationFromNonAttendees,
-                      onChange: setHideLocationFromNonAttendees,
-                    },
-                  ].map((ctrl) => (
-                    <label
-                      key={ctrl.id}
-                      className="flex items-start gap-3 rounded-2xl border border-stone-200 p-3 hover:bg-stone-50 cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={ctrl.checked}
-                        onChange={(e) => ctrl.onChange(e.target.checked)}
-                        className="mt-0.5 rounded-md border-stone-300 text-emerald-800 focus:ring-emerald-700"
-                      />
-                      <div>
-                        <div className="text-xs font-bold text-stone-800">{ctrl.label}</div>
-                        <div className="text-[11px] text-stone-500">{ctrl.desc}</div>
-                      </div>
-                    </label>
-                  ))}
-                </div>
+                <label className="flex items-start gap-3 rounded-2xl border border-stone-200 p-3.5 hover:bg-stone-50 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hideLocationFromNonAttendees}
+                    onChange={(e) => setHideLocationFromNonAttendees(e.target.checked)}
+                    className="mt-0.5 rounded-md border-stone-300 text-emerald-800 focus:ring-emerald-700"
+                  />
+                  <div>
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-stone-800">
+                      <Lock className="h-3.5 w-3.5 text-emerald-700" />
+                      <span>Hide meeting link or venue address from non-attendees</span>
+                    </div>
+                    <div className="text-[11px] text-stone-500 mt-0.5">
+                      Only guests who have clicked RSVP will see the meeting join link or physical address.
+                    </div>
+                  </div>
+                </label>
               </div>
 
               {/* Capacity Limit */}

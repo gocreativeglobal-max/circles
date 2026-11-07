@@ -7,19 +7,14 @@ import {
   CheckCircle2,
   Clock,
   Copy,
-  Disc,
   Download,
   Edit3,
   ExternalLink,
   Globe,
   Lock,
   MapPin,
-  MessageSquareOff,
-  MicOff,
   Plus,
-  Radio,
   Search,
-  Tag,
   UserCheck,
   Video,
   X,
@@ -34,6 +29,25 @@ import {
 import { Button } from '@/components/ui/button';
 import { EventCreationWizardModal } from '@/components/circles/event-creation-wizard-modal';
 import { EventSettingsModal } from '@/components/circles/event-settings-modal';
+
+function getMeetingPlatformLabel(ev: CircleEventItem): string {
+  const hc = ev.host_controls as Record<string, unknown> | undefined;
+  const savedChannel = hc?.meeting_channel;
+  if (savedChannel === 'google_meet') return 'Google Meet';
+  if (savedChannel === 'zoom') return 'Zoom';
+  if (savedChannel === 'teams') return 'Microsoft Teams';
+  if (savedChannel === 'youtube') return 'YouTube Live';
+  if (savedChannel === 'custom') return 'Online Meeting';
+
+  const url = (ev.meeting_url || '').toLowerCase();
+  if (url.includes('meet.google.com')) return 'Google Meet';
+  if (url.includes('zoom.us') || ev.location_type === 'zoom') return 'Zoom';
+  if (url.includes('teams.microsoft.com') || url.includes('teams.live.com')) return 'Microsoft Teams';
+  if (url.includes('youtube.com') || url.includes('youtu.be')) return 'YouTube Live';
+  if (ev.location_type === 'in_person') return 'In-Person';
+  if (ev.location_type === 'hybrid') return 'Hybrid';
+  return 'Online Meeting';
+}
 
 export interface EventsBoardProps {
   circleId: string;
@@ -57,14 +71,11 @@ export function EventsBoard({
   isMember,
   currentUserId,
   currentUserRole,
-  spaces = [],
   members = [],
 }: EventsBoardProps) {
   const [events, setEvents] = useState<CircleEventItem[]>(initialEvents);
   const [timeframe, setTimeframe] = useState<'upcoming' | 'past' | 'my_rsvps'>('upcoming');
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedSpaceId, setSelectedSpaceId] = useState<'all' | string>('all');
-  const [selectedTopic, setSelectedTopic] = useState<'all' | string>('all');
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
 
   // Calendar month state
@@ -85,15 +96,6 @@ export function EventsBoard({
   const [rosterSearch, setRosterSearch] = useState('');
 
   const isStaff = currentUserRole ? ['owner', 'admin', 'moderator'].includes(currentUserRole) : false;
-
-  // Extract all distinct topics across events for filter pill bar
-  const allAvailableTopics = useMemo(() => {
-    const set = new Set<string>();
-    events.forEach((e) => {
-      e.topics?.forEach((t) => set.add(t));
-    });
-    return Array.from(set);
-  }, [events]);
 
   function handleOpenCreate() {
     setCreateWizardOpen(true);
@@ -226,11 +228,9 @@ export function EventsBoard({
     );
     const titleEnc = encodeURIComponent(ev.title);
     const locationEnc = encodeURIComponent(
-      ev.location_type === 'live_room'
-        ? `Live Room (Circle.so)`
-        : ev.location_type === 'zoom' || ev.location_type === 'online'
-        ? ev.meeting_url || 'Online Meeting'
-        : ev.venue_text || 'In-person'
+      ev.location_type === 'in_person'
+        ? ev.venue_text || 'In-person'
+        : ev.meeting_url || ev.venue_text || getMeetingPlatformLabel(ev)
     );
     return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${titleEnc}&dates=${start}/${end}&details=${details}&location=${locationEnc}`;
   }
@@ -243,10 +243,9 @@ export function EventsBoard({
     const now = formatIcsDate(new Date().toISOString());
 
     const loc =
-      ev.location_type === 'live_room'
-        ? 'Live Room'
-        : (ev.location_type === 'zoom' || ev.location_type === 'online' ? ev.meeting_url : ev.venue_text) ||
-          'Online';
+      ev.location_type === 'in_person'
+        ? ev.venue_text || 'In-Person'
+        : ev.meeting_url || ev.venue_text || getMeetingPlatformLabel(ev);
 
     const icsContent = [
       'BEGIN:VCALENDAR',
@@ -293,16 +292,6 @@ export function EventsBoard({
         if (!ev.viewer_rsvp_status || ev.viewer_rsvp_status === 'cancelled') return false;
       }
 
-      // Space
-      if (selectedSpaceId !== 'all' && ev.space_id !== selectedSpaceId) {
-        return false;
-      }
-
-      // Topic
-      if (selectedTopic !== 'all' && (!ev.topics || !ev.topics.includes(selectedTopic))) {
-        return false;
-      }
-
       // Search
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
@@ -311,15 +300,14 @@ export function EventsBoard({
         const matchesHost = (ev.host?.display_name || ev.organizer?.display_name || '')
           .toLowerCase()
           .includes(q);
-        const matchesTopic = ev.topics?.some((t) => t.toLowerCase().includes(q));
-        if (!matchesTitle && !matchesDesc && !matchesHost && !matchesTopic) {
+        if (!matchesTitle && !matchesDesc && !matchesHost) {
           return false;
         }
       }
 
       return true;
     });
-  }, [events, timeframe, selectedSpaceId, selectedTopic, searchQuery]);
+  }, [events, timeframe, searchQuery]);
 
   // Calendar Days generator
   const calendarDays = useMemo(() => {
@@ -374,7 +362,7 @@ export function EventsBoard({
             </span>
           </div>
           <p className="mt-1 text-xs sm:text-sm text-stone-500 font-normal">
-            Live rooms, workshops, community calls, and meetups with RSVP sync.
+            Workshops, community calls, livestreams, and in-person meetups with RSVP sync.
           </p>
         </div>
 
@@ -430,35 +418,19 @@ export function EventsBoard({
             </button>
           </div>
 
-          {/* Search, Space filter & List/Calendar view toggle */}
+          {/* Search & List/Calendar view toggle */}
           <div className="flex flex-wrap items-center gap-2">
             {/* Search Input */}
-            <div className="relative min-w-[200px] flex-1 sm:w-60">
+            <div className="relative min-w-[200px] flex-1 sm:w-64">
               <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-stone-400" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search events, topics, hosts..."
+                placeholder="Search events or hosts..."
                 className="w-full rounded-xl border border-stone-200 bg-white pl-9 pr-3 py-1.5 text-xs text-stone-900 placeholder:text-stone-400 focus:border-emerald-600 focus:outline-none"
               />
             </div>
-
-            {/* Space Dropdown */}
-            {spaces.length > 0 && (
-              <select
-                value={selectedSpaceId}
-                onChange={(e) => setSelectedSpaceId(e.target.value)}
-                className="rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 focus:outline-none"
-              >
-                <option value="all">All Spaces</option>
-                {spaces.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    #{s.name}
-                  </option>
-                ))}
-              </select>
-            )}
 
             {/* List vs Calendar Toggle */}
             <div className="flex items-center rounded-xl border border-stone-200 bg-white p-1">
@@ -487,41 +459,6 @@ export function EventsBoard({
             </div>
           </div>
         </div>
-
-        {/* Topic Filter Pills Bar */}
-        {allAvailableTopics.length > 0 && (
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5">
-            <span className="text-[11px] font-mono uppercase font-bold text-stone-400 mr-1 flex items-center gap-1">
-              <Tag className="h-3 w-3" />
-              Topics:
-            </span>
-            <button
-              type="button"
-              onClick={() => setSelectedTopic('all')}
-              className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-all ${
-                selectedTopic === 'all'
-                  ? 'bg-emerald-800 text-white font-semibold'
-                  : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-              }`}
-            >
-              All
-            </button>
-            {allAvailableTopics.map((t) => (
-              <button
-                key={t}
-                type="button"
-                onClick={() => setSelectedTopic(t)}
-                className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-all ${
-                  selectedTopic === t
-                    ? 'bg-emerald-800 text-white font-semibold'
-                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
-                }`}
-              >
-                #{t}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* 3. Main Events Content (List Mode or Calendar Mode) */}
@@ -632,7 +569,7 @@ export function EventsBoard({
           <h3 className="mt-4 text-base font-bold text-stone-900">No Events Found</h3>
           <p className="mt-1 text-xs sm:text-sm text-stone-500 max-w-sm mx-auto">
             {timeframe === 'upcoming'
-              ? 'There are no upcoming events scheduled right now. Host a live room or meetup!'
+              ? 'There are no upcoming events scheduled right now. Host an online call or in-person meetup!'
               : 'No past events match your current filters.'}
           </p>
           {canCreateEvent && (
@@ -647,13 +584,14 @@ export function EventsBoard({
           )}
         </div>
       ) : (
-        /* Circle.so Style Event Cards Grid / List */
+        /* Event Cards Grid / List */
         <div className="space-y-4">
           {filteredEvents.map((ev) => {
             const dateComp = formatDateComponents(ev.starts_at);
             const isGoing = ev.viewer_rsvp_status === 'going';
             const isWaitlisted = ev.viewer_rsvp_status === 'waitlisted';
             const hostUser = ev.host || ev.organizer;
+            const platformLabel = getMeetingPlatformLabel(ev);
 
             return (
               <div
@@ -675,15 +613,19 @@ export function EventsBoard({
                   ) : (
                     <div className="h-44 md:h-full w-full bg-gradient-to-br from-emerald-800 via-stone-800 to-stone-900 flex items-center justify-center p-6 text-white text-center">
                       <div>
-                        <Radio className="h-8 w-8 mx-auto text-emerald-400/80 mb-2" />
+                        {ev.location_type === 'in_person' ? (
+                          <MapPin className="h-8 w-8 mx-auto text-emerald-400/80 mb-2" />
+                        ) : (
+                          <Video className="h-8 w-8 mx-auto text-emerald-400/80 mb-2" />
+                        )}
                         <span className="text-xs font-mono font-bold uppercase tracking-wider text-white/70 block">
-                          {ev.location_type === 'live_room' ? 'Circle Live Room' : 'Community Event'}
+                          {platformLabel}
                         </span>
                       </div>
                     </div>
                   )}
 
-                  {/* Circle.so Date Pill Overlay on Mobile / Cover */}
+                  {/* Date Pill Overlay on Cover */}
                   <div className="absolute top-3 left-3 flex flex-col items-center overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-md">
                     <span className="w-full bg-emerald-800 px-2.5 py-0.5 text-center text-[9px] font-mono font-bold tracking-wider text-white">
                       {dateComp.month}
@@ -697,37 +639,22 @@ export function EventsBoard({
                 {/* Right / Middle Content */}
                 <div className="flex-1 p-5 sm:p-6 flex flex-col justify-between">
                   <div>
-                    {/* Top Meta Line: Space pill, Location badge, Repeat indicator */}
+                    {/* Top Meta Line: Location / Channel badge & Repeat indicator */}
                     <div className="flex flex-wrap items-center gap-2 mb-2">
-                      {ev.space_name && (
-                        <span className="rounded-full bg-stone-100 px-2.5 py-0.5 text-[11px] font-semibold text-stone-700 border border-stone-200">
-                          #{ev.space_name}
-                        </span>
-                      )}
-
-                      {/* Location Type Pill */}
-                      {ev.location_type === 'live_room' && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-mono font-bold text-emerald-800 border border-emerald-200">
-                          <Radio className="h-3 w-3 text-emerald-600 animate-pulse" />
-                          Live Room
-                        </span>
-                      )}
-                      {ev.location_type === 'zoom' && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-mono font-bold text-sky-800 border border-sky-200">
-                          <Video className="h-3 w-3 text-sky-600" />
-                          Zoom
-                        </span>
-                      )}
-                      {ev.location_type === 'in_person' && (
+                      {ev.location_type === 'in_person' ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-mono font-bold text-amber-800 border border-amber-200">
                           <MapPin className="h-3 w-3 text-amber-600" />
                           In-Person
                         </span>
-                      )}
-                      {ev.location_type === 'online' && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-0.5 text-[11px] font-mono font-bold text-indigo-800 border border-indigo-200">
-                          <Globe className="h-3 w-3 text-indigo-600" />
-                          Online
+                      ) : ev.location_type === 'hybrid' ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-mono font-bold text-emerald-800 border border-emerald-200">
+                          <Globe className="h-3 w-3 text-emerald-600" />
+                          Hybrid · {platformLabel}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-mono font-bold text-sky-800 border border-sky-200">
+                          <Video className="h-3 w-3 text-sky-600" />
+                          {platformLabel}
                         </span>
                       )}
 
@@ -762,23 +689,9 @@ export function EventsBoard({
                         {ev.description}
                       </p>
                     )}
-
-                    {/* Topics Tags */}
-                    {ev.topics && ev.topics.length > 0 && (
-                      <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
-                        {ev.topics.map((t) => (
-                          <span
-                            key={t}
-                            className="rounded-md bg-stone-100 px-2 py-0.5 text-[10px] font-mono font-medium text-stone-600"
-                          >
-                            #{t}
-                          </span>
-                        ))}
-                      </div>
-                    )}
                   </div>
 
-                  {/* Bottom Footer: Host & Social Proof Facepile & Circle.so RSVP */}
+                  {/* Bottom Footer: Host & Social Proof Facepile & 1-Click RSVP */}
                   <div className="mt-4 pt-3 border-t border-stone-100 flex flex-wrap items-center justify-between gap-3">
                     {/* Host Avatar & Name */}
                     <div className="flex items-center gap-2">
@@ -832,7 +745,7 @@ export function EventsBoard({
                         {ev.going_count || 0} attending
                       </span>
 
-                      {/* Circle.so 1-Click RSVP Button */}
+                      {/* 1-Click RSVP Button */}
                       {isMember && (
                         <div>
                           {isGoing ? (
@@ -878,7 +791,7 @@ export function EventsBoard({
       )}
 
       {/* ========================================================================= */}
-      {/* 4. CIRCLE.SO EVENT DETAIL MODAL                                           */}
+      {/* 4. EVENT DETAIL MODAL                                                     */}
       {/* ========================================================================= */}
       {selectedEventDetail && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs animate-in fade-in">
@@ -894,7 +807,11 @@ export function EventsBoard({
                 />
               ) : (
                 <div className="h-full w-full bg-gradient-to-br from-emerald-900 via-stone-900 to-black flex items-center justify-center">
-                  <Radio className="h-12 w-12 text-emerald-400/60" />
+                  {selectedEventDetail.location_type === 'in_person' ? (
+                    <MapPin className="h-12 w-12 text-emerald-400/60" />
+                  ) : (
+                    <Video className="h-12 w-12 text-emerald-400/60" />
+                  )}
                 </div>
               )}
 
@@ -909,13 +826,10 @@ export function EventsBoard({
 
               {/* Top Meta Tag on Cover */}
               <div className="absolute bottom-4 left-4 flex items-center gap-2">
-                {selectedEventDetail.space_name && (
-                  <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-bold text-stone-900 shadow-md backdrop-blur-md">
-                    #{selectedEventDetail.space_name}
-                  </span>
-                )}
                 <span className="rounded-full bg-emerald-700 text-white px-3 py-1 text-xs font-mono font-bold uppercase tracking-wider shadow-md">
-                  {selectedEventDetail.location_type.replace('_', ' ')}
+                  {selectedEventDetail.location_type === 'hybrid'
+                    ? `Hybrid · ${getMeetingPlatformLabel(selectedEventDetail)}`
+                    : getMeetingPlatformLabel(selectedEventDetail)}
                 </span>
               </div>
             </div>
@@ -951,20 +865,6 @@ export function EventsBoard({
                   </div>
                 </div>
               </div>
-
-              {/* Topics Pills */}
-              {selectedEventDetail.topics && selectedEventDetail.topics.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {selectedEventDetail.topics.map((t) => (
-                    <span
-                      key={t}
-                      className="rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-mono font-semibold text-stone-700 border border-stone-200"
-                    >
-                      #{t}
-                    </span>
-                  ))}
-                </div>
-              )}
 
               {/* RSVP & Add to Calendar Action Row */}
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-stone-200 bg-stone-50/70 p-4">
@@ -1032,58 +932,27 @@ export function EventsBoard({
                     <MapPin className="h-3.5 w-3.5 text-emerald-700" />
                     Location & Access
                   </h4>
-                  {selectedEventDetail.live_room_default_view && (
-                    <span className="text-[11px] font-mono text-stone-400 capitalize">
-                      Default view: {selectedEventDetail.live_room_default_view}
+                  {selectedEventDetail.host_controls?.hide_location_from_non_attendees && (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-800 border border-amber-200">
+                      <Lock className="h-2.5 w-2.5" />
+                      Attendee-only link
                     </span>
                   )}
                 </div>
 
                 {selectedEventDetail.location_hidden ? (
-                  /* Location Hidden notice from host controls */
                   <div className="rounded-xl border border-amber-200 bg-amber-50/70 p-4 text-center">
                     <Lock className="mx-auto h-5 w-5 text-amber-700 mb-1" />
-                    <p className="text-xs font-bold text-amber-900">Location Hidden from Non-Attendees</p>
+                    <p className="text-xs font-bold text-amber-900">
+                      Location Hidden from Non-Attendees
+                    </p>
                     <p className="mt-0.5 text-xs text-amber-700">
-                      RSVP &quot;Going&quot; to this event to reveal the live room and meeting links.
+                      RSVP &quot;Going&quot; to this event to reveal the meeting link or venue address.
                     </p>
                   </div>
                 ) : (
-                  <div>
-                    {selectedEventDetail.location_type === 'live_room' && (
-                      <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-700 text-white shrink-0">
-                            <Radio className="h-5 w-5 animate-pulse" />
-                          </div>
-                          <div>
-                            <span className="text-xs font-bold text-emerald-950 block">
-                              Circles Native Live Room
-                            </span>
-                            <span className="text-[11px] text-emerald-800">
-                              Direct high-definition audio & video in your browser
-                            </span>
-                          </div>
-                        </div>
-
-                        <Button
-                          type="button"
-                          className="rounded-xl bg-emerald-800 text-white text-xs font-semibold px-4 py-2 hover:bg-emerald-900 shadow-xs"
-                          onClick={() =>
-                            alert(
-                              `Joining Live Room for "${selectedEventDetail.title}" (Default View: ${
-                                selectedEventDetail.live_room_default_view || 'Gallery'
-                              }).`
-                            )
-                          }
-                        >
-                          Join Live Room
-                        </Button>
-                      </div>
-                    )}
-
-                    {(selectedEventDetail.location_type === 'zoom' ||
-                      selectedEventDetail.location_type === 'online') && (
+                  <div className="space-y-3">
+                    {selectedEventDetail.location_type !== 'in_person' && (
                       <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div className="flex items-center gap-3 min-w-0">
                           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-sky-600 text-white shrink-0">
@@ -1091,25 +960,23 @@ export function EventsBoard({
                           </div>
                           <div className="truncate">
                             <span className="text-xs font-bold text-stone-900 block truncate">
-                              {selectedEventDetail.location_type === 'zoom'
-                                ? 'Zoom Meeting'
-                                : 'Virtual Meeting Link'}
+                              {getMeetingPlatformLabel(selectedEventDetail)}
                             </span>
                             <span className="text-[11px] text-stone-500 font-mono truncate block">
-                              {selectedEventDetail.meeting_url || 'Meeting URL provided upon start'}
+                              {selectedEventDetail.meeting_url || 'Meeting link will be shared before start'}
                             </span>
                           </div>
                         </div>
 
                         {selectedEventDetail.meeting_url && (
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 shrink-0">
                             <a
                               href={selectedEventDetail.meeting_url}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="rounded-xl bg-sky-600 px-3.5 py-2 text-xs font-bold text-white hover:bg-sky-700 shadow-xs inline-flex items-center gap-1"
                             >
-                              Open Meeting
+                              Join {getMeetingPlatformLabel(selectedEventDetail)}
                               <ExternalLink className="h-3.5 w-3.5" />
                             </a>
                             <button
@@ -1133,8 +1000,9 @@ export function EventsBoard({
                       </div>
                     )}
 
-                    {selectedEventDetail.location_type === 'in_person' && (
-                      <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 flex items-center justify-between">
+                    {(selectedEventDetail.location_type === 'in_person' ||
+                      selectedEventDetail.location_type === 'hybrid') && (
+                      <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
                           <MapPin className="h-6 w-6 text-amber-600 shrink-0" />
                           <div>
@@ -1153,7 +1021,7 @@ export function EventsBoard({
                             )}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 shadow-2xs inline-flex items-center gap-1"
+                            className="rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 shadow-2xs inline-flex items-center gap-1 shrink-0"
                           >
                             Maps
                             <ExternalLink className="h-3 w-3" />
@@ -1215,45 +1083,6 @@ export function EventsBoard({
                 </div>
               )}
 
-              {/* Host Controls Badges & Transparency */}
-              {selectedEventDetail.host_controls && (
-                <div className="rounded-2xl border border-stone-200 bg-stone-50 p-4 space-y-2">
-                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-stone-500 block">
-                    Host Session Rules
-                  </span>
-                  <div className="flex flex-wrap gap-2 text-[11px]">
-                    {selectedEventDetail.host_controls.record_live && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 px-2.5 py-0.5 font-medium text-rose-800 border border-rose-200">
-                        <Disc className="h-3 w-3 text-rose-600" />
-                        Will be recorded
-                      </span>
-                    )}
-                    {selectedEventDetail.host_controls.mute_on_entry && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2.5 py-0.5 font-medium text-stone-700 border border-stone-200">
-                        <MicOff className="h-3 w-3" />
-                        Mute upon entry
-                      </span>
-                    )}
-                    {selectedEventDetail.host_controls.disable_chat ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2.5 py-0.5 font-medium text-stone-700 border border-stone-200">
-                        <MessageSquareOff className="h-3 w-3" />
-                        Chat disabled
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2.5 py-0.5 font-medium text-stone-700 border border-stone-200">
-                        Chat enabled
-                      </span>
-                    )}
-                    {selectedEventDetail.host_controls.hide_location_from_non_attendees && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-0.5 font-medium text-amber-800 border border-amber-200">
-                        <Lock className="h-3 w-3" />
-                        Attendee-only location
-                      </span>
-                    )}
-                  </div>
-                </div>
-              )}
-
               {/* Staff / Organizer Controls */}
               {(isStaff ||
                 selectedEventDetail.organizer_id === currentUserId ||
@@ -1271,7 +1100,7 @@ export function EventsBoard({
                       className="rounded-xl text-xs font-semibold"
                     >
                       <Edit3 className="mr-1.5 h-3.5 w-3.5" />
-                      Edit Event
+                      Event Settings
                     </Button>
                     <Button
                       type="button"
@@ -1311,7 +1140,6 @@ export function EventsBoard({
         onClose={() => setCreateWizardOpen(false)}
         circleId={circleId}
         circleSlug={circleSlug}
-        spaces={spaces}
         members={members}
         currentUserId={currentUserId}
         onEventCreated={handleEventCreated}
@@ -1327,7 +1155,6 @@ export function EventsBoard({
           circleId={circleId}
           circleSlug={circleSlug}
           event={settingsModalEvent}
-          spaces={spaces}
           members={members}
           currentUserId={currentUserId}
           onEventUpdated={handleEventUpdated}
