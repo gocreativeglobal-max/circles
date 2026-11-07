@@ -627,7 +627,26 @@ export function CircleStudioClient({
 
       {/* TAB 2: FEATURES / CAPABILITIES */}
       {activeTab === 'capabilities' && (
-        <div className="rounded-2xl border border-stone-200/80 bg-white divide-y divide-stone-100">
+        <div className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-stone-200 bg-[#F4F3EE]/80 p-4">
+            <div>
+              <h3 className="text-sm font-bold text-stone-900">
+                Want a custom module tailored to your community?
+              </h3>
+              <p className="text-xs text-stone-600">
+                Build custom directories, prayer walls, startup pitch boards, or embed external apps—and review member-proposed features.
+              </p>
+            </div>
+            <a
+              href={`/circles/${initialCircle.slug}/custom`}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[#1B4332] px-4 py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F] shrink-0"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Custom Feature Builder</span>
+            </a>
+          </div>
+
+          <div className="rounded-2xl border border-stone-200/80 bg-white divide-y divide-stone-100">
           {capabilities
             .filter(
               (cap) =>
@@ -693,6 +712,7 @@ export function CircleStudioClient({
               </div>
             );
           })}
+          </div>
         </div>
       )}
 

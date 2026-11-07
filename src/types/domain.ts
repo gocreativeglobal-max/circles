@@ -1437,5 +1437,60 @@ export interface DirectMessageItem {
   };
 }
 
+export interface CircleCustomModuleField {
+  key: string;
+  label: string;
+  type: 'text' | 'textarea' | 'select' | 'url' | 'date' | 'number';
+  required?: boolean;
+  options?: string[];
+}
+
+export interface CircleCustomModuleItem {
+  id: string;
+  circle_id: string;
+  creator_id: string;
+  slug: string;
+  name: string;
+  description: string;
+  icon: string;
+  layout_type: 'cards' | 'wall' | 'board' | 'embed';
+  embed_url: string | null;
+  fields_schema: CircleCustomModuleField[];
+  board_columns: string[];
+  reaction_label: string;
+  enable_payments: boolean;
+  payment_label: string;
+  default_currency: string;
+  posting_policy: 'all_members' | 'admins_only';
+  is_shared_template: boolean;
+  status: 'pending_approval' | 'active' | 'archived';
+  created_at: string;
+  updated_at: string;
+  creator?: Pick<UserProfile, 'id' | 'username' | 'display_name' | 'avatar_url'>;
+  entry_count?: number;
+}
+
+export interface CircleCustomModuleEntryItem {
+  id: string;
+  module_id: string;
+  circle_id: string;
+  author_id: string;
+  title: string;
+  body: string;
+  image_url: string | null;
+  board_status: string;
+  field_values: Record<string, string | number | null>;
+  price_amount: number | null;
+  currency: string;
+  upvoter_ids: string[];
+  upvote_count: number;
+  tips_total: number;
+  created_at: string;
+  updated_at: string;
+  author?: Pick<UserProfile, 'id' | 'username' | 'display_name' | 'avatar_url'>;
+  viewer_has_upvoted?: boolean;
+}
+
+
 
 
