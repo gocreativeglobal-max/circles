@@ -64,6 +64,7 @@ export function NavbarClient({ user, unreadCount }: NavbarClientProps) {
           { href: '/circles', label: 'My Circles', icon: Layers },
           { href: '/circles/new', label: 'Create', icon: PlusCircle },
           { href: '/moderation', label: 'Moderation', icon: ShieldAlert },
+          { href: '/admin', label: 'Central Admin', icon: Settings },
         ]
       : []),
   ];

@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Bell, Hash, Home, Menu, PanelLeft, PanelLeftClose, Settings, Sparkles, X } from 'lucide-react';
+import { Bell, Hash, Home, Menu, PanelLeft, PanelLeftClose, Settings, X } from 'lucide-react';
 import { Circle, CircleNavigationItem, CircleSpace } from '@/types/domain';
 import { DynamicIcon } from '@/components/ui/icon-map';
 
@@ -111,15 +111,8 @@ export function CircleCollapsibleLayout({
           </div>
         )}
 
-        <div className="border-t border-stone-100 pt-3 space-y-0.5">
-          <SidebarLink
-            href={`${homeHref}/custom`}
-            label={isStaff ? 'Build Feature' : 'Suggest Feature'}
-            active={pathname === `${homeHref}/custom`}
-            collapsed={collapsed}
-            icon={<Sparkles className="h-4 w-4 shrink-0" />}
-          />
-          {isStaff && (
+        {isStaff && (
+          <div className="border-t border-stone-100 pt-3">
             <SidebarLink
               href={studioHref}
               label="Settings"
@@ -127,8 +120,8 @@ export function CircleCollapsibleLayout({
               collapsed={collapsed}
               icon={<Settings className="h-4 w-4 shrink-0" />}
             />
-          )}
-        </div>
+          </div>
+        )}
       </div>
     );
   }

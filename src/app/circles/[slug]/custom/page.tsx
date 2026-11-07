@@ -1,8 +1,10 @@
 import React from 'react';
+import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Lock } from 'lucide-react';
+import { Lock, ShieldAlert } from 'lucide-react';
 import { getAuthenticatedUser } from '@/lib/auth/session';
 import { getCircleBySlugOrId } from '@/features/circles/service';
+import { getPlatformFeatureFlags } from '@/features/admin/service';
 import {
   BUILT_IN_CUSTOM_FEATURE_TEMPLATES,
   listCircleCustomModules,
@@ -21,6 +23,37 @@ export default async function CircleCustomFeaturesHubPage({
   const circle = await getCircleBySlugOrId(user?.id ?? null, params.slug);
   if (!circle) {
     notFound();
+  }
+
+  const flags = await getPlatformFeatureFlags();
+  if (!flags.custom_features_builder) {
+    return (
+      <div className="rounded-2xl border border-stone-200 bg-white p-10 text-center space-y-3">
+        <ShieldAlert className="mx-auto h-7 w-7 text-stone-400" />
+        <h2 className="text-base font-bold text-stone-900">
+          Custom Features Builder is Currently Disabled
+        </h2>
+        <p className="text-xs text-stone-500 max-w-md mx-auto">
+          The Custom Features & Mini-Apps Builder is currently turned off globally and can be enabled anytime from Circles Central Admin.
+        </p>
+        <div className="flex items-center justify-center gap-2 pt-2">
+          <Link
+            href={`/circles/${circle.slug}`}
+            className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-xs font-medium text-stone-700 hover:bg-stone-50"
+          >
+            Back to {circle.name}
+          </Link>
+          {user?.is_platform_admin && (
+            <Link
+              href="/admin"
+              className="rounded-xl bg-[#1B4332] px-4 py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
+            >
+              Open Circles Central Admin
+            </Link>
+          )}
+        </div>
+      </div>
+    );
   }
 
   const canRead = canReadCircleContent(circle.visibility, {

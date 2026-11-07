@@ -361,36 +361,45 @@ export async function getCircleNavigation(
       }
     }
 
-    // Append active user-built Custom Features to the Circle sidebar navigation
+    // Append active user-built Custom Features ONLY if enabled globally in Circles Central Admin
     try {
-      const customModsRes = await tx.query<{
-        id: string;
-        slug: string;
-        name: string;
-        icon: string;
-      }>(
-        `SELECT id, slug, name, icon
-         FROM public.circle_custom_modules
-         WHERE circle_id = $1 AND status = 'active'
-         ORDER BY created_at ASC;`,
-        [circleId]
+      const flagRes = await tx.query<{ value: Record<string, unknown> }>(
+        `SELECT value FROM public.platform_settings WHERE key = 'feature_flags' LIMIT 1;`
       );
-      for (const mod of customModsRes.rows) {
-        navItems.push({
-          id: `nav-custom-${mod.id}`,
-          circle_id: circleId,
-          label: mod.name,
-          href: `/circles/${circleSlug}/custom/${mod.slug}`,
-          icon: mod.icon || 'sparkles',
-          capability_key: null,
-          space_id: null,
-          visibility: 'members',
-          sort_order: order++,
-          is_enabled: true,
-        });
+      const customBuilderEnabled = Boolean(
+        flagRes.rows[0]?.value?.custom_features_builder === true
+      );
+
+      if (customBuilderEnabled) {
+        const customModsRes = await tx.query<{
+          id: string;
+          slug: string;
+          name: string;
+          icon: string;
+        }>(
+          `SELECT id, slug, name, icon
+           FROM public.circle_custom_modules
+           WHERE circle_id = $1 AND status = 'active'
+           ORDER BY created_at ASC;`,
+          [circleId]
+        );
+        for (const mod of customModsRes.rows) {
+          navItems.push({
+            id: `nav-custom-${mod.id}`,
+            circle_id: circleId,
+            label: mod.name,
+            href: `/circles/${circleSlug}/custom/${mod.slug}`,
+            icon: mod.icon || 'sparkles',
+            capability_key: null,
+            space_id: null,
+            visibility: 'members',
+            sort_order: order++,
+            is_enabled: true,
+          });
+        }
       }
     } catch {
-      // Safe fallback if migration 0031 has not run in an isolated test context
+      // Safe fallback if migration 0031/0032 has not run in an isolated test context
     }
 
     return {
