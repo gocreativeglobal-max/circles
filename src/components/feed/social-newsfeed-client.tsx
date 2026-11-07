@@ -878,7 +878,7 @@ export function SocialNewsfeedClient({
             </div>
 
             {/* My Joined Circles Quick-Jump Rail */}
-            {currentUser ? (
+            {currentUser && (
               <div className="rounded-2xl border border-stone-200/90 bg-white p-4 shadow-xs space-y-3">
                 <div className="flex items-center justify-between">
                   <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-stone-500">
@@ -944,31 +944,6 @@ export function SocialNewsfeedClient({
                     )}
                   </div>
                 )}
-              </div>
-            ) : (
-              /* Guest Community Stats Card */
-              <div className="hidden lg:block rounded-2xl border border-stone-200/90 bg-white p-4 shadow-xs space-y-3">
-                <h2 className="text-xs font-mono font-bold uppercase tracking-wider text-stone-500">
-                  Platform Pulse
-                </h2>
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div className="rounded-xl bg-[#FAF9F6] border border-stone-200/60 p-3">
-                    <p className="text-lg font-extrabold text-[#1B4332]">
-                      {stats.publicCircleCount}
-                    </p>
-                    <p className="text-[11px] text-stone-500">Public Circles</p>
-                  </div>
-                  <div className="rounded-xl bg-[#FAF9F6] border border-stone-200/60 p-3">
-                    <p className="text-lg font-extrabold text-[#1B4332]">
-                      {stats.totalPostCount}
-                    </p>
-                    <p className="text-[11px] text-stone-500">Public Posts</p>
-                  </div>
-                </div>
-                <p className="text-xs text-stone-500 leading-relaxed">
-                  Anyone can read public community posts. Sign in to like, bookmark, join groups,
-                  and reply to discussions.
-                </p>
               </div>
             )}
           </aside>
