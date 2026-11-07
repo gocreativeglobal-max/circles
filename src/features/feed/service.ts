@@ -230,14 +230,19 @@ export async function getGlobalFeedData(
             label: opt.label,
             sort_order: opt.sort_order,
             vote_count: Number(opt.vote_count ?? 0),
+            percentage: 0,
             viewer_voted: Boolean(opt.viewer_voted),
           });
           optionsByPoll.set(opt.poll_id, list);
         }
 
         for (const pRow of pollsRes.rows) {
-          const opts = optionsByPoll.get(pRow.id) ?? [];
-          const totalVotes = opts.reduce((acc, o) => acc + (o.vote_count ?? 0), 0);
+          const rawOpts = optionsByPoll.get(pRow.id) ?? [];
+          const totalVotes = rawOpts.reduce((acc, o) => acc + (o.vote_count ?? 0), 0);
+          const opts = rawOpts.map((o) => ({
+            ...o,
+            percentage: totalVotes > 0 ? Math.round(((o.vote_count ?? 0) / totalVotes) * 100) : 0,
+          }));
           pollMap.set(pRow.id, {
             ...pRow,
             options: opts,
