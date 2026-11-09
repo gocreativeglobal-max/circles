@@ -459,13 +459,13 @@ export function CircleStudioClient({
                 type="button"
                 onClick={() => setActiveTab(tab.id as typeof activeTab)}
                 className={`relative inline-flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-medium transition-colors whitespace-nowrap ${
-                  active ? 'text-[#1B4332] font-semibold' : 'text-stone-500 hover:text-stone-900'
+                  active ? 'text-stone-900 font-semibold' : 'text-stone-500 hover:text-stone-900'
                 }`}
               >
                 <Icon className="h-3.5 w-3.5" />
                 <span>{tab.label}</span>
                 {active && (
-                  <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[#1B4332]" />
+                  <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-black" />
                 )}
               </button>
             );
@@ -492,9 +492,9 @@ export function CircleStudioClient({
       {savedBanner && (
         <div
           role="status"
-          className="flex items-center gap-2 rounded-xl border border-stone-200 bg-[#F4F3EE] px-4 py-2.5 text-xs font-medium text-[#1B4332]"
+          className="flex items-center gap-2 rounded-xl border border-stone-200 bg-[#F4F3EE] px-4 py-2.5 text-xs font-medium text-stone-900"
         >
-          <CheckCircle2 className="h-4 w-4 shrink-0 text-[#1B4332]" />
+          <CheckCircle2 className="h-4 w-4 shrink-0 text-stone-900" />
           <span>{savedBanner}</span>
         </div>
       )}
@@ -516,7 +516,7 @@ export function CircleStudioClient({
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-sm text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
+                className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-sm text-stone-900 focus:border-black focus:bg-white focus:outline-none"
               />
             </div>
 
@@ -530,7 +530,7 @@ export function CircleStudioClient({
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
                 placeholder="City, Campus, or Remote"
-                className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-sm text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
+                className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-sm text-stone-900 focus:border-black focus:bg-white focus:outline-none"
               />
             </div>
           </div>
@@ -544,7 +544,7 @@ export function CircleStudioClient({
               rows={3}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-sm text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
+              className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-sm text-stone-900 focus:border-black focus:bg-white focus:outline-none"
             />
           </div>
 
@@ -557,7 +557,7 @@ export function CircleStudioClient({
                 id="studio-category"
                 value={category}
                 onChange={(e) => setCategory(e.target.value as CircleCategory)}
-                className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-sm text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
+                className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-sm text-stone-900 focus:border-black focus:bg-white focus:outline-none"
               >
                 <option value="university">University</option>
                 <option value="neighbourhood">Neighbourhood</option>
@@ -587,7 +587,7 @@ export function CircleStudioClient({
                     setMembershipPolicy('open');
                   }
                 }}
-                className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-sm text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
+                className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-sm text-stone-900 focus:border-black focus:bg-white focus:outline-none"
               >
                 <option value="public">Public</option>
                 <option value="discoverable_approval">Approval required</option>
@@ -604,7 +604,7 @@ export function CircleStudioClient({
                 value={membershipPolicy}
                 onChange={(e) => setMembershipPolicy(e.target.value as MembershipPolicy)}
                 disabled={visibility === 'private'}
-                className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-sm text-stone-900 disabled:opacity-60 focus:border-[#1B4332] focus:bg-white focus:outline-none"
+                className="mt-1.5 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-sm text-stone-900 disabled:opacity-60 focus:border-black focus:bg-white focus:outline-none"
               >
                 {visibility === 'public' && <option value="open">Open</option>}
                 {visibility !== 'private' && <option value="approval">Approval</option>}
@@ -617,7 +617,7 @@ export function CircleStudioClient({
             <button
               type="submit"
               disabled={busy || !hasUnsavedChanges}
-              className="rounded-xl bg-[#1B4332] px-5 py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F] disabled:opacity-40"
+              className="rounded-xl bg-black px-5 py-2 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-40"
             >
               {busy ? 'Saving...' : 'Save'}
             </button>
@@ -683,7 +683,7 @@ export function CircleStudioClient({
                       className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
                         cap.enabled
                           ? 'border border-stone-200 bg-white text-stone-700 hover:bg-stone-50'
-                          : 'bg-[#1B4332] text-white hover:bg-[#2D6A4F]'
+                          : 'bg-black text-white hover:bg-zinc-800'
                       }`}
                     >
                       {cap.enabled ? 'Disable' : 'Enable'}
@@ -714,14 +714,14 @@ export function CircleStudioClient({
                 value={newSpaceName}
                 onChange={(e) => setNewSpaceName(e.target.value)}
                 placeholder="Space name"
-                className="rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
+                className="rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs text-stone-900 focus:border-black focus:bg-white focus:outline-none"
               />
 
               <select
                 id="space-capability"
                 value={newSpaceCapability}
                 onChange={(e) => setNewSpaceCapability(e.target.value)}
-                className="rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
+                className="rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs text-stone-900 focus:border-black focus:bg-white focus:outline-none"
               >
                 <option value="discussions">Discussions</option>
                 <option value="events">Events</option>
@@ -734,7 +734,7 @@ export function CircleStudioClient({
                 id="space-policy"
                 value={newSpacePolicy}
                 onChange={(e) => setNewSpacePolicy(e.target.value as typeof newSpacePolicy)}
-                className="rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
+                className="rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs text-stone-900 focus:border-black focus:bg-white focus:outline-none"
               >
                 <option value="members">All members can post</option>
                 <option value="moderators">Moderators & admins only</option>
@@ -749,12 +749,12 @@ export function CircleStudioClient({
                 value={newSpaceDescription}
                 onChange={(e) => setNewSpaceDescription(e.target.value)}
                 placeholder="Short description (optional)"
-                className="flex-1 rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
+                className="flex-1 rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs text-stone-900 focus:border-black focus:bg-white focus:outline-none"
               />
               <button
                 type="submit"
                 disabled={busy}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-[#1B4332] px-4 py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-black px-4 py-2 text-xs font-semibold text-white hover:bg-zinc-800"
               >
                 <Plus className="h-3.5 w-3.5" />
                 <span>Add</span>
@@ -817,7 +817,7 @@ export function CircleStudioClient({
           {joinRequests.length > 0 && (
             <div className="rounded-2xl border border-stone-200/80 bg-white p-5 space-y-3">
               <div className="flex items-center gap-2">
-                <UserCheck className="h-4 w-4 text-[#1B4332]" />
+                <UserCheck className="h-4 w-4 text-stone-900" />
                 <h3 className="text-sm font-semibold text-stone-900">
                   Requests ({pendingJoinCount})
                 </h3>
@@ -846,7 +846,7 @@ export function CircleStudioClient({
                         <button
                           type="button"
                           onClick={() => handleReviewJoinRequest(jr.id, 'approve_request')}
-                          className="rounded-lg bg-[#1B4332] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
+                          className="rounded-lg bg-black px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800"
                         >
                           Approve
                         </button>
@@ -884,7 +884,7 @@ export function CircleStudioClient({
                 value={inviteEmail}
                 onChange={(e) => setInviteEmail(e.target.value)}
                 placeholder="Email address"
-                className="flex-1 rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-xs text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
+                className="flex-1 rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-xs text-stone-900 focus:border-black focus:bg-white focus:outline-none"
               />
               <select
                 value={inviteRole}
@@ -898,14 +898,14 @@ export function CircleStudioClient({
               <button
                 type="submit"
                 disabled={busy}
-                className="rounded-xl bg-[#1B4332] px-4 py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
+                className="rounded-xl bg-black px-4 py-2 text-xs font-semibold text-white hover:bg-zinc-800"
               >
                 Send invite
               </button>
             </div>
 
             {lastIssuedToken && (
-              <div className="rounded-xl bg-[#F4F3EE] p-3 text-xs text-[#1B4332]">
+              <div className="rounded-xl bg-[#F4F3EE] p-3 text-xs text-stone-900">
                 <p className="font-mono break-all">
                   /circles/{initialCircle.slug}?inviteToken={lastIssuedToken}
                 </p>
@@ -943,7 +943,7 @@ export function CircleStudioClient({
                 </div>
 
                 {m.role === 'owner' ? (
-                  <span className="rounded-full bg-[#F4F3EE] px-2.5 py-0.5 text-xs font-semibold text-[#1B4332]">
+                  <span className="rounded-full bg-[#F4F3EE] px-2.5 py-0.5 text-xs font-semibold text-stone-900">
                     Owner
                   </span>
                 ) : (
@@ -1425,7 +1425,7 @@ export function CircleStudioClient({
                 <button
                   type="submit"
                   disabled={busy}
-                  className="rounded-lg bg-[#1B4332] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#2D6A4F] disabled:opacity-50"
+                  className="rounded-lg bg-black px-4 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
                 >
                   {busy ? 'Saving...' : 'Save'}
                 </button>

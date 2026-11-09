@@ -133,12 +133,12 @@ export function CircleFinancesClient({
         </div>
 
         {activeEntitlements.length > 0 && (
-          <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 text-xs shrink-0">
-            <div className="flex items-center gap-1.5 font-semibold text-emerald-900">
-              <ShieldCheck className="h-4 w-4 text-emerald-600" />
+          <div className="rounded-xl border border-stone-200 bg-stone-100 p-4 text-xs shrink-0">
+            <div className="flex items-center gap-1.5 font-semibold text-stone-900">
+              <ShieldCheck className="h-4 w-4 text-stone-700" />
               <span>Good Standing</span>
             </div>
-            <p className="mt-1 text-emerald-700">
+            <p className="mt-1 text-stone-900">
               {activeEntitlements.length} active{' '}
               {activeEntitlements.length === 1 ? 'privilege' : 'privileges'} granted.
             </p>
@@ -148,8 +148,8 @@ export function CircleFinancesClient({
 
       {/* Notifications */}
       {banner && (
-        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800 shadow-sm animate-in fade-in">
-          <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+        <div className="flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-100 px-4 py-3 text-sm font-medium text-stone-900 shadow-sm animate-in fade-in">
+          <CheckCircle2 className="h-4 w-4 text-stone-700 shrink-0" />
           {banner}
         </div>
       )}
@@ -357,7 +357,7 @@ export function CircleFinancesClient({
                         <span
                           className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                             inv.status === 'paid'
-                              ? 'bg-emerald-100 text-emerald-800'
+                              ? 'bg-stone-100 text-stone-900'
                               : inv.status === 'open'
                               ? 'bg-amber-100 text-amber-800'
                               : 'bg-stone-100 text-stone-700'
@@ -376,7 +376,7 @@ export function CircleFinancesClient({
                             Pay / Wire Instructions
                           </Button>
                         ) : (
-                          <span className="text-xs font-medium text-emerald-700 inline-flex items-center gap-1">
+                          <span className="text-xs font-medium text-stone-900 inline-flex items-center gap-1">
                             <CheckCircle2 className="h-3.5 w-3.5" /> Paid
                           </span>
                         )}
@@ -412,10 +412,10 @@ export function CircleFinancesClient({
               {activeEntitlements.map((ent) => (
                 <div
                   key={ent.id}
-                  className="rounded-2xl border border-emerald-200 bg-white p-5 shadow-sm"
+                  className="rounded-2xl border border-stone-200 bg-white p-5 shadow-sm"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="rounded-lg bg-emerald-100 p-1.5 text-emerald-800">
+                    <span className="rounded-lg bg-stone-100 p-1.5 text-stone-900">
                       <ShieldCheck className="h-4 w-4" />
                     </span>
                     <h4 className="font-bold text-stone-900 capitalize">
@@ -454,7 +454,7 @@ export function CircleFinancesClient({
               <span className="text-xs font-semibold uppercase tracking-wider text-stone-500">
                 Total Member Contributions
               </span>
-              <div className="mt-2 text-2xl font-bold text-emerald-700">
+              <div className="mt-2 text-2xl font-bold text-stone-900">
                 ${(((treasurySummary?.total_revenue_cents || 0) / 100)).toLocaleString('en-US', {
                   minimumFractionDigits: 2,
                 })}
@@ -529,7 +529,7 @@ export function CircleFinancesClient({
                         </td>
                         <td
                           className={`px-6 py-4 text-right font-bold font-mono ${
-                            entry.entry_type === 'revenue' ? 'text-emerald-700' : 'text-red-700'
+                            entry.entry_type === 'revenue' ? 'text-stone-900' : 'text-red-700'
                           }`}
                         >
                           {entry.entry_type === 'revenue' ? '+' : '-'}$

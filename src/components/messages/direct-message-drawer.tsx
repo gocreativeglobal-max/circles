@@ -137,7 +137,7 @@ export function DirectMessageDrawer({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-stone-100 px-4 py-3 bg-stone-50/50">
           <div className="flex items-center gap-2">
-            <MessageSquare className="h-4 w-4 text-emerald-800" />
+            <MessageSquare className="h-4 w-4 text-stone-900" />
             <h3 className="text-sm font-bold text-stone-900">
               {activeConvo ? 'Conversation' : 'Direct Messages'}
             </h3>
@@ -176,23 +176,23 @@ export function DirectMessageDrawer({
 
             {/* Contextual Listing Banner */}
             {activeConvo.listing && (
-              <div className="border-b border-stone-100 bg-emerald-50/60 p-3 flex items-center justify-between">
+              <div className="border-b border-stone-100 bg-stone-50 p-3 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-800">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-stone-100 text-stone-900">
                     <ShoppingBag className="h-4 w-4" />
                   </div>
                   <div>
                     <h4 className="text-xs font-bold text-stone-900">
                       {activeConvo.listing.title}
                     </h4>
-                    <p className="text-[11px] font-mono text-emerald-800">
+                    <p className="text-[11px] font-mono text-stone-900 font-bold">
                       {activeConvo.listing.price_amount !== null
                         ? `$${Number(activeConvo.listing.price_amount).toFixed(2)}`
                         : 'Free / Contact'}
                     </p>
                   </div>
                 </div>
-                <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-mono text-stone-600 border border-emerald-200">
+                <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-mono text-stone-600 border border-stone-200">
                   {activeConvo.listing.listing_type}
                 </span>
               </div>
@@ -215,7 +215,7 @@ export function DirectMessageDrawer({
                       <div
                         className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-xs leading-relaxed shadow-2xs ${
                           isMe
-                            ? 'bg-emerald-900 text-white rounded-br-xs'
+                            ? 'bg-black text-white rounded-br-xs'
                             : 'bg-stone-100 text-stone-800 rounded-bl-xs'
                         }`}
                       >
@@ -241,7 +241,7 @@ export function DirectMessageDrawer({
                   value={messageInput}
                   onChange={(e) => setMessageInput(e.target.value)}
                   placeholder="Type a direct message..."
-                  className="flex-1 rounded-xl border border-stone-200 bg-stone-50/60 px-3 py-2 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-emerald-800"
+                  className="flex-1 rounded-xl border border-stone-200 bg-stone-50/60 px-3 py-2 text-xs text-stone-900 focus:outline-none focus:ring-1 focus:ring-black"
                 />
                 <Button size="sm" type="submit" disabled={sending || !messageInput.trim()}>
                   <Send className="h-3.5 w-3.5" />
@@ -282,7 +282,7 @@ export function DirectMessageDrawer({
                       }}
                       className={`w-full text-left rounded-xl p-3 transition-colors flex items-center justify-between border ${
                         hasUnread
-                          ? 'border-emerald-200 bg-emerald-50/40 hover:bg-emerald-50/70'
+                          ? 'border-stone-300 bg-stone-100/70 hover:bg-stone-100'
                           : 'border-stone-100 bg-stone-50/40 hover:bg-stone-100/70'
                       }`}
                     >
@@ -310,7 +310,7 @@ export function DirectMessageDrawer({
                       </div>
 
                       {hasUnread && (
-                        <span className="rounded-full bg-emerald-800 px-2 py-0.5 text-[10px] font-mono font-bold text-white">
+                        <span className="rounded-full bg-black px-2 py-0.5 text-[10px] font-mono font-bold text-white">
                           {convo.unread_count}
                         </span>
                       )}

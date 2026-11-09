@@ -406,8 +406,8 @@ export function ListingDetailClient({
           <Button size="sm" variant="outline" onClick={handleCopyShareLink}>
             {copiedLink ? (
               <>
-                <Check className="h-3.5 w-3.5 mr-1 text-emerald-600" />
-                <span className="text-emerald-700 font-semibold">Link Copied!</span>
+                <Check className="h-3.5 w-3.5 mr-1 text-stone-700" />
+                <span className="text-stone-900 font-semibold">Link Copied!</span>
               </>
             ) : (
               <>
@@ -495,7 +495,7 @@ export function ListingDetailClient({
           {/* Title, Badges & Header Info */}
           <div className="rounded-2xl border border-stone-200/90 bg-white p-6 shadow-xs space-y-4">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-mono font-bold uppercase tracking-wider text-emerald-900 border border-emerald-200">
+              <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-mono font-bold uppercase tracking-wider text-stone-900 border border-stone-200">
                 {listing.listing_type}
               </span>
               <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-mono font-semibold text-stone-700 border border-stone-200">
@@ -517,7 +517,7 @@ export function ListingDetailClient({
                 </span>
               )}
               {listing.status === 'published' && (
-                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-mono font-bold text-emerald-800 border border-emerald-200">
+                <span className="rounded-full bg-stone-100 px-3 py-1 text-xs font-mono font-bold text-stone-900 border border-stone-200">
                   AVAILABLE
                 </span>
               )}
@@ -574,7 +574,7 @@ export function ListingDetailClient({
             {/* Specifications Details & Custom Attributes */}
             <div className="border-t border-stone-100 pt-4 space-y-3">
               <div className="flex items-center gap-1.5">
-                <Layers className="h-4 w-4 text-emerald-800" />
+                <Layers className="h-4 w-4 text-stone-900" />
                 <h3 className="text-xs font-bold uppercase tracking-wider text-stone-700 font-mono">
                   Specifications & Attributes
                 </h3>
@@ -625,7 +625,7 @@ export function ListingDetailClient({
             <section className="rounded-2xl border border-stone-200/90 bg-white p-6 shadow-xs space-y-4">
               <div className="flex items-center justify-between border-b border-stone-100 pb-3">
                 <div className="flex items-center gap-2">
-                  <Calendar className="h-5 w-5 text-emerald-700" />
+                  <Calendar className="h-5 w-5 text-stone-900" />
                   <div>
                     <h2 className="text-base font-bold text-stone-900">
                       Book a Slot / Schedule Reservation
@@ -640,17 +640,17 @@ export function ListingDetailClient({
               </div>
 
               {bookingSuccess ? (
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-5 text-center space-y-3">
-                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-800">
+                <div className="rounded-xl border border-stone-200 bg-stone-100 p-5 text-center space-y-3">
+                  <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-stone-900">
                     <Check className="h-6 w-6" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-emerald-950">
+                    <h3 className="text-sm font-bold text-stone-900">
                       {bookingSuccess.status === 'approved'
                         ? 'Appointment Confirmed!'
                         : 'Booking Request Submitted!'}
                     </h3>
-                    <p className="text-xs text-emerald-800 mt-1">
+                    <p className="text-xs text-stone-900 mt-1">
                       Scheduled for{' '}
                       <strong>{new Date(bookingSuccess.starts_at).toLocaleString()}</strong>
                     </p>
@@ -659,7 +659,7 @@ export function ListingDetailClient({
                     <Button
                       size="sm"
                       onClick={() => handleDownloadIcs(bookingSuccess)}
-                      className="bg-emerald-800 hover:bg-emerald-900 text-white"
+                      className="bg-black hover:bg-zinc-800 text-white"
                     >
                       <Calendar className="h-3.5 w-3.5 mr-1" />
                       <span>Add to Calendar (.ics)</span>
@@ -687,7 +687,7 @@ export function ListingDetailClient({
                         setBookingDate(e.target.value);
                         setSelectedSlot(null);
                       }}
-                      className="w-full sm:w-64 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 focus:outline-hidden focus:ring-2 focus:ring-emerald-700"
+                      className="w-full sm:w-64 rounded-xl border border-stone-200 bg-white px-3 py-2 text-sm text-stone-900 focus:outline-hidden focus:ring-2 focus:ring-black"
                       required
                     />
                   </div>
@@ -716,7 +716,7 @@ export function ListingDetailClient({
                                 !slot.available
                                   ? 'border-stone-100 bg-stone-50 text-stone-300 cursor-not-allowed line-through'
                                   : isSelected
-                                  ? 'border-emerald-700 bg-emerald-50 text-emerald-900 ring-2 ring-emerald-700/20 font-bold shadow-xs'
+                                  ? 'border-black bg-stone-100 text-stone-900 ring-2 ring-black/10 font-bold shadow-xs'
                                   : 'border-stone-200 bg-white text-stone-800 hover:border-stone-400 hover:bg-stone-50'
                               }`}
                             >
@@ -740,7 +740,7 @@ export function ListingDetailClient({
                       value={bookingNotes}
                       onChange={(e) => setBookingNotes(e.target.value)}
                       placeholder="Share any background details or questions for your appointment..."
-                      className="w-full rounded-xl border border-stone-200 bg-white p-3 text-xs text-stone-900 focus:outline-hidden focus:ring-2 focus:ring-emerald-700"
+                      className="w-full rounded-xl border border-stone-200 bg-white p-3 text-xs text-stone-900 focus:outline-hidden focus:ring-2 focus:ring-black"
                     />
                   </div>
 
@@ -769,7 +769,7 @@ export function ListingDetailClient({
                 </h3>
                 <Link
                   href={`/circles/${circle.slug}/marketplace`}
-                  className="text-xs font-semibold text-emerald-800 hover:underline"
+                  className="text-xs font-semibold text-stone-900 hover:underline"
                 >
                   View All Listings →
                 </Link>
@@ -797,7 +797,7 @@ export function ListingDetailClient({
                       </div>
                     )}
                     <div>
-                      <h4 className="text-xs font-bold text-stone-900 truncate group-hover:text-emerald-900">
+                      <h4 className="text-xs font-bold text-stone-900 truncate group-hover:text-stone-900">
                         {rel.title}
                       </h4>
                       <p className="text-xs font-mono font-black text-stone-800 mt-0.5">
@@ -839,7 +839,7 @@ export function ListingDetailClient({
                     href={listing.action_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-800 px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-emerald-900 transition-colors"
+                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-black px-4 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-zinc-800 transition-colors"
                   >
                     <span>Visit / Apply Externally</span>
                     <ExternalLink className="h-4 w-4" />
@@ -851,7 +851,7 @@ export function ListingDetailClient({
                       const el = document.querySelector('section');
                       el?.scrollIntoView({ behavior: 'smooth' });
                     }}
-                    className="w-full bg-emerald-800 hover:bg-emerald-900 text-white shadow-xs"
+                    className="w-full bg-black hover:bg-zinc-800 text-white shadow-xs"
                   >
                     <Calendar className="h-4 w-4 mr-2" />
                     <span>
@@ -864,7 +864,7 @@ export function ListingDetailClient({
                   <Button
                     size="md"
                     onClick={handleOpenInquiry}
-                    className="w-full bg-emerald-800 hover:bg-emerald-900 text-white shadow-xs"
+                    className="w-full bg-black hover:bg-zinc-800 text-white shadow-xs"
                   >
                     <Send className="h-4 w-4 mr-2" />
                     <span>Apply / Submit Pitch</span>
@@ -873,7 +873,7 @@ export function ListingDetailClient({
                   <Button
                     size="md"
                     onClick={handleOpenInquiry}
-                    className="w-full bg-emerald-800 hover:bg-emerald-900 text-white shadow-xs"
+                    className="w-full bg-black hover:bg-zinc-800 text-white shadow-xs"
                   >
                     <MessageSquare className="h-4 w-4 mr-2" />
                     <span>Message Seller / Inquire</span>
@@ -979,7 +979,7 @@ export function ListingDetailClient({
                   className="h-11 w-11 rounded-full object-cover border border-stone-200"
                 />
               ) : (
-                <div className="h-11 w-11 rounded-full bg-emerald-100 text-emerald-900 font-bold text-sm flex items-center justify-center border border-emerald-200">
+                <div className="h-11 w-11 rounded-full bg-stone-100 text-stone-900 font-bold text-sm flex items-center justify-center border border-stone-200">
                   {(listing.seller?.display_name || 'M')[0].toUpperCase()}
                 </div>
               )}
@@ -1164,7 +1164,7 @@ export function ListingDetailClient({
                   )}
 
                   {editTransactionType === 'free' && (
-                    <div className="rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800 border border-emerald-200 inline-block">
+                    <div className="rounded-lg bg-stone-100 px-3 py-1.5 text-xs font-medium text-stone-900 border border-stone-200 inline-block">
                       ✓ Free community listing — no payment required
                     </div>
                   )}
@@ -1236,7 +1236,7 @@ export function ListingDetailClient({
               <div className="rounded-xl border border-stone-200/90 bg-stone-50/60 p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-1.5">
-                    <Layers className="h-4 w-4 text-emerald-800" />
+                    <Layers className="h-4 w-4 text-stone-900" />
                     <label className="block text-[11px] font-mono font-bold uppercase tracking-wider text-stone-700">
                       Specifications & Attributes
                     </label>

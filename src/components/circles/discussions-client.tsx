@@ -459,7 +459,7 @@ export function DiscussionsClient({
               onClick={() => setSelectedSpaceId(null)}
               className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
                 selectedSpaceId === null
-                  ? 'bg-[#F4F3EE] text-[#1B4332] font-semibold'
+                  ? 'bg-[#F4F3EE] text-stone-900 font-semibold'
                   : 'text-stone-600 hover:bg-stone-100'
               }`}
             >
@@ -475,7 +475,7 @@ export function DiscussionsClient({
                   onClick={() => setSelectedSpaceId(sp.id)}
                   className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
                     active
-                      ? 'bg-[#F4F3EE] text-[#1B4332] font-semibold'
+                      ? 'bg-[#F4F3EE] text-stone-900 font-semibold'
                       : 'text-stone-600 hover:bg-stone-100'
                   }`}
                 >
@@ -493,7 +493,7 @@ export function DiscussionsClient({
               onClick={() => setResourcesOnly((v) => !v)}
               className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
                 resourcesOnly
-                  ? 'bg-[#1B4332] text-white'
+                  ? 'bg-black text-white'
                   : 'text-stone-500 hover:bg-stone-100 hover:text-stone-900'
               }`}
             >
@@ -506,7 +506,7 @@ export function DiscussionsClient({
               onClick={() => setSavedOnly((v) => !v)}
               className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
                 savedOnly
-                  ? 'bg-[#1B4332] text-white'
+                  ? 'bg-black text-white'
                   : 'text-stone-500 hover:bg-stone-100 hover:text-stone-900'
               }`}
             >
@@ -543,7 +543,7 @@ export function DiscussionsClient({
         {/* Pinned Banner */}
         {pinnedInSpace.length > 0 && (
           <div className="flex items-center gap-2 border-b border-stone-100 bg-[#FAF9F6] px-5 py-2 text-xs text-stone-700">
-            <Pin className="h-3.5 w-3.5 shrink-0 text-[#1B4332]" />
+            <Pin className="h-3.5 w-3.5 shrink-0 text-stone-900" />
             <div className="flex flex-1 items-center gap-3 overflow-x-auto no-scrollbar">
               {pinnedInSpace.map((p) => {
                 const { resource, cleanBody } = parsePostContent(p.body);
@@ -563,7 +563,7 @@ export function DiscussionsClient({
         )}
 
         {feedbackToast && (
-          <div className="bg-[#1B4332] px-4 py-1.5 text-center text-xs font-medium text-white">
+          <div className="bg-black px-4 py-1.5 text-center text-xs font-medium text-white">
             {feedbackToast}
           </div>
         )}
@@ -583,7 +583,7 @@ export function DiscussionsClient({
                         setShowPollCreator(false);
                         setShowResourceCreator(true);
                       }}
-                      className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-[#1B4332] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
+                      className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-black px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800"
                     >
                       <Plus className="h-3.5 w-3.5" />
                       <span>Share resource</span>
@@ -624,7 +624,7 @@ export function DiscussionsClient({
                   }`}
                 >
                   {!isGroupedWithPrev ? (
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#F4F3EE] text-xs font-semibold text-[#1B4332]">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#F4F3EE] text-xs font-semibold text-stone-900">
                       {(post.author?.display_name || 'M').slice(0, 2).toUpperCase()}
                     </div>
                   ) : (
@@ -647,7 +647,7 @@ export function DiscussionsClient({
                         <span className="text-[11px] text-stone-400">
                           {formatShortTime(post.created_at)}
                         </span>
-                        {post.is_pinned && <Pin className="h-3 w-3 text-[#1B4332]" />}
+                        {post.is_pinned && <Pin className="h-3 w-3 text-stone-900" />}
                       </div>
                     )}
 
@@ -660,11 +660,11 @@ export function DiscussionsClient({
                       <div className="mt-2 max-w-lg rounded-xl border border-stone-200 bg-[#FAF9F6] p-3.5">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-start gap-2.5 min-w-0">
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#F4F3EE] text-[#1B4332]">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#F4F3EE] text-stone-900">
                               <BookOpen className="h-4 w-4" />
                             </div>
                             <div className="min-w-0">
-                              <span className="text-[10px] font-semibold uppercase tracking-wider text-[#1B4332]">
+                              <span className="text-[10px] font-semibold uppercase tracking-wider text-stone-900">
                                 {attachedResource.category}
                               </span>
                               <h4 className="text-sm font-semibold text-stone-900 truncate">
@@ -678,7 +678,7 @@ export function DiscussionsClient({
                               href={attachedResource.url}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-[#1B4332] px-2.5 py-1 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
+                              className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-black px-2.5 py-1 text-xs font-semibold text-white hover:bg-zinc-800"
                             >
                               <span>Open</span>
                               <ExternalLink className="h-3 w-3" />
@@ -733,7 +733,7 @@ export function DiscussionsClient({
                                 onClick={() => handleVotePoll(post.id, attachedPoll.id, opt.id)}
                                 className={`relative w-full overflow-hidden rounded-lg border px-3 py-2 text-left text-xs transition-all ${
                                   opt.viewer_voted
-                                    ? 'border-[#1B4332] bg-white font-semibold text-stone-900'
+                                    ? 'border-stone-900 bg-white font-semibold text-stone-900'
                                     : 'border-stone-200 bg-white text-stone-700 hover:border-stone-300'
                                 }`}
                               >
@@ -744,7 +744,7 @@ export function DiscussionsClient({
                                 <div className="relative flex items-center justify-between gap-2">
                                   <span className="flex items-center gap-1.5">
                                     {opt.viewer_voted && (
-                                      <Check className="h-3.5 w-3.5 text-[#1B4332]" />
+                                      <Check className="h-3.5 w-3.5 text-stone-900" />
                                     )}
                                     <span>{opt.label}</span>
                                   </span>
@@ -766,7 +766,7 @@ export function DiscussionsClient({
                             onClick={() => handlePostInteraction(post.id, 'toggle_reaction')}
                             className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] transition-colors ${
                               post.viewer_has_liked
-                                ? 'border-[#1B4332]/30 bg-[#F4F3EE] text-[#1B4332] font-medium'
+                                ? 'border-stone-200 bg-[#F4F3EE] text-stone-900 font-medium'
                                 : 'border-stone-200 bg-white text-stone-600 hover:bg-stone-50'
                             }`}
                           >
@@ -779,7 +779,7 @@ export function DiscussionsClient({
                           <button
                             type="button"
                             onClick={() => handleOpenThread(post.id)}
-                            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium text-[#1B4332] hover:bg-[#F4F3EE]"
+                            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium text-stone-900 hover:bg-[#F4F3EE]"
                           >
                             <MessageSquare className="h-3 w-3" />
                             <span>
@@ -800,7 +800,7 @@ export function DiscussionsClient({
                       title="Like"
                       className={`rounded p-1.5 hover:bg-stone-100 ${
                         post.viewer_has_liked
-                          ? 'text-[#1B4332]'
+                          ? 'text-stone-900'
                           : 'text-stone-500 hover:text-stone-900'
                       }`}
                     >
@@ -822,7 +822,7 @@ export function DiscussionsClient({
                       title="Save"
                       className={`rounded p-1.5 hover:bg-stone-100 ${
                         post.viewer_has_saved
-                          ? 'text-[#1B4332]'
+                          ? 'text-stone-900'
                           : 'text-stone-500 hover:text-stone-900'
                       }`}
                     >
@@ -902,12 +902,12 @@ export function DiscussionsClient({
                   value={resourceTitle}
                   onChange={(e) => setResourceTitle(e.target.value)}
                   placeholder="Resource title *"
-                  className="sm:col-span-2 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-900 focus:border-[#1B4332] focus:outline-none"
+                  className="sm:col-span-2 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-900 focus:border-black focus:outline-none"
                 />
                 <select
                   value={resourceCategory}
                   onChange={(e) => setResourceCategory(e.target.value)}
-                  className="rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs text-stone-900 focus:border-[#1B4332] focus:outline-none"
+                  className="rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs text-stone-900 focus:border-black focus:outline-none"
                 >
                   {RESOURCE_CATEGORIES.map((cat) => (
                     <option key={cat} value={cat}>
@@ -922,7 +922,7 @@ export function DiscussionsClient({
                 value={resourceUrl}
                 onChange={(e) => setResourceUrl(e.target.value)}
                 placeholder="Link URL (https://... optional)"
-                className="w-full rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-900 focus:border-[#1B4332] focus:outline-none"
+                className="w-full rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-900 focus:border-black focus:outline-none"
               />
             </div>
           )}
@@ -945,7 +945,7 @@ export function DiscussionsClient({
                 value={pollQuestion}
                 onChange={(e) => setPollQuestion(e.target.value)}
                 placeholder="Question"
-                className="w-full rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-900 focus:border-[#1B4332] focus:outline-none"
+                className="w-full rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-900 focus:border-black focus:outline-none"
               />
               <div className="space-y-1.5">
                 {pollOptions.map((opt, i) => (
@@ -959,7 +959,7 @@ export function DiscussionsClient({
                         )
                       }
                       placeholder={`Option ${i + 1}`}
-                      className="flex-1 rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-xs text-stone-900 focus:border-[#1B4332] focus:outline-none"
+                      className="flex-1 rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-xs text-stone-900 focus:border-black focus:outline-none"
                     />
                     {pollOptions.length > 2 && (
                       <button
@@ -980,7 +980,7 @@ export function DiscussionsClient({
                   <button
                     type="button"
                     onClick={() => setPollOptions((prev) => [...prev, ''])}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-[#1B4332]"
+                    className="inline-flex items-center gap-1 text-xs font-medium text-stone-900"
                   >
                     <Plus className="h-3 w-3" /> Add option
                   </button>
@@ -1010,7 +1010,7 @@ export function DiscussionsClient({
                 title="Create poll"
                 className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition-colors ${
                   showPollCreator
-                    ? 'border-[#1B4332] bg-[#F4F3EE] text-[#1B4332]'
+                    ? 'border-stone-900 bg-[#F4F3EE] text-stone-900'
                     : 'border-stone-200 text-stone-500 hover:bg-stone-50'
                 }`}
               >
@@ -1027,7 +1027,7 @@ export function DiscussionsClient({
                   title="Share resource"
                   className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border transition-colors ${
                     showResourceCreator
-                      ? 'border-[#1B4332] bg-[#F4F3EE] text-[#1B4332]'
+                      ? 'border-stone-900 bg-[#F4F3EE] text-stone-900'
                       : 'border-stone-200 text-stone-500 hover:bg-stone-50'
                   }`}
                 >
@@ -1050,7 +1050,7 @@ export function DiscussionsClient({
                     ? 'Add notes or summary for this resource...'
                     : `Write a message in #${activeSpace?.name || spaces[0]?.name || 'general'}...`
                 }
-                className="max-h-32 min-h-[38px] flex-1 resize-none rounded-xl border border-stone-200 bg-[#FAF9F6] px-3.5 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-[#1B4332] focus:bg-white focus:outline-none"
+                className="max-h-32 min-h-[38px] flex-1 resize-none rounded-xl border border-stone-200 bg-[#FAF9F6] px-3.5 py-2 text-sm text-stone-900 placeholder:text-stone-400 focus:border-black focus:bg-white focus:outline-none"
               />
 
               <button
@@ -1059,7 +1059,7 @@ export function DiscussionsClient({
                   submittingPost ||
                   (!chatMessage.trim() && !showPollCreator && !showResourceCreator)
                 }
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#1B4332] text-white transition-colors hover:bg-[#2D6A4F] disabled:opacity-40"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black text-white transition-colors hover:bg-zinc-800 disabled:opacity-40"
               >
                 <Send className="h-4 w-4" />
               </button>
@@ -1152,12 +1152,12 @@ export function DiscussionsClient({
                 value={commentDraft}
                 onChange={(e) => setCommentDraft(e.target.value)}
                 placeholder="Reply..."
-                className="flex-1 rounded-xl border border-stone-200 bg-[#FAF9F6] px-3 py-2 text-xs text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
+                className="flex-1 rounded-xl border border-stone-200 bg-[#FAF9F6] px-3 py-2 text-xs text-stone-900 focus:border-black focus:bg-white focus:outline-none"
               />
               <button
                 type="submit"
                 disabled={!commentDraft.trim()}
-                className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#1B4332] text-white hover:bg-[#2D6A4F] disabled:opacity-40"
+                className="flex h-8 w-8 items-center justify-center rounded-xl bg-black text-white hover:bg-zinc-800 disabled:opacity-40"
               >
                 <Send className="h-3.5 w-3.5" />
               </button>
@@ -1216,7 +1216,7 @@ export function DiscussionsClient({
               </button>
               <button
                 type="submit"
-                className="rounded-xl bg-[#1B4332] px-4 py-1.5 text-xs font-semibold text-white"
+                className="rounded-xl bg-black px-4 py-1.5 text-xs font-semibold text-white"
               >
                 Report
               </button>

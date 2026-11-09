@@ -147,7 +147,7 @@ export function QuizRunner({ circleId, quizId, onClose, onCompleted }: QuizRunne
       <div className="w-full max-w-2xl rounded-2xl border border-stone-200 bg-white p-6 shadow-2xl max-h-[92vh] overflow-y-auto">
         <div className="flex items-center justify-between border-b border-stone-100 pb-4">
           <div>
-            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-stone-900">
               Assessment Checkpoint
             </span>
             <h3 className="text-lg font-bold text-stone-900">{quiz?.title || 'Quiz Assessment'}</h3>
@@ -172,7 +172,7 @@ export function QuizRunner({ circleId, quizId, onClose, onCompleted }: QuizRunne
           <div className="py-16 text-center text-xs text-stone-500">Loading assessment questions...</div>
         ) : !attempt && !completedAttempt ? (
           <div className="py-8 space-y-6 text-center">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-100 text-emerald-800">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-stone-100 text-stone-900">
               <Award className="h-7 w-7" />
             </div>
 
@@ -208,7 +208,7 @@ export function QuizRunner({ circleId, quizId, onClose, onCompleted }: QuizRunne
           <div className="py-8 space-y-6 text-center">
             <div
               className={`mx-auto flex h-14 w-14 items-center justify-center rounded-full ${
-                completedAttempt.is_passed ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                completedAttempt.is_passed ? 'bg-stone-100 text-stone-900' : 'bg-red-100 text-red-800'
               }`}
             >
               {completedAttempt.is_passed ? <CheckCircle2 className="h-7 w-7" /> : <AlertCircle className="h-7 w-7" />}
@@ -249,7 +249,7 @@ export function QuizRunner({ circleId, quizId, onClose, onCompleted }: QuizRunne
             {timeRemainingSec !== null && (
               <div className="flex items-center justify-between rounded-xl bg-stone-900 text-white px-4 py-2.5 text-xs">
                 <span className="font-medium">Time Remaining:</span>
-                <span className="font-mono font-bold text-emerald-400">{formatTime(timeRemainingSec)}</span>
+                <span className="font-mono font-bold text-white">{formatTime(timeRemainingSec)}</span>
               </div>
             )}
 

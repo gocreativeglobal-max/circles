@@ -37,7 +37,7 @@ export default async function CircleLayout({
       <header className="border-b border-stone-200/80 bg-white">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#1B4332] text-base font-semibold text-white">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-black text-base font-semibold text-white">
               {circle.name.slice(0, 1).toUpperCase()}
             </div>
             <div className="min-w-0">

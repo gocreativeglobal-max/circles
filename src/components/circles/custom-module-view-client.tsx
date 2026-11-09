@@ -212,7 +212,7 @@ export function CustomModuleViewClient({
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-stone-200 pb-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#F4F3EE] text-[#1B4332]">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#F4F3EE] text-stone-900">
             <DynamicIcon name={mod.icon || 'sparkles'} className="h-4 w-4" />
           </div>
           <div>
@@ -240,7 +240,7 @@ export function CustomModuleViewClient({
             <button
               type="button"
               onClick={() => setShowAddModal(true)}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[#1B4332] px-4 py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-black px-4 py-2 text-xs font-semibold text-white hover:bg-zinc-800"
             >
               <Plus className="h-3.5 w-3.5" />
               <span>Add to {mod.name}</span>
@@ -250,7 +250,7 @@ export function CustomModuleViewClient({
       </div>
 
       {toast && (
-        <div className="flex items-center gap-2 rounded-xl border border-stone-200 bg-[#F4F3EE] px-4 py-2.5 text-xs font-medium text-[#1B4332]">
+        <div className="flex items-center gap-2 rounded-xl border border-stone-200 bg-[#F4F3EE] px-4 py-2.5 text-xs font-medium text-stone-900">
           <CheckCircle2 className="h-4 w-4 shrink-0" />
           <span>{toast}</span>
         </div>
@@ -273,7 +273,7 @@ export function CustomModuleViewClient({
               href={mod.embed_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 text-xs font-semibold text-[#1B4332] hover:underline shrink-0"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-stone-900 hover:underline shrink-0"
             >
               <span>Open in New Tab</span>
               <ExternalLink className="h-3.5 w-3.5" />
@@ -296,7 +296,7 @@ export function CustomModuleViewClient({
                 onClick={() => setActiveColumn('all')}
                 className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                   activeColumn === 'all'
-                    ? 'bg-[#1B4332] text-white'
+                    ? 'bg-black text-white'
                     : 'bg-stone-100 text-stone-600 hover:bg-stone-200/70'
                 }`}
               >
@@ -311,7 +311,7 @@ export function CustomModuleViewClient({
                     onClick={() => setActiveColumn(col)}
                     className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                       activeColumn === col
-                        ? 'bg-[#1B4332] text-white'
+                        ? 'bg-black text-white'
                         : 'bg-stone-100 text-stone-600 hover:bg-stone-200/70'
                     }`}
                   >
@@ -357,7 +357,7 @@ export function CustomModuleViewClient({
                               onChange={(e) =>
                                 handleChangeBoardStatus(entry.id, e.target.value)
                               }
-                              className="rounded-full border border-stone-200 bg-[#F4F3EE] px-2.5 py-0.5 text-[11px] font-semibold text-[#1B4332]"
+                              className="rounded-full border border-stone-200 bg-[#F4F3EE] px-2.5 py-0.5 text-[11px] font-semibold text-stone-900"
                             >
                               {mod.board_columns.map((col) => (
                                 <option key={col} value={col}>
@@ -366,7 +366,7 @@ export function CustomModuleViewClient({
                               ))}
                             </select>
                           ) : (
-                            <span className="rounded-full bg-[#F4F3EE] px-2.5 py-0.5 text-[11px] font-semibold text-[#1B4332]">
+                            <span className="rounded-full bg-[#F4F3EE] px-2.5 py-0.5 text-[11px] font-semibold text-stone-900">
                               {entry.board_status}
                             </span>
                           )}
@@ -398,7 +398,7 @@ export function CustomModuleViewClient({
                                 }
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1 text-xs font-medium text-[#1B4332] hover:bg-stone-100"
+                                className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1 text-xs font-medium text-stone-900 hover:bg-stone-100"
                               >
                                 <span>{field.label}</span>
                                 <ArrowUpRight className="h-3 w-3" />
@@ -427,7 +427,7 @@ export function CustomModuleViewClient({
                       onClick={() => handleToggleUpvote(entry.id)}
                       className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-colors ${
                         entry.viewer_has_upvoted
-                          ? 'border-[#1B4332] bg-[#F4F3EE] text-[#1B4332]'
+                          ? 'border-stone-900 bg-[#F4F3EE] text-stone-900'
                           : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-50'
                       }`}
                     >
@@ -455,7 +455,7 @@ export function CustomModuleViewClient({
                                 : '15'
                             );
                           }}
-                          className="inline-flex items-center gap-1.5 rounded-xl bg-[#1B4332] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-black px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800"
                         >
                           <Heart className="h-3.5 w-3.5" />
                           <span>
@@ -512,7 +512,7 @@ export function CustomModuleViewClient({
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="Title or headline..."
-                  className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-xs text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
+                  className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-xs text-stone-900 focus:border-black focus:bg-white focus:outline-none"
                 />
               </div>
 
@@ -525,7 +525,7 @@ export function CustomModuleViewClient({
                   value={body}
                   onChange={(e) => setBody(e.target.value)}
                   placeholder="Share details..."
-                  className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-xs text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
+                  className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-xs text-stone-900 focus:border-black focus:bg-white focus:outline-none"
                 />
               </div>
 
@@ -624,7 +624,7 @@ export function CustomModuleViewClient({
                 <button
                   type="submit"
                   disabled={busy}
-                  className="rounded-xl bg-[#1B4332] px-5 py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F] disabled:opacity-50"
+                  className="rounded-xl bg-black px-5 py-2 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
                 >
                   {busy ? 'Posting...' : 'Publish'}
                 </button>
@@ -642,7 +642,7 @@ export function CustomModuleViewClient({
           <div className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl space-y-4">
             <div className="flex items-center justify-between border-b border-stone-100 pb-3">
               <div>
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-[#1B4332]">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-stone-900">
                   {mod.payment_label || 'Support / Pay'}
                 </span>
                 <h3 className="text-base font-bold text-stone-900">{payTarget.title}</h3>
@@ -678,7 +678,7 @@ export function CustomModuleViewClient({
                   onClick={() => setPayMethod('card')}
                   className={`flex flex-col items-center gap-1 rounded-xl border p-2.5 text-xs font-medium ${
                     payMethod === 'card'
-                      ? 'border-[#1B4332] bg-[#F4F3EE] text-[#1B4332] font-semibold'
+                      ? 'border-stone-900 bg-[#F4F3EE] text-stone-900 font-semibold'
                       : 'border-stone-200 text-stone-600'
                   }`}
                 >
@@ -690,7 +690,7 @@ export function CustomModuleViewClient({
                   onClick={() => setPayMethod('bank_transfer')}
                   className={`flex flex-col items-center gap-1 rounded-xl border p-2.5 text-xs font-medium ${
                     payMethod === 'bank_transfer'
-                      ? 'border-[#1B4332] bg-[#F4F3EE] text-[#1B4332] font-semibold'
+                      ? 'border-stone-900 bg-[#F4F3EE] text-stone-900 font-semibold'
                       : 'border-stone-200 text-stone-600'
                   }`}
                 >
@@ -702,7 +702,7 @@ export function CustomModuleViewClient({
                   onClick={() => setPayMethod('wallet')}
                   className={`flex flex-col items-center gap-1 rounded-xl border p-2.5 text-xs font-medium ${
                     payMethod === 'wallet'
-                      ? 'border-[#1B4332] bg-[#F4F3EE] text-[#1B4332] font-semibold'
+                      ? 'border-stone-900 bg-[#F4F3EE] text-stone-900 font-semibold'
                       : 'border-stone-200 text-stone-600'
                   }`}
                 >
@@ -722,7 +722,7 @@ export function CustomModuleViewClient({
                 <button
                   type="submit"
                   disabled={busy}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#1B4332] px-5 py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F] disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-black px-5 py-2 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
                 >
                   <Check className="h-3.5 w-3.5" />
                   <span>

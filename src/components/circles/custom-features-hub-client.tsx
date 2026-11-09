@@ -126,7 +126,7 @@ export function CustomFeaturesHubClient({
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-stone-200 pb-4">
         <div>
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-[#1B4332]">
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-stone-900">
             <Sparkles className="h-3 w-3" />
             <span>User-Built Community Features</span>
           </span>
@@ -142,7 +142,7 @@ export function CustomFeaturesHubClient({
           <button
             type="button"
             onClick={() => setShowBuilder(true)}
-            className="inline-flex items-center gap-1.5 rounded-xl bg-[#1B4332] px-4 py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-black px-4 py-2 text-xs font-semibold text-white hover:bg-zinc-800"
           >
             <Plus className="h-3.5 w-3.5" />
             <span>{isStaff ? 'Create Custom Feature' : 'Build / Propose Feature'}</span>
@@ -151,7 +151,7 @@ export function CustomFeaturesHubClient({
       </div>
 
       {toast && (
-        <div className="flex items-center gap-2 rounded-xl border border-stone-200 bg-[#F4F3EE] px-4 py-2.5 text-xs font-medium text-[#1B4332]">
+        <div className="flex items-center gap-2 rounded-xl border border-stone-200 bg-[#F4F3EE] px-4 py-2.5 text-xs font-medium text-stone-900">
           <CheckCircle2 className="h-4 w-4 shrink-0" />
           <span>{toast}</span>
         </div>
@@ -180,7 +180,7 @@ export function CustomFeaturesHubClient({
               >
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <DynamicIcon name={m.icon || 'sparkles'} className="h-4 w-4 text-[#1B4332]" />
+                    <DynamicIcon name={m.icon || 'sparkles'} className="h-4 w-4 text-stone-900" />
                     <span className="text-sm font-bold text-stone-900">{m.name}</span>
                     <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] text-stone-600">
                       {m.layout_type}
@@ -198,7 +198,7 @@ export function CustomFeaturesHubClient({
                       type="button"
                       disabled={busy}
                       onClick={() => handleUpdateModuleStatus(m.id, 'active')}
-                      className="inline-flex items-center gap-1 rounded-lg bg-[#1B4332] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
+                      className="inline-flex items-center gap-1 rounded-lg bg-black px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800"
                     >
                       <Check className="h-3 w-3" />
                       <span>Approve</span>
@@ -239,7 +239,7 @@ export function CustomFeaturesHubClient({
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#F4F3EE] text-[#1B4332]">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#F4F3EE] text-stone-900">
                         <DynamicIcon name={m.icon || 'sparkles'} className="h-4 w-4" />
                       </div>
                       <div>
@@ -252,7 +252,7 @@ export function CustomFeaturesHubClient({
 
                     <div className="flex items-center gap-1.5">
                       {m.enable_payments && (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-[#F4F3EE] px-2 py-0.5 text-[10px] font-semibold text-[#1B4332]">
+                        <span className="inline-flex items-center gap-1 rounded-full bg-[#F4F3EE] px-2 py-0.5 text-[10px] font-semibold text-stone-900">
                           <Wallet className="h-2.5 w-2.5" />
                           <span>Paid / Tips</span>
                         </span>
@@ -290,7 +290,7 @@ export function CustomFeaturesHubClient({
 
                   <Link
                     href={`/circles/${circleSlug}/custom/${m.slug}`}
-                    className="inline-flex items-center gap-1 rounded-xl bg-[#1B4332] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
+                    className="inline-flex items-center gap-1 rounded-xl bg-black px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800"
                   >
                     <span>Open {m.name}</span>
                     <ArrowRight className="h-3.5 w-3.5" />
@@ -336,7 +336,7 @@ export function CustomFeaturesHubClient({
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#F4F3EE] text-[#1B4332]">
+                      <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#F4F3EE] text-stone-900">
                         <DynamicIcon name={tpl.icon || 'sparkles'} className="h-3.5 w-3.5" />
                       </div>
                       <span className="text-xs font-bold text-stone-900">{tpl.name}</span>
@@ -359,7 +359,7 @@ export function CustomFeaturesHubClient({
                       type="button"
                       disabled={busy || alreadyActive}
                       onClick={() => handleQuickInstall(tpl)}
-                      className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1 text-xs font-semibold text-[#1B4332] hover:bg-[#F4F3EE] disabled:opacity-40"
+                      className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1 text-xs font-semibold text-stone-900 hover:bg-[#F4F3EE] disabled:opacity-40"
                     >
                       {alreadyActive ? (
                         <span>Installed</span>

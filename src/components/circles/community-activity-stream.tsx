@@ -142,7 +142,7 @@ export function CommunityActivityStream({
                   onClick={() => setActiveFilter(tab.key)}
                   className={`whitespace-nowrap border-b-2 pb-2.5 text-sm transition-colors ${
                     active
-                      ? 'border-[#1B4332] font-medium text-stone-900'
+                      ? 'border-stone-900 font-medium text-stone-900'
                       : 'border-transparent text-stone-500 hover:text-stone-800'
                   }`}
                 >
@@ -155,7 +155,7 @@ export function CommunityActivityStream({
           {isMember && (
             <Link
               href={`/circles/${circle.slug}/discussions`}
-              className="mb-2 inline-flex shrink-0 items-center gap-1 rounded-lg bg-[#1B4332] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#2D6A4F]"
+              className="mb-2 inline-flex shrink-0 items-center gap-1 rounded-lg bg-black px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800"
             >
               <Plus className="h-4 w-4" />
               New post
@@ -271,7 +271,7 @@ function RailCard({ title, href, children }: { title: string; href?: string; chi
 
 function DateBadge({ date }: { date: Date }) {
   return (
-    <div className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg bg-[#F4F3EE] text-[#1B4332]">
+    <div className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg bg-[#F4F3EE] text-stone-900">
       <span className="text-[9px] font-semibold uppercase leading-none">
         {date.toLocaleString('en-US', { month: 'short' })}
       </span>
@@ -431,7 +431,7 @@ function StreamCard({
               onClick={() => onRsvp(event.id, isGoing ? 'declined' : 'going')}
               className={
                 isGoing
-                  ? 'inline-flex items-center gap-1 rounded-lg bg-[#F4F3EE] px-3 py-1.5 text-xs font-medium text-[#1B4332]'
+                  ? 'inline-flex items-center gap-1 rounded-lg bg-[#F4F3EE] px-3 py-1.5 text-xs font-medium text-stone-900'
                   : ghostBtn
               }
             >
@@ -462,7 +462,7 @@ function StreamCard({
                 onClick={() => onVote(poll.id, opt.id)}
                 className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
                   isSelected
-                    ? 'border-[#2D6A4F] bg-[#F4F3EE] font-medium text-[#1B4332]'
+                    ? 'border-stone-900 bg-[#F4F3EE] font-medium text-stone-900'
                     : 'border-stone-200 text-stone-700 hover:bg-stone-50'
                 }`}
               >

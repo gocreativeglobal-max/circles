@@ -243,7 +243,7 @@ function SidebarLink({
           : 'text-stone-600 hover:bg-stone-100 hover:text-stone-900'
       }`}
     >
-      <span className={active ? 'text-[#2D6A4F]' : 'text-stone-400'}>{icon}</span>
+      <span className={active ? 'text-stone-900' : 'text-stone-400'}>{icon}</span>
       {!collapsed && <span className="truncate">{label}</span>}
     </Link>
   );
@@ -264,7 +264,7 @@ function DockLink({
     <Link
       href={href}
       className={`flex flex-col items-center gap-0.5 px-3 py-1 text-[10px] font-medium ${
-        active ? 'text-[#1B4332]' : 'text-stone-500'
+        active ? 'text-stone-900 font-semibold' : 'text-stone-500'
       }`}
     >
       {icon}

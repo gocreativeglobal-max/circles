@@ -203,7 +203,7 @@ export function EventCreationWizardModal({
         <div className="border-b border-stone-200/80 bg-stone-50/90 px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-800 text-white shadow-xs">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-black text-white shadow-xs">
                 <CalendarIcon className="h-5 w-5" />
               </div>
               <div>
@@ -241,9 +241,9 @@ export function EventCreationWizardModal({
                 }}
                 className={`flex items-center justify-center gap-2 rounded-xl py-2 text-xs font-semibold transition-all ${
                   step === s.num
-                    ? 'bg-emerald-800 text-white shadow-xs'
+                    ? 'bg-black text-white shadow-xs'
                     : step > s.num
-                    ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                    ? 'bg-stone-100 text-stone-900 border border-stone-200'
                     : 'bg-stone-200/70 text-stone-600'
                 }`}
               >
@@ -281,7 +281,7 @@ export function EventCreationWizardModal({
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g. Super Sunday Community Workshop"
-                  className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-emerald-700 focus:outline-hidden focus:ring-2 focus:ring-emerald-700/20"
+                  className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-2.5 text-sm text-stone-900 placeholder:text-stone-400 focus:border-black focus:outline-hidden focus:ring-2 focus:ring-black/10"
                 />
               </div>
 
@@ -293,7 +293,7 @@ export function EventCreationWizardModal({
                 <select
                   value={hostId}
                   onChange={(e) => setHostId(e.target.value)}
-                  className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-2.5 text-xs text-stone-800 focus:border-emerald-700 focus:outline-hidden focus:ring-2 focus:ring-emerald-700/20"
+                  className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-2.5 text-xs text-stone-800 focus:border-black focus:outline-hidden focus:ring-2 focus:ring-black/10"
                 >
                   {members.map((m) => (
                     <option key={m.user_id} value={m.user_id}>
@@ -313,7 +313,7 @@ export function EventCreationWizardModal({
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="What is this event about? Share the agenda, learning outcomes, or what guests should prepare."
-                  className="w-full rounded-2xl border border-stone-300 bg-white p-3.5 text-xs text-stone-800 placeholder:text-stone-400 focus:border-emerald-700 focus:outline-hidden focus:ring-2 focus:ring-emerald-700/20 resize-y"
+                  className="w-full rounded-2xl border border-stone-300 bg-white p-3.5 text-xs text-stone-800 placeholder:text-stone-400 focus:border-black focus:outline-hidden focus:ring-2 focus:ring-black/10 resize-y"
                 />
               </div>
 
@@ -339,12 +339,12 @@ export function EventCreationWizardModal({
           {/* ============================================================== */}
           {step === 2 && (
             <div className="space-y-6 animate-in fade-in-50">
-              <div className="rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4">
-                <div className="flex items-center gap-2 text-xs font-semibold text-emerald-900 mb-1">
-                  <Clock className="h-4 w-4 text-emerald-700" />
+              <div className="rounded-2xl border border-stone-200 bg-stone-100 p-4">
+                <div className="flex items-center gap-2 text-xs font-semibold text-stone-900 mb-1">
+                  <Clock className="h-4 w-4 text-stone-900" />
                   <span>Timezone</span>
                 </div>
-                <p className="text-xs text-emerald-800">
+                <p className="text-xs text-stone-900">
                   Times are displayed in your local timezone ({Intl.DateTimeFormat().resolvedOptions().timeZone}).
                 </p>
               </div>
@@ -360,7 +360,7 @@ export function EventCreationWizardModal({
                     required
                     value={startsAt}
                     onChange={(e) => setStartsAt(e.target.value)}
-                    className="w-full rounded-2xl border border-stone-300 bg-white px-3.5 py-2.5 text-xs text-stone-800 focus:border-emerald-700 focus:outline-hidden focus:ring-2 focus:ring-emerald-700/20"
+                    className="w-full rounded-2xl border border-stone-300 bg-white px-3.5 py-2.5 text-xs text-stone-800 focus:border-black focus:outline-hidden focus:ring-2 focus:ring-black/10"
                   />
                 </div>
                 <div>
@@ -372,7 +372,7 @@ export function EventCreationWizardModal({
                     required
                     value={endsAt}
                     onChange={(e) => setEndsAt(e.target.value)}
-                    className="w-full rounded-2xl border border-stone-300 bg-white px-3.5 py-2.5 text-xs text-stone-800 focus:border-emerald-700 focus:outline-hidden focus:ring-2 focus:ring-emerald-700/20"
+                    className="w-full rounded-2xl border border-stone-300 bg-white px-3.5 py-2.5 text-xs text-stone-800 focus:border-black focus:outline-hidden focus:ring-2 focus:ring-black/10"
                   />
                 </div>
               </div>
@@ -388,7 +388,7 @@ export function EventCreationWizardModal({
                     onChange={(e) =>
                       setRepeatFrequency(e.target.value as 'none' | 'weekly' | 'biweekly' | 'monthly')
                     }
-                    className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-2.5 text-xs text-stone-800 focus:border-emerald-700 focus:outline-hidden focus:ring-2 focus:ring-emerald-700/20"
+                    className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-2.5 text-xs text-stone-800 focus:border-black focus:outline-hidden focus:ring-2 focus:ring-black/10"
                   >
                     <option value="none">Does not repeat</option>
                     <option value="weekly">Weekly</option>
@@ -413,8 +413,8 @@ export function EventCreationWizardModal({
                               onClick={() => toggleWeekday(day.key)}
                               className={`h-9 w-9 rounded-full text-xs font-bold transition-all ${
                                 active
-                                  ? 'bg-emerald-800 text-white shadow-xs'
-                                  : 'bg-white border border-stone-300 text-stone-700 hover:border-emerald-600'
+                                  ? 'bg-black text-white shadow-xs'
+                                  : 'bg-white border border-stone-300 text-stone-700 hover:border-black'
                               }`}
                               title={day.key}
                             >
@@ -437,7 +437,7 @@ export function EventCreationWizardModal({
                             value="never"
                             checked={repeatEnds === 'never'}
                             onChange={() => setRepeatEnds('never')}
-                            className="text-emerald-700 focus:ring-emerald-700"
+                            className="text-stone-900 focus:ring-black"
                           />
                           <span>Never</span>
                         </label>
@@ -449,7 +449,7 @@ export function EventCreationWizardModal({
                             value="on_date"
                             checked={repeatEnds === 'on_date'}
                             onChange={() => setRepeatEnds('on_date')}
-                            className="text-emerald-700 focus:ring-emerald-700"
+                            className="text-stone-900 focus:ring-black"
                           />
                           <span>On</span>
                           <input
@@ -468,7 +468,7 @@ export function EventCreationWizardModal({
                             value="after_occurrences"
                             checked={repeatEnds === 'after_occurrences'}
                             onChange={() => setRepeatEnds('after_occurrences')}
-                            className="text-emerald-700 focus:ring-emerald-700"
+                            className="text-stone-900 focus:ring-black"
                           />
                           <span>After</span>
                           <input
@@ -535,7 +535,7 @@ export function EventCreationWizardModal({
                         }
                         className={`text-left p-3.5 rounded-2xl border transition-all ${
                           active
-                            ? 'border-emerald-700 bg-emerald-50/50 ring-2 ring-emerald-700/20 shadow-xs'
+                            ? 'border-black bg-stone-100 ring-2 ring-black/10 shadow-xs'
                             : 'border-stone-200 bg-white hover:border-stone-300'
                         }`}
                       >
@@ -543,7 +543,7 @@ export function EventCreationWizardModal({
                           <div className="flex items-center gap-2">
                             <div
                               className={`flex h-8 w-8 items-center justify-center rounded-xl ${
-                                active ? 'bg-emerald-800 text-white' : 'bg-stone-100 text-stone-700'
+                                active ? 'bg-black text-white' : 'bg-stone-100 text-stone-700'
                               }`}
                             >
                               <Icon className="h-4 w-4" />
@@ -575,7 +575,7 @@ export function EventCreationWizardModal({
                             onClick={() => setMeetingChannel(ch.id)}
                             className={`rounded-xl px-3 py-1.5 text-xs font-semibold border transition-all ${
                               active
-                                ? 'border-emerald-700 bg-emerald-800 text-white shadow-xs'
+                                ? 'border-black bg-black text-white shadow-xs'
                                 : 'border-stone-200 bg-white text-stone-700 hover:border-stone-300'
                             }`}
                           >
@@ -595,7 +595,7 @@ export function EventCreationWizardModal({
                       value={meetingUrl}
                       onChange={(e) => setMeetingUrl(e.target.value)}
                       placeholder={activeChannelConfig.placeholder}
-                      className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-2.5 text-xs text-stone-800 focus:border-emerald-700 focus:outline-hidden focus:ring-2 focus:ring-emerald-700/20"
+                      className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-2.5 text-xs text-stone-800 focus:border-black focus:outline-hidden focus:ring-2 focus:ring-black/10"
                     />
                   </div>
                 </div>
@@ -612,7 +612,7 @@ export function EventCreationWizardModal({
                     value={venueText}
                     onChange={(e) => setVenueText(e.target.value)}
                     placeholder="e.g. Building 4, Conference Room B, Main Campus"
-                    className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-2.5 text-xs text-stone-800 focus:border-emerald-700 focus:outline-hidden focus:ring-2 focus:ring-emerald-700/20"
+                    className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-2.5 text-xs text-stone-800 focus:border-black focus:outline-hidden focus:ring-2 focus:ring-black/10"
                   />
                 </div>
               )}
@@ -627,7 +627,7 @@ export function EventCreationWizardModal({
                   onChange={(e) =>
                     setVisibility(e.target.value as 'community' | 'secret')
                   }
-                  className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-2.5 text-xs text-stone-800 focus:border-emerald-700 focus:outline-hidden focus:ring-2 focus:ring-emerald-700/20"
+                  className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-2.5 text-xs text-stone-800 focus:border-black focus:outline-hidden focus:ring-2 focus:ring-black/10"
                 >
                   <option value="community">Community (Open to all circle members)</option>
                   <option value="secret">Private / Invite-only</option>
@@ -641,11 +641,11 @@ export function EventCreationWizardModal({
                     type="checkbox"
                     checked={hideLocationFromNonAttendees}
                     onChange={(e) => setHideLocationFromNonAttendees(e.target.checked)}
-                    className="mt-0.5 rounded-md border-stone-300 text-emerald-800 focus:ring-emerald-700"
+                    className="mt-0.5 rounded-md border-stone-300 text-stone-900 focus:ring-black"
                   />
                   <div>
                     <div className="flex items-center gap-1.5 text-xs font-bold text-stone-800">
-                      <Lock className="h-3.5 w-3.5 text-emerald-700" />
+                      <Lock className="h-3.5 w-3.5 text-stone-900" />
                       <span>Hide meeting link or venue address until member RSVPs</span>
                     </div>
                     <div className="text-[11px] text-stone-500 mt-0.5">
@@ -691,7 +691,7 @@ export function EventCreationWizardModal({
                 size="sm"
                 disabled={step === 1 && !title.trim()}
                 onClick={() => setStep((s) => (s + 1) as 1 | 2 | 3)}
-                className="rounded-xl bg-emerald-800 px-5 text-white hover:bg-emerald-900 shadow-xs text-xs font-semibold"
+                className="rounded-xl bg-black px-5 text-white hover:bg-zinc-800 shadow-xs text-xs font-semibold"
               >
                 Next <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
@@ -701,7 +701,7 @@ export function EventCreationWizardModal({
                 size="sm"
                 disabled={loading || !title.trim()}
                 onClick={() => handlePublishEvent()}
-                className="rounded-xl bg-emerald-800 px-6 text-white hover:bg-emerald-900 shadow-xs text-xs font-semibold"
+                className="rounded-xl bg-black px-6 text-white hover:bg-zinc-800 shadow-xs text-xs font-semibold"
               >
                 {loading ? 'Publishing...' : 'Publish Event 🎉'}
               </Button>

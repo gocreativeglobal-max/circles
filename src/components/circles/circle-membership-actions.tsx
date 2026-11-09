@@ -61,7 +61,7 @@ export function CircleMembershipActions({
   }
 
   const primaryBtn =
-    'rounded-lg bg-[#1B4332] px-4 py-2 text-sm font-medium text-white hover:bg-[#2D6A4F] disabled:opacity-50';
+    'rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50';
   const quietBtn =
     'rounded-lg px-3 py-2 text-sm text-stone-500 hover:bg-stone-100 hover:text-stone-800 disabled:opacity-50';
 
@@ -112,7 +112,7 @@ export function CircleMembershipActions({
             value={requestNote}
             onChange={(e) => setRequestNote(e.target.value)}
             placeholder="Add a note (optional)"
-            className="w-full resize-none rounded-lg border border-stone-200 bg-stone-50 p-2 text-sm text-stone-900 focus:outline-none focus:ring-1 focus:ring-[#2D6A4F]"
+            className="w-full resize-none rounded-lg border border-stone-200 bg-stone-50 p-2 text-sm text-stone-900 focus:outline-none focus:ring-1 focus:ring-black"
           />
           <div className="flex justify-end gap-1">
             <button type="button" onClick={() => setShowRequestForm(false)} className={quietBtn}>

@@ -338,7 +338,7 @@ export function EventSettingsModal({
         <div className="border-b border-stone-200/80 bg-stone-50/90 px-6 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-800 text-white shadow-xs">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-black text-white shadow-xs">
                 <Sliders className="h-5 w-5" />
               </div>
               <div>
@@ -349,7 +349,7 @@ export function EventSettingsModal({
                   <span
                     className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold border ${
                       eventStatus === 'published'
-                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                        ? 'bg-stone-100 text-stone-900 border-stone-200'
                         : eventStatus === 'cancelled'
                         ? 'bg-rose-50 text-rose-700 border-rose-200'
                         : 'bg-stone-100 text-stone-600 border-stone-200'
@@ -388,7 +388,7 @@ export function EventSettingsModal({
                   onClick={() => setActiveTab(tab.id as 'details' | 'attendees' | 'registration')}
                   className={`flex items-center gap-2 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all ${
                     active
-                      ? 'bg-emerald-800 text-white shadow-xs'
+                      ? 'bg-black text-white shadow-xs'
                       : 'text-stone-600 hover:bg-stone-100'
                   }`}
                 >
@@ -441,7 +441,7 @@ export function EventSettingsModal({
                     required
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
-                    className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-2.5 text-xs text-stone-800 focus:border-emerald-700 focus:outline-hidden focus:ring-2 focus:ring-emerald-700/20"
+                    className="w-full rounded-2xl border border-stone-300 bg-white px-4 py-2.5 text-xs text-stone-800 focus:border-black focus:outline-hidden focus:ring-2 focus:ring-black/10"
                   />
                 </div>
                 <div>
@@ -451,7 +451,7 @@ export function EventSettingsModal({
                   <select
                     value={hostId}
                     onChange={(e) => setHostId(e.target.value)}
-                    className="w-full rounded-2xl border border-stone-300 bg-white px-3.5 py-2.5 text-xs text-stone-800 focus:border-emerald-700 focus:outline-hidden"
+                    className="w-full rounded-2xl border border-stone-300 bg-white px-3.5 py-2.5 text-xs text-stone-800 focus:border-black focus:outline-hidden"
                   >
                     {members.map((m) => (
                       <option key={m.user_id} value={m.user_id}>
@@ -471,7 +471,7 @@ export function EventSettingsModal({
                   rows={3}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  className="w-full rounded-2xl border border-stone-300 bg-white p-3.5 text-xs text-stone-800 focus:border-emerald-700 focus:outline-hidden"
+                  className="w-full rounded-2xl border border-stone-300 bg-white p-3.5 text-xs text-stone-800 focus:border-black focus:outline-hidden"
                 />
               </div>
 
@@ -538,7 +538,7 @@ export function EventSettingsModal({
                               onClick={() => toggleWeekday(day.key)}
                               className={`h-7 w-7 rounded-full text-xs font-bold ${
                                 active
-                                  ? 'bg-emerald-800 text-white'
+                                  ? 'bg-black text-white'
                                   : 'bg-white border border-stone-300 text-stone-600'
                               }`}
                             >
@@ -607,7 +607,7 @@ export function EventSettingsModal({
                               onClick={() => setMeetingChannel(ch.id)}
                               className={`rounded-xl px-2.5 py-1 text-xs font-semibold border transition-all ${
                                 active
-                                  ? 'border-emerald-700 bg-emerald-800 text-white'
+                                  ? 'border-black bg-black text-white'
                                   : 'border-stone-200 bg-white text-stone-700 hover:border-stone-300'
                               }`}
                             >
@@ -717,7 +717,7 @@ export function EventSettingsModal({
                       className="flex items-center justify-between p-3.5 hover:bg-stone-50/70 transition-colors"
                     >
                       <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 font-bold text-emerald-800 text-xs">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-stone-100 font-bold text-stone-900 text-xs">
                           {rsvp.profile?.display_name?.slice(0, 2).toUpperCase() || 'MB'}
                         </div>
                         <div>
@@ -728,7 +728,7 @@ export function EventSettingsModal({
                             <span
                               className={`rounded-full px-2 py-0.5 text-[10px] font-semibold border ${
                                 rsvp.status === 'going'
-                                  ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                  ? 'bg-stone-100 text-stone-900 border-stone-200'
                                   : 'bg-stone-100 text-stone-600 border-stone-200'
                               }`}
                             >
@@ -747,8 +747,8 @@ export function EventSettingsModal({
                           onClick={() => handleToggleAttendance(rsvp.user_id, Boolean(rsvp.attended))}
                           className={`flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
                             rsvp.attended
-                              ? 'bg-emerald-800 text-white shadow-xs'
-                              : 'border border-stone-300 bg-white text-stone-700 hover:border-emerald-700'
+                              ? 'bg-black text-white shadow-xs'
+                              : 'border border-stone-300 bg-white text-stone-700 hover:border-black'
                           }`}
                         >
                           <UserCheck className="h-3.5 w-3.5" />
@@ -777,11 +777,11 @@ export function EventSettingsModal({
                     type="checkbox"
                     checked={hideLocationFromNonAttendees}
                     onChange={(e) => setHideLocationFromNonAttendees(e.target.checked)}
-                    className="mt-0.5 rounded-md border-stone-300 text-emerald-800 focus:ring-emerald-700"
+                    className="mt-0.5 rounded-md border-stone-300 text-stone-900 focus:ring-black"
                   />
                   <div>
                     <div className="flex items-center gap-1.5 text-xs font-bold text-stone-800">
-                      <Lock className="h-3.5 w-3.5 text-emerald-700" />
+                      <Lock className="h-3.5 w-3.5 text-stone-900" />
                       <span>Hide meeting link or venue address from non-attendees</span>
                     </div>
                     <div className="text-[11px] text-stone-500 mt-0.5">
@@ -820,7 +820,7 @@ export function EventSettingsModal({
                       type="checkbox"
                       checked={remind24h}
                       onChange={(e) => setRemind24h(e.target.checked)}
-                      className="rounded-md border-stone-300 text-emerald-800"
+                      className="rounded-md border-stone-300 text-stone-900"
                     />
                     <span>24 hours before</span>
                   </label>
@@ -829,7 +829,7 @@ export function EventSettingsModal({
                       type="checkbox"
                       checked={remind1h}
                       onChange={(e) => setRemind1h(e.target.checked)}
-                      className="rounded-md border-stone-300 text-emerald-800"
+                      className="rounded-md border-stone-300 text-stone-900"
                     />
                     <span>1 hour before</span>
                   </label>
@@ -838,7 +838,7 @@ export function EventSettingsModal({
                       type="checkbox"
                       checked={remind10m}
                       onChange={(e) => setRemind10m(e.target.checked)}
-                      className="rounded-md border-stone-300 text-emerald-800"
+                      className="rounded-md border-stone-300 text-stone-900"
                     />
                     <span>10 mins before</span>
                   </label>
@@ -884,7 +884,7 @@ export function EventSettingsModal({
             size="sm"
             disabled={loading || !title.trim()}
             onClick={() => handleSaveSettings()}
-            className="rounded-xl bg-emerald-800 px-6 text-white hover:bg-emerald-900 shadow-xs text-xs font-semibold"
+            className="rounded-xl bg-black px-6 text-white hover:bg-zinc-800 shadow-xs text-xs font-semibold"
           >
             {loading ? 'Saving...' : 'Save Changes'}
           </Button>

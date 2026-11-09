@@ -697,12 +697,12 @@ export function CoursePlayer({
           role="status"
           className={`fixed top-5 right-5 z-[100] flex max-w-sm items-center gap-3 rounded-2xl border px-4 py-3 text-xs shadow-xl backdrop-blur-md transition-all animate-in slide-in-from-top-3 duration-200 ${
             toast.type === 'success'
-              ? 'border-emerald-200 bg-emerald-50/95 text-emerald-950 font-medium'
+              ? 'border-stone-200 bg-stone-100/95 text-stone-900 font-medium'
               : 'border-red-200 bg-red-50/95 text-red-950 font-medium'
           }`}
         >
           {toast.type === 'success' ? (
-            <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600" />
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-stone-700" />
           ) : (
             <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
           )}
@@ -966,8 +966,8 @@ export function CoursePlayer({
                                 <span
                                   className={`rounded px-1.5 py-0.2 text-[9px] font-bold uppercase tracking-wider ${
                                     isActive
-                                      ? 'bg-emerald-600 text-white'
-                                      : 'bg-emerald-50 text-emerald-700 border border-emerald-200/80'
+                                      ? 'bg-black text-white'
+                                      : 'bg-stone-100 text-stone-900 border border-stone-200'
                                   }`}
                                 >
                                   Preview
@@ -1181,9 +1181,9 @@ export function CoursePlayer({
             <div className="rounded-2xl border border-stone-200/80 bg-white p-6 shadow-xs space-y-6">
               {/* Free Preview Banner if paywalled */}
               {isPaywalled && !hasCoursePaywallAccess && activeLesson.is_free_preview && (
-                <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50/90 px-4 py-2.5 text-xs text-emerald-950 shadow-2xs">
+                <div className="flex items-center justify-between rounded-xl border border-stone-200 bg-stone-100/90 px-4 py-2.5 text-xs text-stone-900 shadow-2xs">
                   <div className="flex items-center gap-2">
-                    <span className="rounded bg-emerald-600 px-2 py-0.5 text-[10px] font-bold text-white uppercase tracking-wider">
+                    <span className="rounded bg-black px-2 py-0.5 text-[10px] font-bold text-white uppercase tracking-wider">
                       Free Preview
                     </span>
                     <span>You are viewing a free preview lesson. Unlock the full course to access all lessons, quizzes, and resources.</span>
@@ -1194,7 +1194,7 @@ export function CoursePlayer({
                         setSelectedPaywallPlan(course.paywall_plans![0]);
                         setShowCheckoutModal(true);
                       }}
-                      className="bg-emerald-800 text-white hover:bg-emerald-900 text-xs px-3 py-1.5 rounded-lg font-semibold"
+                      className="bg-black text-white hover:bg-zinc-800 text-xs px-3 py-1.5 rounded-lg font-semibold"
                     >
                       Unlock Full Course
                     </Button>
@@ -1223,8 +1223,8 @@ export function CoursePlayer({
                       </span>
                     )}
                     {activeLesson.quiz?.id && (
-                      <span className="flex items-center gap-1 text-emerald-700 font-medium">
-                        <HelpCircle className="h-3.5 w-3.5 text-emerald-600" />
+                      <span className="flex items-center gap-1 text-stone-900 font-medium">
+                        <HelpCircle className="h-3.5 w-3.5 text-stone-700" />
                         Graded Quiz Included
                       </span>
                     )}
@@ -1248,7 +1248,7 @@ export function CoursePlayer({
                   {activeLesson.quiz?.id && (
                     <Button
                       onClick={() => setActiveQuizId(activeLesson.quiz?.id || null)}
-                      className="rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs flex items-center gap-1.5"
+                      className="rounded-xl bg-black hover:bg-zinc-800 text-white text-xs flex items-center gap-1.5"
                     >
                       <HelpCircle className="h-3.5 w-3.5" />
                       Take Lesson Quiz
@@ -1375,7 +1375,7 @@ export function CoursePlayer({
                   <FolderDown className="h-3.5 w-3.5" />
                   <span>Resources</span>
                   {lessonResources.length > 0 && (
-                    <span className="rounded-full bg-emerald-100 text-emerald-800 px-1.5 py-0.2 text-[10px] font-mono font-bold">
+                    <span className="rounded-full bg-stone-100 text-stone-900 px-1.5 py-0.2 text-[10px] font-mono font-bold">
                       {lessonResources.length}
                     </span>
                   )}
@@ -1392,7 +1392,7 @@ export function CoursePlayer({
                   <FileText className="h-3.5 w-3.5" />
                   <span>My Notes</span>
                   {studentNote.trim() && (
-                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
+                    <span className="h-1.5 w-1.5 rounded-full bg-black" />
                   )}
                 </button>
 
@@ -1501,7 +1501,7 @@ export function CoursePlayer({
 
                     <div className="flex items-center gap-2">
                       {isNoteSaved && (
-                        <span className="flex items-center gap-1 text-[11px] font-semibold text-emerald-700 animate-fade-in">
+                        <span className="flex items-center gap-1 text-[11px] font-semibold text-stone-900 animate-fade-in">
                           <Check className="h-3 w-3" />
                           Saved
                         </span>
@@ -2070,7 +2070,7 @@ export function CoursePlayer({
                       {getBachsCurrency(selectedPaywallPlan.currency).paymentMethodsDescription} via Bachs.io
                     </p>
                   </div>
-                  <span className="text-[10px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">Bachs Pay</span>
+                  <span className="text-[10px] font-semibold bg-stone-100 text-stone-900 px-2 py-0.5 rounded-full">Bachs Pay</span>
                 </div>
               </div>
 

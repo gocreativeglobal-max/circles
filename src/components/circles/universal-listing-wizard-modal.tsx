@@ -381,9 +381,9 @@ export function UniversalListingWizardModal({
                   key={s}
                   className={`h-1.5 rounded-full transition-all ${
                     currentStep === s
-                      ? 'w-5 bg-[#1B4332]'
+                      ? 'w-5 bg-black'
                       : currentStep > s
-                        ? 'w-2 bg-[#40916C]'
+                        ? 'w-2 bg-[#52525b]'
                         : 'w-2 bg-stone-200'
                   }`}
                 />
@@ -422,7 +422,7 @@ export function UniversalListingWizardModal({
                       onClick={() => handleSelectArchetype(arch.id)}
                       className={`flex flex-col items-start gap-3 rounded-xl border p-4 text-left transition-all ${
                         selected
-                          ? 'border-[#1B4332] bg-[#F4F3EE]/70 text-[#1B4332]'
+                          ? 'border-stone-900 bg-[#F4F3EE]/70 text-stone-900'
                           : 'border-stone-200 bg-white text-stone-700 hover:border-stone-300 hover:bg-stone-50/60'
                       }`}
                     >
@@ -445,7 +445,7 @@ export function UniversalListingWizardModal({
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   placeholder="e.g. Sunny 1BR sublet near campus"
-                  className="mt-1.5 w-full rounded-xl border border-stone-200 px-3.5 py-2.5 text-sm text-stone-900 focus:border-[#1B4332] focus:outline-none"
+                  className="mt-1.5 w-full rounded-xl border border-stone-200 px-3.5 py-2.5 text-sm text-stone-900 focus:border-black focus:outline-none"
                 />
               </div>
 
@@ -455,7 +455,7 @@ export function UniversalListingWizardModal({
                   <select
                     value={category}
                     onChange={(e) => setCategory(e.target.value)}
-                    className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:border-[#1B4332] focus:outline-none"
+                    className="mt-1.5 w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:border-black focus:outline-none"
                   >
                     {activeCategories.map((c) => (
                       <option key={c} value={c}>
@@ -474,7 +474,7 @@ export function UniversalListingWizardModal({
                       value={location}
                       onChange={(e) => setLocation(e.target.value)}
                       placeholder="City, area, or Remote"
-                      className="w-full rounded-xl border border-stone-200 py-2.5 pl-9 pr-3 text-sm text-stone-900 focus:border-[#1B4332] focus:outline-none"
+                      className="w-full rounded-xl border border-stone-200 py-2.5 pl-9 pr-3 text-sm text-stone-900 focus:border-black focus:outline-none"
                     />
                   </div>
                 </div>
@@ -495,7 +495,7 @@ export function UniversalListingWizardModal({
                           onClick={() => handleQuickChipSelect(group.key, opt)}
                           className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
                             currentVal === opt
-                              ? 'border-[#1B4332] bg-[#1B4332] text-white'
+                              ? 'border-stone-900 bg-black text-white'
                               : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-50'
                           }`}
                         >
@@ -527,7 +527,7 @@ export function UniversalListingWizardModal({
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
                   placeholder="Share key details..."
-                  className="mt-1.5 w-full rounded-xl border border-stone-200 px-3.5 py-2.5 text-sm text-stone-900 focus:border-[#1B4332] focus:outline-none"
+                  className="mt-1.5 w-full rounded-xl border border-stone-200 px-3.5 py-2.5 text-sm text-stone-900 focus:border-black focus:outline-none"
                 />
               </div>
             </div>
@@ -543,7 +543,7 @@ export function UniversalListingWizardModal({
                   <select
                     value={priceCurrency}
                     onChange={(e) => setPriceCurrency(e.target.value)}
-                    className="rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-xs font-semibold text-stone-900 focus:border-[#1B4332] focus:outline-none"
+                    className="rounded-lg border border-stone-200 bg-white px-2.5 py-1 text-xs font-semibold text-stone-900 focus:border-black focus:outline-none"
                   >
                     {BACHS_ACCEPTED_CURRENCIES.map((cur) => (
                       <option key={cur.code} value={cur.code}>
@@ -580,7 +580,7 @@ export function UniversalListingWizardModal({
                       }}
                       className={`rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors ${
                         transactionType === t.id
-                          ? 'border-[#1B4332] bg-[#1B4332] text-white'
+                          ? 'border-stone-900 bg-black text-white'
                           : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-50'
                       }`}
                     >
@@ -604,7 +604,7 @@ export function UniversalListingWizardModal({
                         value={priceAmount}
                         onChange={(e) => setPriceAmount(e.target.value)}
                         placeholder={transactionType === 'negotiable' ? 'Optional amount' : '0.00'}
-                        className="w-full rounded-xl border border-stone-200 py-2.5 pl-10 pr-3 text-sm text-stone-900 focus:border-[#1B4332] focus:outline-none"
+                        className="w-full rounded-xl border border-stone-200 py-2.5 pl-10 pr-3 text-sm text-stone-900 focus:border-black focus:outline-none"
                       />
                     </div>
 
@@ -612,7 +612,7 @@ export function UniversalListingWizardModal({
                       <select
                         value={rateInterval}
                         onChange={(e) => setRateInterval(e.target.value as ListingRateInterval)}
-                        className="rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:border-[#1B4332] focus:outline-none"
+                        className="rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm text-stone-900 focus:border-black focus:outline-none"
                       >
                         <option value="hourly">/ hour</option>
                         <option value="daily">/ day</option>
@@ -632,7 +632,7 @@ export function UniversalListingWizardModal({
                       value={priceMin}
                       onChange={(e) => setPriceMin(e.target.value)}
                       placeholder={`Min (${activeCurrencyDef.symbol})`}
-                      className="w-full rounded-xl border border-stone-200 px-3.5 py-2.5 text-sm text-stone-900 focus:border-[#1B4332] focus:outline-none"
+                      className="w-full rounded-xl border border-stone-200 px-3.5 py-2.5 text-sm text-stone-900 focus:border-black focus:outline-none"
                     />
                     <input
                       type="number"
@@ -640,7 +640,7 @@ export function UniversalListingWizardModal({
                       value={priceMax}
                       onChange={(e) => setPriceMax(e.target.value)}
                       placeholder={`Max (${activeCurrencyDef.symbol})`}
-                      className="w-full rounded-xl border border-stone-200 px-3.5 py-2.5 text-sm text-stone-900 focus:border-[#1B4332] focus:outline-none"
+                      className="w-full rounded-xl border border-stone-200 px-3.5 py-2.5 text-sm text-stone-900 focus:border-black focus:outline-none"
                     />
                   </div>
                 )}
@@ -676,7 +676,7 @@ export function UniversalListingWizardModal({
                         onClick={() => setActionType(a.id as ListingActionType)}
                         className={`flex items-center gap-2.5 rounded-xl border px-3.5 py-2.5 text-left text-xs font-medium transition-colors disabled:opacity-40 ${
                           active
-                            ? 'border-[#1B4332] bg-[#F4F3EE] text-[#1B4332]'
+                            ? 'border-stone-900 bg-[#F4F3EE] text-stone-900'
                             : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-50'
                         }`}
                       >
@@ -701,7 +701,7 @@ export function UniversalListingWizardModal({
                     value={actionUrl}
                     onChange={(e) => setActionUrl(e.target.value)}
                     placeholder="https://..."
-                    className="mt-2.5 w-full rounded-xl border border-stone-200 px-3.5 py-2.5 text-sm text-stone-900 focus:border-[#1B4332] focus:outline-none"
+                    className="mt-2.5 w-full rounded-xl border border-stone-200 px-3.5 py-2.5 text-sm text-stone-900 focus:border-black focus:outline-none"
                   />
                 )}
               </div>
@@ -717,7 +717,7 @@ export function UniversalListingWizardModal({
                   <button
                     type="button"
                     onClick={() => setCustomFields([...customFields, { key: '', value: '' }])}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-[#1B4332] hover:underline"
+                    className="inline-flex items-center gap-1 text-xs font-medium text-stone-900 hover:underline"
                   >
                     <Plus className="h-3.5 w-3.5" /> Add
                   </button>
@@ -816,14 +816,14 @@ export function UniversalListingWizardModal({
                       {title || 'Untitled listing'}
                     </h4>
                   </div>
-                  <span className="rounded-lg bg-[#F4F3EE] px-2.5 py-1 text-xs font-semibold text-[#1B4332]">
+                  <span className="rounded-lg bg-[#F4F3EE] px-2.5 py-1 text-xs font-semibold text-stone-900">
                     {previewPrice}
                   </span>
                 </div>
               </div>
 
               {requiresPayToPost && (
-                <div className="flex items-center justify-between rounded-xl border border-[#1B4332]/20 bg-[#F4F3EE] px-4 py-3 text-xs text-[#1B4332]">
+                <div className="flex items-center justify-between rounded-xl border border-stone-200 bg-[#F4F3EE] px-4 py-3 text-xs text-stone-900">
                   <span className="font-medium">Community posting fee</span>
                   <span className="font-bold">
                     {formatBachsAmount(
@@ -852,7 +852,7 @@ export function UniversalListingWizardModal({
               <button
                 type="button"
                 onClick={goNext}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-[#1B4332] px-4 py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-black px-4 py-2 text-xs font-semibold text-white hover:bg-zinc-800"
               >
                 <span>Continue</span>
                 <ArrowRight className="h-3.5 w-3.5" />
@@ -862,7 +862,7 @@ export function UniversalListingWizardModal({
                 type="button"
                 disabled={loading}
                 onClick={handleSubmit}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-[#1B4332] px-5 py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F] disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-black px-5 py-2 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
               >
                 <span>
                   {loading

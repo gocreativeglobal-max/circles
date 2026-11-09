@@ -792,7 +792,7 @@ export function CourseStudioClient({
                 disabled={isSaving}
                 className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold shadow-2xs transition-all ${
                   course.status === 'published'
-                    ? 'bg-emerald-600 text-white hover:bg-emerald-700'
+                    ? 'bg-black text-white hover:bg-zinc-800'
                     : 'bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200'
                 }`}
                 title="Click to toggle Draft / Published"
@@ -817,7 +817,7 @@ export function CourseStudioClient({
                 <span
                   className={`rounded-full px-2.5 py-0.5 text-[11px] font-semibold tracking-wide uppercase ${
                     course.status === 'published'
-                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                      ? 'bg-stone-100 text-stone-900 border border-stone-200'
                       : 'bg-stone-100 text-stone-600 border border-stone-200'
                   }`}
                 >
@@ -892,7 +892,7 @@ export function CourseStudioClient({
           <div
             className={`flex items-center justify-between rounded-xl px-4 py-3 text-xs font-semibold shadow-2xs border ${
               feedbackMsg.type === 'success'
-                ? 'bg-emerald-50 text-emerald-900 border-emerald-200'
+                ? 'bg-stone-100 text-stone-900 border-stone-200'
                 : 'bg-rose-50 text-rose-900 border-rose-200'
             }`}
           >
@@ -919,7 +919,7 @@ export function CourseStudioClient({
               <span
                 className={`rounded-md px-2.5 py-1 text-xs font-semibold ${
                   course.status === 'published'
-                    ? 'bg-emerald-100 text-emerald-900'
+                    ? 'bg-stone-100 text-stone-900'
                     : 'bg-stone-200 text-stone-700'
                 }`}
               >
@@ -1037,7 +1037,7 @@ export function CourseStudioClient({
                   <button
                     type="button"
                     onClick={() => setActiveTab('options')}
-                    className="mt-4 text-xs font-semibold text-emerald-800 hover:underline inline-flex items-center gap-1"
+                    className="mt-4 text-xs font-semibold text-stone-900 hover:underline inline-flex items-center gap-1"
                   >
                     Change pacing in Options →
                   </button>
@@ -1231,7 +1231,7 @@ export function CourseStudioClient({
                                       <span
                                         className={`rounded-full px-2 py-0.2 text-[9px] font-semibold uppercase ${
                                           lesson.status === 'published'
-                                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200'
+                                            ? 'bg-stone-100 text-stone-900 border border-stone-200'
                                             : 'bg-stone-100 text-stone-600 border border-stone-200'
                                         }`}
                                       >
@@ -1928,7 +1928,7 @@ export function CourseStudioClient({
                     <div>
                       <div className="flex items-center gap-2">
                         <p className="text-xs font-bold text-stone-900">Self-Paced</p>
-                        <span className="rounded-full bg-emerald-100 px-2 py-0.2 text-[9px] font-semibold text-emerald-800">
+                        <span className="rounded-full bg-stone-100 px-2 py-0.2 text-[9px] font-semibold text-stone-900">
                           Recommended
                         </span>
                       </div>

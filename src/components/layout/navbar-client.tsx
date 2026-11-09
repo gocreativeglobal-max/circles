@@ -270,7 +270,7 @@ export function NavbarClient({ user, unreadCount }: NavbarClientProps) {
                         <span>Notifications</span>
                       </span>
                       {unreadCount > 0 && (
-                        <span className="rounded-full bg-emerald-600 px-2 py-0.5 text-xs font-bold text-white">
+                        <span className="rounded-full bg-black px-2 py-0.5 text-xs font-bold text-white">
                           {unreadCount}
                         </span>
                       )}

@@ -430,7 +430,7 @@ export function CommunityHubBoard({
                 setCampCurrency(String(settings.defaultCurrency || 'USD'));
                 setShowCreateModal(true);
               }}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[#1B4332] px-4 py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-black px-4 py-2 text-xs font-semibold text-white hover:bg-zinc-800"
             >
               <Plus className="h-3.5 w-3.5" />
               <span>Start a Cause</span>
@@ -453,7 +453,7 @@ export function CommunityHubBoard({
               onClick={() => setTypeFilter(tab.id as typeof typeFilter)}
               className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
                 typeFilter === tab.id
-                  ? 'bg-[#1B4332] text-white'
+                  ? 'bg-black text-white'
                   : 'bg-stone-100 text-stone-600 hover:bg-stone-200/70'
               }`}
             >
@@ -479,7 +479,7 @@ export function CommunityHubBoard({
         <select
           value={categoryFilter}
           onChange={(e) => setCategoryFilter(e.target.value as typeof categoryFilter)}
-          className="rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-700 focus:border-[#1B4332] focus:outline-none"
+          className="rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-700 focus:border-black focus:outline-none"
         >
           <option value="all">All Categories</option>
           {Object.entries(CATEGORY_LABELS).map(([k, label]) => (
@@ -491,7 +491,7 @@ export function CommunityHubBoard({
       </div>
 
       {toast && (
-        <div className="flex items-center gap-2 rounded-xl border border-stone-200 bg-[#F4F3EE] px-4 py-2.5 text-xs font-medium text-[#1B4332]">
+        <div className="flex items-center gap-2 rounded-xl border border-stone-200 bg-[#F4F3EE] px-4 py-2.5 text-xs font-medium text-stone-900">
           <CheckCircle2 className="h-4 w-4 shrink-0" />
           <span>{toast}</span>
         </div>
@@ -536,7 +536,7 @@ export function CommunityHubBoard({
                       <span
                         className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
                           isOfficial
-                            ? 'bg-[#F4F3EE] text-[#1B4332]'
+                            ? 'bg-[#F4F3EE] text-stone-900'
                             : 'bg-stone-100 text-stone-700'
                         }`}
                       >
@@ -570,7 +570,7 @@ export function CommunityHubBoard({
                     <button
                       type="button"
                       onClick={() => setDetailTarget(c)}
-                      className="text-left text-base font-bold text-stone-900 hover:text-[#1B4332] transition-colors"
+                      className="text-left text-base font-bold text-stone-900 hover:text-black transition-colors"
                     >
                       {c.title}
                     </button>
@@ -588,11 +588,11 @@ export function CommunityHubBoard({
                           raised of {c.currency} {goal.toLocaleString()}
                         </span>
                       </span>
-                      <span className="font-semibold text-[#1B4332]">{ratio}%</span>
+                      <span className="font-semibold text-stone-900">{ratio}%</span>
                     </div>
                     <div className="h-2 w-full rounded-full bg-stone-100 overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-[#1B4332] transition-all"
+                        className="h-full rounded-full bg-black transition-all"
                         style={{ width: `${ratio}%` }}
                       />
                     </div>
@@ -620,7 +620,7 @@ export function CommunityHubBoard({
                       type="button"
                       disabled={busy}
                       onClick={() => handleUpdateStatus(c.id, 'active')}
-                      className="flex-1 rounded-xl bg-[#1B4332] px-3 py-1.5 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
+                      className="flex-1 rounded-xl bg-black px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800"
                     >
                       Approve & Publish
                     </button>
@@ -658,7 +658,7 @@ export function CommunityHubBoard({
                       <button
                         type="button"
                         onClick={() => openDonateModal(c)}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-[#1B4332] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-black px-4 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800"
                       >
                         <Heart className="h-3.5 w-3.5" />
                         <span>Donate</span>
@@ -718,12 +718,12 @@ export function CommunityHubBoard({
                       onClick={() => setCampCauseType('official')}
                       className={`flex flex-col items-start rounded-xl border p-3 text-left transition-all ${
                         campCauseType === 'official'
-                          ? 'border-[#1B4332] bg-[#F4F3EE]/70'
+                          ? 'border-stone-900 bg-[#F4F3EE]/70'
                           : 'border-stone-200 bg-white hover:bg-stone-50'
                       }`}
                     >
                       <span className="inline-flex items-center gap-1.5 text-xs font-bold text-stone-900">
-                        <Landmark className="h-3.5 w-3.5 text-[#1B4332]" />
+                        <Landmark className="h-3.5 w-3.5 text-stone-900" />
                         <span>Official Community Cause</span>
                       </span>
                       <span className="mt-0.5 text-[11px] text-stone-500">
@@ -736,12 +736,12 @@ export function CommunityHubBoard({
                       onClick={() => setCampCauseType('member')}
                       className={`flex flex-col items-start rounded-xl border p-3 text-left transition-all ${
                         campCauseType === 'member'
-                          ? 'border-[#1B4332] bg-[#F4F3EE]/70'
+                          ? 'border-stone-900 bg-[#F4F3EE]/70'
                           : 'border-stone-200 bg-white hover:bg-stone-50'
                       }`}
                     >
                       <span className="inline-flex items-center gap-1.5 text-xs font-bold text-stone-900">
-                        <Wallet className="h-3.5 w-3.5 text-[#1B4332]" />
+                        <Wallet className="h-3.5 w-3.5 text-stone-900" />
                         <span>Member / Personal Cause</span>
                       </span>
                       <span className="mt-0.5 text-[11px] text-stone-500">
@@ -752,7 +752,7 @@ export function CommunityHubBoard({
                 </div>
               ) : (
                 <div className="rounded-xl border border-stone-200 bg-[#F4F3EE]/60 px-3.5 py-2.5 text-xs text-stone-700 flex items-center gap-2">
-                  <Wallet className="h-4 w-4 text-[#1B4332] shrink-0" />
+                  <Wallet className="h-4 w-4 text-stone-900 shrink-0" />
                   <span>
                     Donations to your cause are credited directly to your{' '}
                     <strong>Member Wallet</strong>.
@@ -769,7 +769,7 @@ export function CommunityHubBoard({
                   value={campTitle}
                   onChange={(e) => setCampTitle(e.target.value)}
                   placeholder="e.g., Annual Student Scholarship Fund or Emergency Medical Aid"
-                  className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-xs text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
+                  className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-xs text-stone-900 focus:border-black focus:bg-white focus:outline-none"
                 />
               </div>
 
@@ -779,7 +779,7 @@ export function CommunityHubBoard({
                   <select
                     value={campCategory}
                     onChange={(e) => setCampCategory(e.target.value as CauseCategory)}
-                    className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
+                    className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs text-stone-900 focus:border-black focus:bg-white focus:outline-none"
                   >
                     {Object.entries(CATEGORY_LABELS).map(([k, label]) => (
                       <option key={k} value={k}>
@@ -795,7 +795,7 @@ export function CommunityHubBoard({
                     value={campCurrency}
                     onChange={(e) => setCampCurrency(e.target.value)}
                     disabled={settings.allowMultiCurrency === false}
-                    className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
+                    className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs text-stone-900 focus:border-black focus:bg-white focus:outline-none"
                   >
                     {CAUSE_CURRENCIES.map((c) => (
                       <option key={c} value={c}>
@@ -814,7 +814,7 @@ export function CommunityHubBoard({
                     step="any"
                     value={campGoal}
                     onChange={(e) => setCampGoal(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
+                    className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs text-stone-900 focus:border-black focus:bg-white focus:outline-none"
                   />
                 </div>
               </div>
@@ -829,7 +829,7 @@ export function CommunityHubBoard({
                   value={campDesc}
                   onChange={(e) => setCampDesc(e.target.value)}
                   placeholder="Share why this cause matters and how contributions will make an impact..."
-                  className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-xs text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
+                  className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-xs text-stone-900 focus:border-black focus:bg-white focus:outline-none"
                 />
               </div>
 
@@ -842,7 +842,7 @@ export function CommunityHubBoard({
                     type="date"
                     value={campDeadline}
                     onChange={(e) => setCampDeadline(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
+                    className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs text-stone-900 focus:border-black focus:bg-white focus:outline-none"
                   />
                 </div>
 
@@ -855,7 +855,7 @@ export function CommunityHubBoard({
                     value={campImageUrl}
                     onChange={(e) => setCampImageUrl(e.target.value)}
                     placeholder="https://..."
-                    className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
+                    className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs text-stone-900 focus:border-black focus:bg-white focus:outline-none"
                   />
                 </div>
               </div>
@@ -872,7 +872,7 @@ export function CommunityHubBoard({
                   >
                     <span className="font-medium text-stone-800">{m.title}</span>
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-[#1B4332]">
+                      <span className="font-semibold text-stone-900">
                         {campCurrency} {m.amount.toLocaleString()}
                       </span>
                       <button
@@ -924,7 +924,7 @@ export function CommunityHubBoard({
                 <button
                   type="submit"
                   disabled={busy}
-                  className="rounded-xl bg-[#1B4332] px-5 py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F] disabled:opacity-50"
+                  className="rounded-xl bg-black px-5 py-2 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
                 >
                   {busy
                     ? 'Submitting...'
@@ -946,7 +946,7 @@ export function CommunityHubBoard({
           <div className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl space-y-4">
             <div className="flex items-start justify-between border-b border-stone-100 pb-3">
               <div>
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-[#1B4332]">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-stone-900">
                   Donate to Cause
                 </span>
                 <h3 className="text-base font-bold text-stone-900">{donateTarget.title}</h3>
@@ -974,7 +974,7 @@ export function CommunityHubBoard({
                       onClick={() => setDonateAmount(String(preset))}
                       className={`rounded-xl border py-2 text-xs font-semibold transition-colors ${
                         Number(donateAmount) === preset
-                          ? 'border-[#1B4332] bg-[#1B4332] text-white'
+                          ? 'border-stone-900 bg-black text-white'
                           : 'border-stone-200 bg-stone-50 text-stone-800 hover:bg-stone-100'
                       }`}
                     >
@@ -990,7 +990,7 @@ export function CommunityHubBoard({
                   value={donateAmount}
                   onChange={(e) => setDonateAmount(e.target.value)}
                   placeholder={`Custom amount (${donateTarget.currency})`}
-                  className="w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-sm font-semibold text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
+                  className="w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-sm font-semibold text-stone-900 focus:border-black focus:bg-white focus:outline-none"
                 />
               </div>
 
@@ -1005,7 +1005,7 @@ export function CommunityHubBoard({
                     onClick={() => setDonateMethod('card')}
                     className={`flex flex-col items-center gap-1 rounded-xl border p-2.5 text-xs font-medium ${
                       donateMethod === 'card'
-                        ? 'border-[#1B4332] bg-[#F4F3EE] text-[#1B4332] font-semibold'
+                        ? 'border-stone-900 bg-[#F4F3EE] text-stone-900 font-semibold'
                         : 'border-stone-200 text-stone-600 hover:bg-stone-50'
                     }`}
                   >
@@ -1018,7 +1018,7 @@ export function CommunityHubBoard({
                     onClick={() => setDonateMethod('bank_transfer')}
                     className={`flex flex-col items-center gap-1 rounded-xl border p-2.5 text-xs font-medium ${
                       donateMethod === 'bank_transfer'
-                        ? 'border-[#1B4332] bg-[#F4F3EE] text-[#1B4332] font-semibold'
+                        ? 'border-stone-900 bg-[#F4F3EE] text-stone-900 font-semibold'
                         : 'border-stone-200 text-stone-600 hover:bg-stone-50'
                     }`}
                   >
@@ -1032,7 +1032,7 @@ export function CommunityHubBoard({
                     onClick={() => setDonateMethod('wallet')}
                     className={`flex flex-col items-center gap-1 rounded-xl border p-2.5 text-xs font-medium disabled:opacity-40 ${
                       donateMethod === 'wallet'
-                        ? 'border-[#1B4332] bg-[#F4F3EE] text-[#1B4332] font-semibold'
+                        ? 'border-stone-900 bg-[#F4F3EE] text-stone-900 font-semibold'
                         : 'border-stone-200 text-stone-600 hover:bg-stone-50'
                     }`}
                   >
@@ -1068,7 +1068,7 @@ export function CommunityHubBoard({
                   type="checkbox"
                   checked={donateAnon}
                   onChange={(e) => setDonateAnon(e.target.checked)}
-                  className="rounded border-stone-300 text-[#1B4332]"
+                  className="rounded border-stone-300 text-stone-900"
                 />
                 <span>Donate anonymously (hide my name on public supporter wall)</span>
               </label>
@@ -1084,7 +1084,7 @@ export function CommunityHubBoard({
 
               {/* Settlement Destination Transparency Box */}
               <div className="rounded-xl border border-stone-200 bg-stone-50 px-3.5 py-2.5 text-[11px] text-stone-600 flex items-center gap-2">
-                <ShieldCheck className="h-4 w-4 text-[#1B4332] shrink-0" />
+                <ShieldCheck className="h-4 w-4 text-stone-900 shrink-0" />
                 <span>
                   {(donateTarget.cause_type ?? 'official') === 'official' ? (
                     <>
@@ -1116,7 +1116,7 @@ export function CommunityHubBoard({
                 <button
                   type="submit"
                   disabled={busy}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-[#1B4332] px-5 py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F] disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-black px-5 py-2 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
                 >
                   <Check className="h-3.5 w-3.5" />
                   <span>
@@ -1140,7 +1140,7 @@ export function CommunityHubBoard({
             <div className="flex items-start justify-between border-b border-stone-100 pb-3">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="rounded-full bg-[#F4F3EE] px-2.5 py-0.5 text-[11px] font-semibold text-[#1B4332]">
+                  <span className="rounded-full bg-[#F4F3EE] px-2.5 py-0.5 text-[11px] font-semibold text-stone-900">
                     {(detailTarget.cause_type ?? 'official') === 'official'
                       ? 'Official Community Cause'
                       : `Member Cause by ${detailTarget.creator?.display_name || 'Member'}`}
@@ -1174,7 +1174,7 @@ export function CommunityHubBoard({
                   {detailTarget.milestones.map((m, i) => (
                     <div key={i} className="flex items-center justify-between py-1.5 text-xs">
                       <span className="font-medium text-stone-800">{m.title}</span>
-                      <span className="font-semibold text-[#1B4332]">
+                      <span className="font-semibold text-stone-900">
                         {detailTarget.currency} {Number(m.amount).toLocaleString()}
                       </span>
                     </div>
@@ -1186,7 +1186,7 @@ export function CommunityHubBoard({
             {/* Organizer Updates */}
             <div className="space-y-3">
               <h4 className="text-xs font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1.5">
-                <Megaphone className="h-3.5 w-3.5 text-[#1B4332]" />
+                <Megaphone className="h-3.5 w-3.5 text-stone-900" />
                 <span>Organizer Updates ({detailTarget.updates?.length ?? 0})</span>
               </h4>
 
@@ -1201,7 +1201,7 @@ export function CommunityHubBoard({
                   <button
                     type="submit"
                     disabled={busy || !updateText.trim()}
-                    className="rounded-xl bg-[#1B4332] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#2D6A4F] disabled:opacity-40"
+                    className="rounded-xl bg-black px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-40"
                   >
                     Post Update
                   </button>
@@ -1237,7 +1237,7 @@ export function CommunityHubBoard({
                   <button
                     type="button"
                     onClick={() => openDonateModal(detailTarget)}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-[#1B4332] px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-black px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800"
                   >
                     <Heart className="h-3.5 w-3.5" />
                     <span>Donate Now</span>
@@ -1260,7 +1260,7 @@ export function CommunityHubBoard({
                           <p className="mt-0.5 text-stone-600">&ldquo;{d.message}&rdquo;</p>
                         )}
                       </div>
-                      <span className="font-bold text-[#1B4332] shrink-0">
+                      <span className="font-bold text-stone-900 shrink-0">
                         {detailTarget.currency} {Number(d.pledge_amount).toLocaleString()}
                       </span>
                     </div>
@@ -1373,7 +1373,7 @@ export function CommunityHubBoard({
                 <button
                   type="submit"
                   disabled={busy}
-                  className="rounded-xl bg-[#1B4332] px-5 py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F] disabled:opacity-50"
+                  className="rounded-xl bg-black px-5 py-2 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
                 >
                   {busy ? 'Saving...' : 'Save Settings'}
                 </button>

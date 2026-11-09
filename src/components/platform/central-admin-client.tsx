@@ -169,7 +169,7 @@ export function CentralAdminClient({
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-stone-200 pb-4">
         <div>
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-[#1B4332]">
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-stone-900">
             <Shield className="h-3.5 w-3.5" />
             <span>Platform Control Center</span>
           </span>
@@ -234,13 +234,13 @@ export function CentralAdminClient({
               type="button"
               onClick={() => setActiveTab(tab.id as typeof activeTab)}
               className={`relative inline-flex items-center gap-1.5 px-3.5 py-2.5 text-xs font-medium transition-colors ${
-                active ? 'text-[#1B4332] font-semibold' : 'text-stone-500 hover:text-stone-900'
+                active ? 'text-stone-900 font-semibold' : 'text-stone-500 hover:text-stone-900'
               }`}
             >
               <Icon className="h-3.5 w-3.5" />
               <span>{tab.label}</span>
               {active && (
-                <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-[#1B4332]" />
+                <span className="absolute inset-x-0 -bottom-px h-0.5 rounded-full bg-black" />
               )}
             </button>
           );
@@ -248,7 +248,7 @@ export function CentralAdminClient({
       </div>
 
       {toast && (
-        <div className="flex items-center gap-2 rounded-xl border border-stone-200 bg-[#F4F3EE] px-4 py-2.5 text-xs font-medium text-[#1B4332]">
+        <div className="flex items-center gap-2 rounded-xl border border-stone-200 bg-[#F4F3EE] px-4 py-2.5 text-xs font-medium text-stone-900">
           <CheckCircle2 className="h-4 w-4 shrink-0" />
           <span>{toast}</span>
         </div>
@@ -276,7 +276,7 @@ export function CentralAdminClient({
                     <span
                       className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                         enabled
-                          ? 'bg-[#F4F3EE] text-[#1B4332]'
+                          ? 'bg-[#F4F3EE] text-stone-900'
                           : 'bg-stone-100 text-stone-500'
                       }`}
                     >
@@ -298,7 +298,7 @@ export function CentralAdminClient({
                   className={`rounded-xl px-4 py-2 text-xs font-semibold transition-colors shrink-0 ${
                     enabled
                       ? 'border border-stone-200 bg-white text-stone-700 hover:bg-stone-50'
-                      : 'bg-[#1B4332] text-white hover:bg-[#2D6A4F]'
+                      : 'bg-black text-white hover:bg-zinc-800'
                   }`}
                 >
                   {enabled ? 'Disable Globally' : 'Enable Globally'}
@@ -321,14 +321,14 @@ export function CentralAdminClient({
                 <div className="flex items-center gap-2">
                   <Link
                     href={`/circles/${c.slug}`}
-                    className="text-sm font-bold text-stone-900 hover:text-[#1B4332]"
+                    className="text-sm font-bold text-stone-900 hover:text-black"
                   >
                     {c.name}
                   </Link>
                   <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-medium text-stone-600">
                     /{c.slug}
                   </span>
-                  <span className="rounded-full bg-[#F4F3EE] px-2 py-0.5 text-[10px] font-semibold text-[#1B4332]">
+                  <span className="rounded-full bg-[#F4F3EE] px-2 py-0.5 text-[10px] font-semibold text-stone-900">
                     {c.category}
                   </span>
                 </div>
@@ -385,7 +385,7 @@ export function CentralAdminClient({
                   <span className="text-sm font-bold text-stone-900">{u.display_name}</span>
                   <span className="text-xs text-stone-400">@{u.username}</span>
                   {u.is_platform_admin && (
-                    <span className="rounded-full bg-[#1B4332] px-2 py-0.5 text-[10px] font-semibold text-white">
+                    <span className="rounded-full bg-black px-2 py-0.5 text-[10px] font-semibold text-white">
                       Central Admin
                     </span>
                   )}
@@ -404,7 +404,7 @@ export function CentralAdminClient({
                     className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${
                       u.is_platform_admin
                         ? 'border border-stone-200 text-stone-700 hover:bg-stone-50'
-                        : 'bg-[#1B4332] text-white hover:bg-[#2D6A4F]'
+                        : 'bg-black text-white hover:bg-zinc-800'
                     }`}
                   >
                     {u.is_platform_admin ? 'Revoke Central Admin' : 'Make Central Admin'}

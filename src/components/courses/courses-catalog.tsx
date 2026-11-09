@@ -370,7 +370,7 @@ export function CoursesCatalog({
                           <span className="rounded-md bg-stone-100 px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-wider text-stone-700 border border-stone-200/60">
                             {course.difficulty_level?.replace('_', ' ') || 'All Levels'}
                           </span>
-                          <span className="rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-mono font-semibold text-emerald-800 border border-emerald-200/80 capitalize">
+                          <span className="rounded-md bg-stone-100 px-2 py-0.5 text-[10px] font-mono font-semibold text-stone-900 border border-stone-200 capitalize">
                             {course.pacing_format ? course.pacing_format.replace('_', ' ') : 'Self-paced'}
                           </span>
                           <span className="rounded-md bg-stone-100 px-2 py-0.5 text-[10px] font-mono text-stone-600 border border-stone-200/60">
@@ -542,7 +542,7 @@ export function CoursesCatalog({
                     onClick={() => setPacingFormat('self_paced')}
                     className={`relative flex flex-col items-start rounded-xl border p-3.5 text-left transition-all ${
                       pacingFormat === 'self_paced'
-                        ? 'border-emerald-600 bg-white shadow-xs ring-2 ring-emerald-600/20'
+                        ? 'border-black bg-white shadow-xs ring-2 ring-black/10'
                         : 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50/60'
                     }`}
                   >
@@ -550,14 +550,14 @@ export function CoursesCatalog({
                       <div
                         className={`flex h-8 w-8 items-center justify-center rounded-lg ${
                           pacingFormat === 'self_paced'
-                            ? 'bg-emerald-600 text-white'
+                            ? 'bg-black text-white'
                             : 'bg-stone-100 text-stone-600'
                         }`}
                       >
                         <Compass className="h-4 w-4" />
                       </div>
                       {pacingFormat === 'self_paced' ? (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        <CheckCircle2 className="h-4 w-4 text-stone-700" />
                       ) : (
                         <span className="h-4 w-4 rounded-full border border-stone-300" />
                       )}
@@ -565,7 +565,7 @@ export function CoursesCatalog({
                     <div className="mt-2.5">
                       <div className="flex items-center gap-1.5">
                         <h4 className="text-xs font-bold text-stone-900">Self-Paced</h4>
-                        <span className="rounded bg-emerald-100 px-1 py-0.2 text-[9px] font-semibold text-emerald-800">
+                        <span className="rounded bg-stone-100 px-1 py-0.2 text-[9px] font-semibold text-stone-900">
                           Popular
                         </span>
                       </div>
@@ -581,7 +581,7 @@ export function CoursesCatalog({
                     onClick={() => setPacingFormat('structured')}
                     className={`relative flex flex-col items-start rounded-xl border p-3.5 text-left transition-all ${
                       pacingFormat === 'structured'
-                        ? 'border-emerald-600 bg-white shadow-xs ring-2 ring-emerald-600/20'
+                        ? 'border-black bg-white shadow-xs ring-2 ring-black/10'
                         : 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50/60'
                     }`}
                   >
@@ -589,14 +589,14 @@ export function CoursesCatalog({
                       <div
                         className={`flex h-8 w-8 items-center justify-center rounded-lg ${
                           pacingFormat === 'structured'
-                            ? 'bg-emerald-600 text-white'
+                            ? 'bg-black text-white'
                             : 'bg-stone-100 text-stone-600'
                         }`}
                       >
                         <Layers className="h-4 w-4" />
                       </div>
                       {pacingFormat === 'structured' ? (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        <CheckCircle2 className="h-4 w-4 text-stone-700" />
                       ) : (
                         <span className="h-4 w-4 rounded-full border border-stone-300" />
                       )}
@@ -615,7 +615,7 @@ export function CoursesCatalog({
                     onClick={() => setPacingFormat('scheduled')}
                     className={`relative flex flex-col items-start rounded-xl border p-3.5 text-left transition-all ${
                       pacingFormat === 'scheduled'
-                        ? 'border-emerald-600 bg-white shadow-xs ring-2 ring-emerald-600/20'
+                        ? 'border-black bg-white shadow-xs ring-2 ring-black/10'
                         : 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50/60'
                     }`}
                   >
@@ -623,14 +623,14 @@ export function CoursesCatalog({
                       <div
                         className={`flex h-8 w-8 items-center justify-center rounded-lg ${
                           pacingFormat === 'scheduled'
-                            ? 'bg-emerald-600 text-white'
+                            ? 'bg-black text-white'
                             : 'bg-stone-100 text-stone-600'
                         }`}
                       >
                         <Calendar className="h-4 w-4" />
                       </div>
                       {pacingFormat === 'scheduled' ? (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                        <CheckCircle2 className="h-4 w-4 text-stone-700" />
                       ) : (
                         <span className="h-4 w-4 rounded-full border border-stone-300" />
                       )}
@@ -654,7 +654,7 @@ export function CoursesCatalog({
                       <label
                         className={`flex items-start gap-2 rounded-lg border p-2.5 cursor-pointer transition-colors ${
                           scheduleType === 'relative_drip'
-                            ? 'border-emerald-600 bg-emerald-50/40 ring-1 ring-emerald-600'
+                            ? 'border-black bg-stone-100 ring-1 ring-black'
                             : 'border-stone-200 bg-white hover:bg-stone-50'
                         }`}
                       >
@@ -663,7 +663,7 @@ export function CoursesCatalog({
                           name="schedule_type"
                           checked={scheduleType === 'relative_drip'}
                           onChange={() => setScheduleType('relative_drip')}
-                          className="mt-0.5 text-emerald-600 focus:ring-emerald-600"
+                          className="mt-0.5 text-stone-700 focus:ring-black"
                         />
                         <div>
                           <div className="font-semibold text-stone-900">Relative Drip</div>
@@ -675,7 +675,7 @@ export function CoursesCatalog({
                       <label
                         className={`flex items-start gap-2 rounded-lg border p-2.5 cursor-pointer transition-colors ${
                           scheduleType === 'calendar_date'
-                            ? 'border-emerald-600 bg-emerald-50/40 ring-1 ring-emerald-600'
+                            ? 'border-black bg-stone-100 ring-1 ring-black'
                             : 'border-stone-200 bg-white hover:bg-stone-50'
                         }`}
                       >
@@ -684,7 +684,7 @@ export function CoursesCatalog({
                           name="schedule_type"
                           checked={scheduleType === 'calendar_date'}
                           onChange={() => setScheduleType('calendar_date')}
-                          className="mt-0.5 text-emerald-600 focus:ring-emerald-600"
+                          className="mt-0.5 text-stone-700 focus:ring-black"
                         />
                         <div>
                           <div className="font-semibold text-stone-900">Fixed Calendar Dates</div>

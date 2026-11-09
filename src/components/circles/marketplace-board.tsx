@@ -478,12 +478,12 @@ export function MarketplaceBoard({
                 type="button"
                 onClick={() => setActiveView(tab.id as typeof activeView)}
                 className={`relative px-3.5 py-2 text-xs font-medium transition-colors whitespace-nowrap ${
-                  active ? 'text-[#1B4332] font-semibold' : 'text-stone-500 hover:text-stone-900'
+                  active ? 'text-stone-900 font-semibold' : 'text-stone-500 hover:text-stone-900'
                 }`}
               >
                 {tab.label}
                 {active && (
-                  <span className="absolute inset-x-0 -bottom-[13px] h-0.5 rounded-full bg-[#1B4332]" />
+                  <span className="absolute inset-x-0 -bottom-[13px] h-0.5 rounded-full bg-black" />
                 )}
               </button>
             );
@@ -512,7 +512,7 @@ export function MarketplaceBoard({
                 setEditingListing(null);
                 setWizardOpen(true);
               }}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[#1B4332] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-black px-3.5 py-2 text-xs font-semibold text-white hover:bg-zinc-800"
             >
               <Plus className="h-3.5 w-3.5" />
               <span>New listing</span>
@@ -523,7 +523,7 @@ export function MarketplaceBoard({
 
       {/* Order Confirmation Banner */}
       {orderReceipt && (
-        <div className="flex items-center justify-between rounded-xl border border-[#1B4332]/20 bg-[#F4F3EE] px-4 py-3 text-xs text-[#1B4332]">
+        <div className="flex items-center justify-between rounded-xl border border-stone-200 bg-[#F4F3EE] px-4 py-3 text-xs text-stone-900">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="h-4 w-4 shrink-0" />
             <span>
@@ -534,7 +534,7 @@ export function MarketplaceBoard({
           <button
             type="button"
             onClick={() => setOrderReceipt(null)}
-            className="text-[#1B4332]/70 hover:text-[#1B4332]"
+            className="text-stone-600 hover:text-black"
           >
             <X className="h-4 w-4" />
           </button>
@@ -557,7 +557,7 @@ export function MarketplaceBoard({
                     onClick={() => setSelectedType(pill.id)}
                     className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium whitespace-nowrap transition-colors ${
                       active
-                        ? 'bg-[#1B4332] text-white'
+                        ? 'bg-black text-white'
                         : 'bg-white border border-stone-200/80 text-stone-600 hover:bg-stone-100'
                     }`}
                   >
@@ -576,14 +576,14 @@ export function MarketplaceBoard({
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search..."
-                  className="w-full rounded-xl border border-stone-200 bg-white py-1.5 pl-8 pr-3 text-xs text-stone-900 focus:border-[#1B4332] focus:outline-none"
+                  className="w-full rounded-xl border border-stone-200 bg-white py-1.5 pl-8 pr-3 text-xs text-stone-900 focus:border-black focus:outline-none"
                 />
               </div>
 
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-                className="rounded-xl border border-stone-200 bg-white px-2.5 py-1.5 text-xs text-stone-700 focus:border-[#1B4332] focus:outline-none"
+                className="rounded-xl border border-stone-200 bg-white px-2.5 py-1.5 text-xs text-stone-700 focus:border-black focus:outline-none"
               >
                 <option value="newest">Newest</option>
                 <option value="price_asc">Price: Low to High</option>
@@ -604,7 +604,7 @@ export function MarketplaceBoard({
                     setEditingListing(null);
                     setWizardOpen(true);
                   }}
-                  className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-[#1B4332] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
+                  className="mt-4 inline-flex items-center gap-1.5 rounded-xl bg-black px-3.5 py-2 text-xs font-semibold text-white hover:bg-zinc-800"
                 >
                   <Plus className="h-3.5 w-3.5" />
                   <span>Post a listing</span>
@@ -651,7 +651,7 @@ export function MarketplaceBoard({
                             className={`rounded-md px-2 py-0.5 text-xs font-semibold ${
                               isSold
                                 ? 'bg-stone-100 text-stone-400 line-through'
-                                : 'bg-[#F4F3EE] text-[#1B4332]'
+                                : 'bg-[#F4F3EE] text-stone-900'
                             }`}
                           >
                             {priceLabel}
@@ -692,7 +692,7 @@ export function MarketplaceBoard({
                             onClick={() => handleToggleSave(item.id)}
                             className={`rounded-lg p-1.5 transition-colors ${
                               item.viewer_has_saved
-                                ? 'text-[#1B4332]'
+                                ? 'text-stone-900'
                                 : 'text-stone-400 hover:bg-stone-100 hover:text-stone-700'
                             }`}
                             title="Save"
@@ -720,7 +720,7 @@ export function MarketplaceBoard({
                           <button
                             type="button"
                             onClick={() => triggerPrimaryAction(item)}
-                            className="inline-flex items-center gap-1 rounded-lg bg-[#1B4332] px-2.5 py-1 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
+                            className="inline-flex items-center gap-1 rounded-lg bg-black px-2.5 py-1 text-xs font-semibold text-white hover:bg-zinc-800"
                           >
                             {item.action_type === 'checkout' && (
                               <CreditCard className="h-3 w-3" />
@@ -745,7 +745,7 @@ export function MarketplaceBoard({
           <div className="space-y-4 lg:col-span-1">
             <div className="rounded-2xl border border-stone-200/80 bg-white p-5 space-y-3">
               <div className="flex items-center gap-2">
-                <Wallet className="h-4 w-4 text-[#1B4332]" />
+                <Wallet className="h-4 w-4 text-stone-900" />
                 <h3 className="text-sm font-semibold text-stone-900">Member Wallet</h3>
               </div>
 
@@ -761,7 +761,7 @@ export function MarketplaceBoard({
                       className="flex items-center justify-between rounded-xl bg-[#FAF9F6] px-3.5 py-2.5"
                     >
                       <span className="text-xs font-medium text-stone-600">{b.currency}</span>
-                      <span className="text-sm font-bold text-[#1B4332]">
+                      <span className="text-sm font-bold text-stone-900">
                         {formatBachsAmount(b.available_cents, b.currency)}
                       </span>
                     </div>
@@ -779,7 +779,7 @@ export function MarketplaceBoard({
               </h4>
 
               {walletNotice && (
-                <p className="rounded-lg bg-[#F4F3EE] px-3 py-1.5 text-xs font-medium text-[#1B4332]">
+                <p className="rounded-lg bg-[#F4F3EE] px-3 py-1.5 text-xs font-medium text-stone-900">
                   {walletNotice}
                 </p>
               )}
@@ -820,7 +820,7 @@ export function MarketplaceBoard({
               <button
                 type="submit"
                 disabled={withdrawing}
-                className="w-full rounded-xl bg-[#1B4332] py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F] disabled:opacity-50"
+                className="w-full rounded-xl bg-black py-2 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
               >
                 {withdrawing ? 'Processing...' : 'Withdraw'}
               </button>
@@ -844,7 +844,7 @@ export function MarketplaceBoard({
                     </div>
                     <span
                       className={`font-semibold ${
-                        tx.entry_type === 'sale_credit' ? 'text-[#1B4332]' : 'text-stone-700'
+                        tx.entry_type === 'sale_credit' ? 'text-stone-900' : 'text-stone-700'
                       }`}
                     >
                       {tx.entry_type === 'sale_credit' ? '+' : '-'}
@@ -886,7 +886,7 @@ export function MarketplaceBoard({
                           <button
                             type="button"
                             onClick={() => handleRespondInquiry(inq.id, 'accepted', 'Accepted')}
-                            className="rounded-lg bg-[#1B4332] px-2.5 py-1 text-[11px] font-semibold text-white"
+                            className="rounded-lg bg-black px-2.5 py-1 text-[11px] font-semibold text-white"
                           >
                             Accept
                           </button>
@@ -938,7 +938,7 @@ export function MarketplaceBoard({
                           <button
                             type="button"
                             onClick={() => handleUpdateBooking(b.id, 'approved')}
-                            className="rounded-lg bg-[#1B4332] px-2.5 py-1 text-[11px] font-semibold text-white"
+                            className="rounded-lg bg-black px-2.5 py-1 text-[11px] font-semibold text-white"
                           >
                             Approve
                           </button>
@@ -992,7 +992,7 @@ export function MarketplaceBoard({
             )}
 
             <div className="flex items-center justify-between">
-              <span className="rounded-lg bg-[#F4F3EE] px-3 py-1 text-sm font-semibold text-[#1B4332]">
+              <span className="rounded-lg bg-[#F4F3EE] px-3 py-1 text-sm font-semibold text-stone-900">
                 {formatListingPrice(detailListing)}
               </span>
               {detailListing.location && (
@@ -1060,7 +1060,7 @@ export function MarketplaceBoard({
                         setDetailListing(null);
                         triggerPrimaryAction(target);
                       }}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-[#1B4332] px-4 py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-black px-4 py-2 text-xs font-semibold text-white hover:bg-zinc-800"
                     >
                       {detailListing.action_type === 'checkout' && (
                         <CreditCard className="h-3.5 w-3.5" />
@@ -1086,7 +1086,7 @@ export function MarketplaceBoard({
           >
             <div className="flex items-center justify-between border-b border-stone-100 pb-3">
               <div className="flex items-center gap-2">
-                <CreditCard className="h-4 w-4 text-[#1B4332]" />
+                <CreditCard className="h-4 w-4 text-stone-900" />
                 <h4 className="text-sm font-semibold text-stone-900">Checkout</h4>
               </div>
               <button
@@ -1111,7 +1111,7 @@ export function MarketplaceBoard({
                   Seller: {checkoutListing.seller?.display_name || 'Member'}
                 </p>
               </div>
-              <span className="text-base font-bold text-[#1B4332]">
+              <span className="text-base font-bold text-stone-900">
                 {formatListingPrice(checkoutListing)}
               </span>
             </div>
@@ -1133,7 +1133,7 @@ export function MarketplaceBoard({
                     onClick={() => setPaymentMethod(pm.id as typeof paymentMethod)}
                     className={`rounded-xl border px-3 py-2 text-xs font-medium transition-colors ${
                       paymentMethod === pm.id
-                        ? 'border-[#1B4332] bg-[#F4F3EE] text-[#1B4332] font-semibold'
+                        ? 'border-stone-900 bg-[#F4F3EE] text-stone-900 font-semibold'
                         : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-50'
                     }`}
                   >
@@ -1152,7 +1152,7 @@ export function MarketplaceBoard({
                 value={buyerNote}
                 onChange={(e) => setBuyerNote(e.target.value)}
                 placeholder="Coordinate pickup or delivery details..."
-                className="w-full rounded-xl border border-stone-200 px-3 py-2 text-xs text-stone-900 focus:border-[#1B4332] focus:outline-none"
+                className="w-full rounded-xl border border-stone-200 px-3 py-2 text-xs text-stone-900 focus:border-black focus:outline-none"
               />
             </div>
 
@@ -1167,7 +1167,7 @@ export function MarketplaceBoard({
               <button
                 type="submit"
                 disabled={checkoutBusy}
-                className="rounded-xl bg-[#1B4332] px-5 py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F] disabled:opacity-50"
+                className="rounded-xl bg-black px-5 py-2 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
               >
                 {checkoutBusy ? 'Processing...' : `Pay ${formatListingPrice(checkoutListing)}`}
               </button>
@@ -1232,7 +1232,7 @@ export function MarketplaceBoard({
                 <label className="text-xs font-medium text-stone-700">
                   Community commission on sales (%)
                 </label>
-                <span className="text-xs font-semibold text-[#1B4332]">
+                <span className="text-xs font-semibold text-stone-900">
                   {draftSettings.commissionPercentage ?? 0}%
                 </span>
               </div>
@@ -1368,7 +1368,7 @@ export function MarketplaceBoard({
                       }}
                       className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors ${
                         active
-                          ? 'border-[#1B4332] bg-[#F4F3EE] text-[#1B4332] font-semibold'
+                          ? 'border-stone-900 bg-[#F4F3EE] text-stone-900 font-semibold'
                           : 'border-stone-200 bg-white text-stone-500'
                       }`}
                     >
@@ -1390,7 +1390,7 @@ export function MarketplaceBoard({
               <button
                 type="submit"
                 disabled={savingSettings}
-                className="rounded-xl bg-[#1B4332] px-4 py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F] disabled:opacity-50"
+                className="rounded-xl bg-black px-4 py-2 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
               >
                 {savingSettings ? 'Saving...' : 'Save'}
               </button>
@@ -1426,7 +1426,7 @@ export function MarketplaceBoard({
               value={inquiryMessage}
               onChange={(e) => setInquiryMessage(e.target.value)}
               placeholder="Write your message..."
-              className="w-full rounded-xl border border-stone-200 p-3 text-xs text-stone-900 focus:border-[#1B4332] focus:outline-none"
+              className="w-full rounded-xl border border-stone-200 p-3 text-xs text-stone-900 focus:border-black focus:outline-none"
             />
 
             <div className="flex justify-end gap-2">
@@ -1440,7 +1440,7 @@ export function MarketplaceBoard({
               <button
                 type="submit"
                 disabled={sendingInquiry}
-                className="rounded-xl bg-[#1B4332] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
+                className="rounded-xl bg-black px-4 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800"
               >
                 {sendingInquiry ? 'Sending...' : 'Send'}
               </button>
@@ -1500,7 +1500,7 @@ export function MarketplaceBoard({
                           !slot.available
                             ? 'border-stone-100 bg-stone-50 text-stone-300'
                             : active
-                              ? 'border-[#1B4332] bg-[#1B4332] text-white'
+                              ? 'border-stone-900 bg-black text-white'
                               : 'border-stone-200 text-stone-700 hover:bg-stone-50'
                         }`}
                       >
@@ -1531,7 +1531,7 @@ export function MarketplaceBoard({
               <button
                 type="submit"
                 disabled={!selectedSlot || submittingBooking}
-                className="rounded-xl bg-[#1B4332] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#2D6A4F] disabled:opacity-40"
+                className="rounded-xl bg-black px-4 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-40"
               >
                 {submittingBooking ? 'Booking...' : 'Confirm'}
               </button>

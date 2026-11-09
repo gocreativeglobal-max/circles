@@ -341,7 +341,7 @@ export function LessonBlockBuilder({
     video: { bg: 'bg-rose-50', text: 'text-rose-700', border: 'border-rose-200' },
     image: { bg: 'bg-pink-50', text: 'text-pink-700', border: 'border-pink-200' },
     rich_text: { bg: 'bg-stone-100', text: 'text-stone-700', border: 'border-stone-200' },
-    code_sandbox: { bg: 'bg-emerald-50', text: 'text-emerald-800', border: 'border-emerald-200' },
+    code_sandbox: { bg: 'bg-stone-100', text: 'text-stone-900', border: 'border-stone-200' },
     file_asset: { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
     quiz_checkpoint: { bg: 'bg-purple-50', text: 'text-purple-800', border: 'border-purple-200' },
     discussion_prompt: { bg: 'bg-sky-50', text: 'text-sky-800', border: 'border-sky-200' },
@@ -430,9 +430,9 @@ export function LessonBlockBuilder({
               <button
                 type="button"
                 onClick={() => handleAddBlock('code_sandbox', insertIdx)}
-                className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-white p-2 text-left hover:bg-emerald-50 transition-colors"
+                className="flex items-center gap-2 rounded-xl border border-stone-200 bg-white p-2 text-left hover:bg-stone-100 transition-colors"
               >
-                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-800">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg bg-stone-100 text-stone-900">
                   <Code className="h-3.5 w-3.5" />
                 </span>
                 <div>
@@ -637,7 +637,7 @@ export function LessonBlockBuilder({
                     <div className="space-y-2.5">
                       <div className="flex items-center justify-between">
                         <label className="text-xs font-bold text-stone-900 flex items-center gap-1.5">
-                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                          <CheckCircle2 className="h-3.5 w-3.5 text-stone-700" />
                           Target Learning Objectives
                         </label>
                         <span className="text-[10px] font-mono text-stone-500">
@@ -1259,7 +1259,7 @@ export function LessonBlockBuilder({
                                               )
                                             );
                                           }}
-                                          className="text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 transition-colors"
+                                          className="text-[11px] font-semibold text-stone-900 hover:text-stone-900 transition-colors"
                                         >
                                           + Add Choice
                                         </button>
@@ -1277,7 +1277,7 @@ export function LessonBlockBuilder({
                                             key={optIdx}
                                             className={`flex items-center gap-2 rounded-xl border p-2 transition-all ${
                                               isCorrect
-                                                ? 'border-emerald-300 bg-emerald-50/70 ring-1 ring-emerald-200'
+                                                ? 'border-stone-300 bg-stone-100 ring-1 ring-stone-300'
                                                 : 'border-stone-200 bg-white'
                                             }`}
                                           >
@@ -1295,7 +1295,7 @@ export function LessonBlockBuilder({
                                               }}
                                               className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-all ${
                                                 isCorrect
-                                                  ? 'border-emerald-600 bg-emerald-600 text-white'
+                                                  ? 'border-black bg-black text-white'
                                                   : 'border-stone-300 bg-stone-50 hover:border-stone-400'
                                               }`}
                                             >
@@ -1395,7 +1395,7 @@ export function LessonBlockBuilder({
                                           )
                                         );
                                       }}
-                                      className="h-4 w-4 rounded border-stone-300 text-emerald-700 focus:ring-emerald-600"
+                                      className="h-4 w-4 rounded border-stone-300 text-stone-900 focus:ring-black"
                                     />
                                     <label htmlFor={`req-${block.id}`} className="text-xs text-stone-700 cursor-pointer select-none">
                                       Student must answer correctly to satisfy lesson progress

@@ -85,4 +85,4 @@ docs/
 
 - **TypeScript Strict Mode**: Avoid `any`. Use Zod schemas at all input boundaries (Server Actions, Route Handlers, forms).
 - **Explicit Domain Operations**: Keep business logic inside `src/features/<domain>/service.ts` rather than inside React components.
-- **Visual Direction**: Forest-green primary palette (`#1B4332`, `#2D6A4F`, `#40916C`), warm neutral stone surfaces (`#FAF9F6`, `#F4F3EE`), clear typography, accessible contrast, and honest UI feedback.
+- **Visual Direction**: Black and white / neutral stone palette (`bg-black`, `text-black`, `bg-zinc-900`, `bg-zinc-100`, stone surfaces), clear typography, accessible contrast, and honest UI feedback.

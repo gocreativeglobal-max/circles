@@ -96,7 +96,7 @@ export function InlinePollCard({
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-wider text-emerald-800 border border-emerald-200/60">
+            <span className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-mono font-semibold uppercase tracking-wider text-stone-900 border border-stone-200">
               <Vote className="h-3 w-3" />
               {isMulti ? 'Multiple Choice' : 'Poll'}
             </span>
@@ -138,11 +138,11 @@ export function InlinePollCard({
               }}
               className={`group relative overflow-hidden rounded-xl border p-3 text-left transition-all select-none ${
                 canInteract
-                  ? 'cursor-pointer hover:border-emerald-500 hover:bg-white active:scale-[0.99]'
+                  ? 'cursor-pointer hover:border-stone-900 hover:bg-white active:scale-[0.99]'
                   : 'cursor-default'
               } ${
                 isSelected
-                  ? 'border-emerald-600/80 bg-white ring-1 ring-emerald-600/30 shadow-xs'
+                  ? 'border-black/80 bg-white ring-1 ring-stone-300 shadow-xs'
                   : 'border-stone-200 bg-white/80'
               }`}
             >
@@ -151,7 +151,7 @@ export function InlinePollCard({
                 <div
                   className={`absolute inset-y-0 left-0 transition-all duration-500 ease-out ${
                     isSelected
-                      ? 'bg-emerald-500/15'
+                      ? 'bg-stone-100'
                       : 'bg-stone-200/50'
                   }`}
                   style={{ width: `${percentage}%` }}
@@ -166,8 +166,8 @@ export function InlinePollCard({
                     <div
                       className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors ${
                         isSelected
-                          ? 'border-emerald-600 bg-emerald-600 text-white'
-                          : 'border-stone-300 bg-white group-hover:border-emerald-500'
+                          ? 'border-black bg-black text-white'
+                          : 'border-stone-300 bg-white group-hover:border-stone-400'
                       }`}
                     >
                       {isSelected && <Check className="h-3 w-3 stroke-[3]" />}
@@ -176,8 +176,8 @@ export function InlinePollCard({
                     <div
                       className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border transition-colors ${
                         isSelected
-                          ? 'border-emerald-600 bg-emerald-600 text-white'
-                          : 'border-stone-300 bg-white group-hover:border-emerald-500'
+                          ? 'border-black bg-black text-white'
+                          : 'border-stone-300 bg-white group-hover:border-stone-400'
                       }`}
                     >
                       {isSelected && <Circle className="h-2 w-2 fill-current" />}
@@ -198,7 +198,7 @@ export function InlinePollCard({
                   {poll.results_visible_to_viewer ? (
                     <span
                       className={`font-semibold ${
-                        isSelected ? 'text-emerald-700' : 'text-stone-600'
+                        isSelected ? 'text-stone-900' : 'text-stone-600'
                       }`}
                     >
                       {percentage}%
@@ -229,7 +229,7 @@ export function InlinePollCard({
             size="sm"
             disabled={submitting || selectedOptionIds.length === 0}
             onClick={() => submitVote(selectedOptionIds)}
-            className="h-8 rounded-lg bg-emerald-700 px-4 text-xs font-semibold text-white hover:bg-emerald-800 disabled:opacity-50"
+            className="h-8 rounded-lg bg-black px-4 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
           >
             {submitting ? 'Submitting...' : 'Vote'}
           </Button>
@@ -250,7 +250,7 @@ export function InlinePollCard({
         </span>
         <div className="flex items-center gap-2">
           {hasVoted && (
-            <span className="inline-flex items-center gap-1 text-emerald-700 font-medium">
+            <span className="inline-flex items-center gap-1 text-stone-900 font-medium">
               <CheckCircle2 className="h-3.5 w-3.5" />
               Voted
             </span>

@@ -46,7 +46,7 @@ export default async function CircleCustomFeaturesHubPage({
           {user?.is_platform_admin && (
             <Link
               href="/admin"
-              className="rounded-xl bg-[#1B4332] px-4 py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F]"
+              className="rounded-xl bg-black px-4 py-2 text-xs font-semibold text-white hover:bg-zinc-800"
             >
               Open Circles Central Admin
             </Link>

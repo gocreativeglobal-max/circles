@@ -129,7 +129,7 @@ export function CircleOnboardingChecklist({
                 aria-label={`Mark "${step.title}" as ${done ? 'incomplete' : 'complete'}`}
               >
                 {done ? (
-                  <CheckCircle2 className="h-4 w-4 text-[#2D6A4F]" />
+                  <CheckCircle2 className="h-4 w-4 text-stone-700" />
                 ) : (
                   <CircleIcon className="h-4 w-4 text-stone-300" />
                 )}

@@ -49,7 +49,7 @@ function formatInlineMarkdown(text: string): React.ReactNode {
       parts.push(
         <code
           key={key++}
-          className="rounded-md bg-stone-100 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-emerald-900 border border-stone-200/80"
+          className="rounded-md bg-stone-100 px-1.5 py-0.5 font-mono text-[11px] font-semibold text-stone-900 border border-stone-200/80"
         >
           {codeMatch[1]}
         </code>
@@ -310,7 +310,7 @@ export function ContentBlockRenderer({
                   // H3
                   if (trimmed.startsWith('### ')) {
                     return (
-                      <h4 key={pIdx} className="text-sm font-bold text-stone-900 uppercase tracking-wide text-emerald-900 pt-1">
+                      <h4 key={pIdx} className="text-sm font-bold text-stone-900 uppercase tracking-wide text-stone-900 pt-1">
                         {formatInlineMarkdown(trimmed.replace(/^###\s+/, ''))}
                       </h4>
                     );
@@ -322,9 +322,9 @@ export function ContentBlockRenderer({
                     return (
                       <div
                         key={pIdx}
-                        className="flex items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4 text-xs text-emerald-950"
+                        className="flex items-start gap-3 rounded-xl border border-stone-200 bg-stone-100 p-4 text-xs text-stone-900"
                       >
-                        <Lightbulb className="h-4 w-4 shrink-0 text-emerald-700 mt-0.5" />
+                        <Lightbulb className="h-4 w-4 shrink-0 text-stone-900 mt-0.5" />
                         <div>{formatInlineMarkdown(content)}</div>
                       </div>
                     );
@@ -349,7 +349,7 @@ export function ContentBlockRenderer({
                     return (
                       <blockquote
                         key={pIdx}
-                        className="border-l-4 border-emerald-700 bg-stone-50/70 py-2.5 px-4 rounded-r-xl text-xs text-stone-700 italic"
+                        className="border-l-4 border-black bg-stone-50/70 py-2.5 px-4 rounded-r-xl text-xs text-stone-700 italic"
                       >
                         {formatInlineMarkdown(quote)}
                       </blockquote>
@@ -363,7 +363,7 @@ export function ContentBlockRenderer({
                       <ul key={pIdx} className="space-y-1.5 pl-1 text-xs text-stone-700">
                         {items.map((item, iIdx) => (
                           <li key={iIdx} className="flex items-start gap-2">
-                            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-700" />
+                            <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-black" />
                             <span>{formatInlineMarkdown(item.replace(/^[-*]\s+/, ''))}</span>
                           </li>
                         ))}
@@ -422,7 +422,7 @@ export function ContentBlockRenderer({
                       <span className="h-2.5 w-2.5 rounded-full bg-[#27c93f]" />
                     </div>
                     <div className="flex items-center gap-1.5 font-mono text-[11px] font-semibold text-stone-300">
-                      <Terminal className="h-3.5 w-3.5 text-emerald-400" />
+                      <Terminal className="h-3.5 w-3.5 text-stone-300" />
                       <span className="uppercase tracking-wider">{block.language || 'typescript'}</span>
                     </div>
                   </div>
@@ -434,8 +434,8 @@ export function ContentBlockRenderer({
                   >
                     {hasCopied ? (
                       <>
-                        <Check className="h-3 w-3 text-emerald-400" />
-                        <span className="text-emerald-400">Copied</span>
+                        <Check className="h-3 w-3 text-white" />
+                        <span className="text-white">Copied</span>
                       </>
                     ) : (
                       <>
@@ -449,14 +449,14 @@ export function ContentBlockRenderer({
                 {/* Instructions bubble if present */}
                 {block.instructions && (
                   <div className="border-b border-stone-800/80 bg-stone-900/60 px-4 py-3 flex items-start gap-2.5 text-xs text-stone-300">
-                    <Info className="h-4 w-4 shrink-0 text-emerald-400 mt-0.5" />
+                    <Info className="h-4 w-4 shrink-0 text-stone-300 mt-0.5" />
                     <p className="leading-relaxed">{block.instructions}</p>
                   </div>
                 )}
 
                 {/* Code Body */}
-                <div className="overflow-x-auto p-4 font-mono text-xs leading-relaxed text-emerald-300">
-                  <pre className="selection:bg-emerald-800 selection:text-white">{block.starterCode}</pre>
+                <div className="overflow-x-auto p-4 font-mono text-xs leading-relaxed text-zinc-300">
+                  <pre className="selection:bg-black selection:text-white">{block.starterCode}</pre>
                 </div>
 
                 {/* Solution Drawer */}
@@ -498,7 +498,7 @@ export function ContentBlockRenderer({
                 className="group flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-stone-200/90 bg-white p-4 shadow-xs transition-all hover:border-stone-300"
               >
                 <div className="flex items-center gap-3.5 min-w-0">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-stone-100 text-stone-700 border border-stone-200/80 group-hover:bg-emerald-50 group-hover:text-emerald-800 group-hover:border-emerald-200 transition-colors">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-stone-100 text-stone-700 border border-stone-200/80 group-hover:bg-stone-100 group-hover:text-stone-900 group-hover:border-stone-200 transition-colors">
                     {ext === 'PY' || ext === 'TS' || ext === 'JS' ? (
                       <FileCode className="h-5 w-5" />
                     ) : (
@@ -547,7 +547,7 @@ export function ContentBlockRenderer({
                 key={block.id || idx}
                 className={`rounded-2xl border p-5 shadow-xs transition-all space-y-4 ${
                   allDone
-                    ? 'border-emerald-300 bg-emerald-50/40'
+                    ? 'border-stone-300 bg-stone-100'
                     : 'border-stone-200/90 bg-white'
                 }`}
               >
@@ -578,7 +578,7 @@ export function ContentBlockRenderer({
                 {total > 0 && (
                   <div className="h-1.5 w-full overflow-hidden rounded-full bg-stone-100">
                     <div
-                      className="h-full bg-emerald-600 transition-all duration-300"
+                      className="h-full bg-black transition-all duration-300"
                       style={{ width: `${percent}%` }}
                     />
                   </div>
@@ -595,7 +595,7 @@ export function ContentBlockRenderer({
                           key={oIdx}
                           className={`flex items-start gap-3 rounded-xl border p-2.5 text-xs cursor-pointer transition-all ${
                             isDone
-                              ? 'border-emerald-200 bg-emerald-50/50 text-stone-500'
+                              ? 'border-stone-200 bg-stone-100 text-stone-500'
                               : 'border-stone-100 bg-stone-50/50 text-stone-800 hover:border-stone-200'
                           }`}
                         >
@@ -603,7 +603,7 @@ export function ContentBlockRenderer({
                             type="checkbox"
                             checked={isDone}
                             onChange={() => toggleObjective(key)}
-                            className="mt-0.5 rounded border-stone-300 text-emerald-700 focus:ring-0"
+                            className="mt-0.5 rounded border-stone-300 text-stone-900 focus:ring-0"
                           />
                           <span className={isDone ? 'line-through text-stone-400' : 'font-medium'}>
                             {obj}
@@ -615,8 +615,8 @@ export function ContentBlockRenderer({
                 )}
 
                 {allDone && (
-                  <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-100/60 p-3 text-xs text-emerald-900 animate-in fade-in">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-700 shrink-0" />
+                  <div className="flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-100/60 p-3 text-xs text-stone-900 animate-in fade-in">
+                    <CheckCircle2 className="h-4 w-4 text-stone-900 shrink-0" />
                     <span className="font-semibold">
                       Awesome! You have completed all learning objectives for this lesson.
                     </span>
@@ -633,19 +633,19 @@ export function ContentBlockRenderer({
               return (
                 <div
                   key={block.id || idx}
-                  className="group relative overflow-hidden rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50/70 via-white to-stone-50 p-6 shadow-xs transition-all hover:border-emerald-300"
+                  className="group relative overflow-hidden rounded-2xl border border-stone-200 bg-gradient-to-br from-stone-100 via-white to-stone-50 p-6 shadow-xs transition-all hover:border-stone-300"
                 >
                   <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                     <div className="space-y-1.5">
                       <div className="flex items-center gap-2">
-                        <span className="flex h-5 w-5 items-center justify-center rounded-md bg-emerald-800 text-white shadow-xs">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-md bg-black text-white shadow-xs">
                           <HelpCircle className="h-3 w-3" />
                         </span>
-                        <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-950">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-stone-900">
                           Knowledge Assessment Checkpoint
                         </span>
                         {block.requiredToPass && (
-                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-900 border border-emerald-200">
+                          <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-bold text-stone-900 border border-stone-200">
                             Required
                           </span>
                         )}
@@ -662,7 +662,7 @@ export function ContentBlockRenderer({
 
                     <Button
                       onClick={() => onLaunchQuiz?.(block.quizId || '')}
-                      className="rounded-xl bg-emerald-800 text-white text-xs font-semibold hover:bg-emerald-900 px-5 shrink-0 shadow-xs"
+                      className="rounded-xl bg-black text-white text-xs font-semibold hover:bg-zinc-800 px-5 shrink-0 shadow-xs"
                     >
                       Start Assessment
                     </Button>
@@ -701,12 +701,12 @@ export function ContentBlockRenderer({
                   {isAnswered && (
                     <span
                       className={`inline-flex items-center gap-1 text-xs font-bold ${
-                        isCorrect ? 'text-emerald-700' : 'text-amber-700'
+                        isCorrect ? 'text-stone-900' : 'text-amber-700'
                       }`}
                     >
                       {isCorrect ? (
                         <>
-                          <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                          <CheckCircle2 className="h-3.5 w-3.5 text-stone-700" />
                           <span>Correct!</span>
                         </>
                       ) : (
@@ -733,10 +733,10 @@ export function ContentBlockRenderer({
                     if (isAnswered) {
                       if (isSelected) {
                         optionStyle = isCorrect
-                          ? 'border-emerald-500 bg-emerald-50 text-emerald-900 ring-1 ring-emerald-400 font-medium'
+                          ? 'border-black bg-stone-100 text-stone-900 ring-1 ring-black font-medium'
                           : 'border-red-400 bg-red-50 text-red-900 ring-1 ring-red-300';
                       } else if (state.isSubmitted && optIdx === (block.correctAnswerIndex ?? 0)) {
-                        optionStyle = 'border-emerald-400 bg-emerald-50/60 text-emerald-900';
+                        optionStyle = 'border-black bg-stone-100 text-stone-900 font-medium';
                       } else {
                         optionStyle = 'border-stone-100 bg-stone-50/30 text-stone-400 opacity-60';
                       }
@@ -762,7 +762,7 @@ export function ContentBlockRenderer({
                             className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
                               isSelected
                                 ? isCorrect
-                                  ? 'bg-emerald-600 text-white'
+                                  ? 'bg-black text-white'
                                   : 'bg-red-600 text-white'
                                 : 'bg-stone-200/70 text-stone-700'
                             }`}
@@ -773,7 +773,7 @@ export function ContentBlockRenderer({
                         </div>
 
                         {isSelected && isCorrect && (
-                          <Check className="h-4 w-4 text-emerald-600 shrink-0" />
+                          <Check className="h-4 w-4 text-stone-700 shrink-0" />
                         )}
                         {isSelected && !isCorrect && (
                           <X className="h-4 w-4 text-red-500 shrink-0" />
@@ -788,13 +788,13 @@ export function ContentBlockRenderer({
                   <div
                     className={`rounded-xl border p-3.5 text-xs transition-all ${
                       isCorrect
-                        ? 'border-emerald-200 bg-emerald-50/70 text-emerald-950'
+                        ? 'border-stone-200 bg-stone-100 text-stone-900'
                         : 'border-amber-200 bg-amber-50/70 text-amber-950'
                     }`}
                   >
                     <div className="flex items-start gap-2">
                       {isCorrect ? (
-                        <Sparkles className="h-4 w-4 shrink-0 text-emerald-700 mt-0.5" />
+                        <Sparkles className="h-4 w-4 shrink-0 text-stone-900 mt-0.5" />
                       ) : (
                         <Info className="h-4 w-4 shrink-0 text-amber-700 mt-0.5" />
                       )}

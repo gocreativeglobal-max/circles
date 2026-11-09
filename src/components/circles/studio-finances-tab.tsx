@@ -428,8 +428,8 @@ export function StudioFinancesTab({
     <div className="space-y-6">
       {/* Top Notification Banners */}
       {banner && (
-        <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-800 shadow-sm animate-in fade-in">
-          <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+        <div className="flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-100 px-4 py-3 text-sm font-medium text-stone-900 shadow-sm animate-in fade-in">
+          <CheckCircle2 className="h-4 w-4 text-stone-700 shrink-0" />
           {banner}
         </div>
       )}
@@ -479,12 +479,12 @@ export function StudioFinancesTab({
             <span className="text-xs font-semibold uppercase tracking-wider text-stone-500">
               Treasury Revenue
             </span>
-            <div className="rounded-xl bg-emerald-50 p-2 text-emerald-700">
+            <div className="rounded-xl bg-stone-100 p-2 text-stone-900">
               <TrendingUp className="h-4 w-4" />
             </div>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-emerald-800">
+            <span className="text-2xl font-bold text-stone-900">
               ${(((treasurySummary?.total_revenue_cents || 0) / 100)).toLocaleString('en-US', {
                 minimumFractionDigits: 2,
               })}
@@ -529,7 +529,7 @@ export function StudioFinancesTab({
               <span className="text-lg font-bold text-stone-900">
                 {PLATFORM_TIERS[currentTier]?.name.split(' ')[0] || 'Free'}
               </span>
-              <p className="text-xs font-semibold text-emerald-700">
+              <p className="text-xs font-semibold text-stone-900">
                 {currentTier === 'enterprise' && customFeePct != null
                   ? `${customFeePct}% Custom Fee`
                   : PLATFORM_TIERS[currentTier]?.badge}
@@ -796,7 +796,7 @@ export function StudioFinancesTab({
                         <span
                           className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                             inv.status === 'paid'
-                              ? 'bg-emerald-100 text-emerald-800'
+                              ? 'bg-stone-100 text-stone-900'
                               : inv.status === 'open'
                               ? 'bg-amber-100 text-amber-800'
                               : 'bg-stone-100 text-stone-700'
@@ -898,7 +898,7 @@ export function StudioFinancesTab({
                           <span
                             className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold ${
                               entry.entry_type === 'revenue'
-                                ? 'bg-emerald-100 text-emerald-800'
+                                ? 'bg-stone-100 text-stone-900'
                                 : 'bg-red-100 text-red-800'
                             }`}
                           >
@@ -918,7 +918,7 @@ export function StudioFinancesTab({
                         </td>
                         <td className="px-5 py-4 text-xs">
                           {entry.is_public_to_members ? (
-                            <span className="inline-flex items-center gap-1 text-emerald-700">
+                            <span className="inline-flex items-center gap-1 text-stone-900">
                               <Eye className="h-3 w-3" /> Public
                             </span>
                           ) : (
@@ -932,7 +932,7 @@ export function StudioFinancesTab({
                         </td>
                         <td
                           className={`px-5 py-4 text-right font-bold font-mono ${
-                            entry.entry_type === 'revenue' ? 'text-emerald-700' : 'text-red-700'
+                            entry.entry_type === 'revenue' ? 'text-stone-900' : 'text-red-700'
                           }`}
                         >
                           {entry.entry_type === 'revenue' ? '+' : '-'}$
@@ -1044,7 +1044,7 @@ export function StudioFinancesTab({
                       ✓ Unlimited video lessons supported via YouTube (Unlisted), Vimeo & Loom embeds
                     </span>
                   ) : (
-                    <span className="text-emerald-700 font-medium">
+                    <span className="text-stone-900 font-medium">
                       ✓ Native high-definition video & document storage unlocked
                     </span>
                   )}
@@ -1090,7 +1090,7 @@ export function StudioFinancesTab({
                       <div className="flex items-center justify-between">
                         <h5 className="text-base font-bold text-stone-900">{tierDef.name}</h5>
                         {tierKey === 'platinum' && <Crown className="h-4 w-4 text-amber-500" />}
-                        {tierKey === 'pro' && <Zap className="h-4 w-4 text-emerald-600" />}
+                        {tierKey === 'pro' && <Zap className="h-4 w-4 text-stone-700" />}
                       </div>
 
                       <div className="mt-4 flex items-baseline gap-1">
@@ -1107,7 +1107,7 @@ export function StudioFinancesTab({
                       </div>
 
                       <div className="mt-2.5 flex flex-wrap gap-1.5">
-                        <span className="inline-flex items-center rounded-lg bg-emerald-100/70 px-2 py-0.5 text-[11px] font-bold text-emerald-800">
+                        <span className="inline-flex items-center rounded-lg bg-stone-100 px-2 py-0.5 text-[11px] font-bold text-stone-900">
                           {tierKey === 'enterprise' && customFeePct != null
                             ? `${customFeePct}% Fee`
                             : tierDef.badge}
@@ -1197,13 +1197,13 @@ export function StudioFinancesTab({
                     <td className="px-5 py-3.5 font-semibold text-stone-900">
                       All LMS & Teaching Tools (Quizzes, Dripping, Question Banks, Learning Paths)
                     </td>
-                    <td className="px-5 py-3.5 text-center font-bold text-emerald-700">
+                    <td className="px-5 py-3.5 text-center font-bold text-stone-900">
                       ✓ 100% Unlocked
                     </td>
-                    <td className="px-5 py-3.5 text-center font-bold text-emerald-700">
+                    <td className="px-5 py-3.5 text-center font-bold text-stone-900">
                       ✓ 100% Unlocked
                     </td>
-                    <td className="px-5 py-3.5 text-center font-bold text-emerald-700">
+                    <td className="px-5 py-3.5 text-center font-bold text-stone-900">
                       ✓ 100% Unlocked
                     </td>
                   </tr>
@@ -1211,13 +1211,13 @@ export function StudioFinancesTab({
                     <td className="px-5 py-3.5 font-medium text-stone-900">
                       Unlimited Members & Discussion Spaces
                     </td>
-                    <td className="px-5 py-3.5 text-center font-semibold text-emerald-700">
+                    <td className="px-5 py-3.5 text-center font-semibold text-stone-900">
                       ✓ Unlimited
                     </td>
-                    <td className="px-5 py-3.5 text-center font-semibold text-emerald-700">
+                    <td className="px-5 py-3.5 text-center font-semibold text-stone-900">
                       ✓ Unlimited
                     </td>
-                    <td className="px-5 py-3.5 text-center font-semibold text-emerald-700">
+                    <td className="px-5 py-3.5 text-center font-semibold text-stone-900">
                       ✓ Unlimited
                     </td>
                   </tr>
@@ -1228,10 +1228,10 @@ export function StudioFinancesTab({
                     <td className="px-5 py-3.5 text-center font-semibold text-stone-800">
                       10% Take-Rate
                     </td>
-                    <td className="px-5 py-3.5 text-center font-semibold text-emerald-700">
+                    <td className="px-5 py-3.5 text-center font-semibold text-stone-900">
                       5% Take-Rate (50% cut)
                     </td>
-                    <td className="px-5 py-3.5 text-center font-semibold text-emerald-700">
+                    <td className="px-5 py-3.5 text-center font-semibold text-stone-900">
                       2% Take-Rate (80% cut)
                     </td>
                   </tr>
@@ -1242,10 +1242,10 @@ export function StudioFinancesTab({
                     <td className="px-5 py-3.5 text-center font-mono text-stone-600">
                       500 MB (Video embeds free)
                     </td>
-                    <td className="px-5 py-3.5 text-center font-mono font-semibold text-emerald-800">
+                    <td className="px-5 py-3.5 text-center font-mono font-semibold text-stone-900">
                       50 GB Native Storage
                     </td>
-                    <td className="px-5 py-3.5 text-center font-mono font-semibold text-emerald-800">
+                    <td className="px-5 py-3.5 text-center font-mono font-semibold text-stone-900">
                       250 GB Enterprise Storage
                     </td>
                   </tr>
@@ -1256,10 +1256,10 @@ export function StudioFinancesTab({
                     <td className="px-5 py-3.5 text-center text-amber-700 font-medium">
                       Circles Platform Ads
                     </td>
-                    <td className="px-5 py-3.5 text-center text-emerald-700 font-bold">
+                    <td className="px-5 py-3.5 text-center text-stone-900 font-bold">
                       ✓ 100% Ad-Free
                     </td>
-                    <td className="px-5 py-3.5 text-center text-emerald-700 font-bold">
+                    <td className="px-5 py-3.5 text-center text-stone-900 font-bold">
                       ✓ 100% Ad-Free
                     </td>
                   </tr>
@@ -1270,10 +1270,10 @@ export function StudioFinancesTab({
                     <td className="px-5 py-3.5 text-center text-stone-400">
                       No (Circles Subpath)
                     </td>
-                    <td className="px-5 py-3.5 text-center text-emerald-700 font-bold">
+                    <td className="px-5 py-3.5 text-center text-stone-900 font-bold">
                       ✓ Included
                     </td>
-                    <td className="px-5 py-3.5 text-center text-emerald-700 font-bold">
+                    <td className="px-5 py-3.5 text-center text-stone-900 font-bold">
                       ✓ Included
                     </td>
                   </tr>
@@ -1284,10 +1284,10 @@ export function StudioFinancesTab({
                     <td className="px-5 py-3.5 text-center text-stone-400">
                       Standard Circles Footer
                     </td>
-                    <td className="px-5 py-3.5 text-center text-emerald-700 font-semibold">
+                    <td className="px-5 py-3.5 text-center text-stone-900 font-semibold">
                       ✓ Custom Sender Domain
                     </td>
-                    <td className="px-5 py-3.5 text-center text-emerald-700 font-bold">
+                    <td className="px-5 py-3.5 text-center text-stone-900 font-bold">
                       ✓ Full White-Label
                     </td>
                   </tr>
@@ -1301,7 +1301,7 @@ export function StudioFinancesTab({
                     <td className="px-5 py-3.5 text-center text-stone-600">
                       Basic CSV Export
                     </td>
-                    <td className="px-5 py-3.5 text-center text-emerald-700 font-bold">
+                    <td className="px-5 py-3.5 text-center text-stone-900 font-bold">
                       ✓ Live Automated Sync
                     </td>
                   </tr>
@@ -1341,7 +1341,7 @@ export function StudioFinancesTab({
                       <th className="px-5 py-3 text-right">Gross Amount</th>
                       <th className="px-5 py-3 text-right">Platform Fee %</th>
                       <th className="px-5 py-3 text-right">Fee Retained</th>
-                      <th className="px-5 py-3 text-right text-emerald-800">Net Creator Deposit</th>
+                      <th className="px-5 py-3 text-right text-stone-900">Net Creator Deposit</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-stone-100">
@@ -1371,7 +1371,7 @@ export function StudioFinancesTab({
                         <td className="px-5 py-3.5 text-right font-mono font-semibold text-red-700">
                           -{formatBachsAmount(row.platform_fee_cents, row.currency)}
                         </td>
-                        <td className="px-5 py-3.5 text-right font-mono font-bold text-emerald-700">
+                        <td className="px-5 py-3.5 text-right font-mono font-bold text-stone-900">
                           +{formatBachsAmount(row.creator_net_cents, row.currency)}
                         </td>
                       </tr>

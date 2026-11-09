@@ -291,7 +291,7 @@ export function LearningPathsView({
                       Track
                     </span>
                     {p.status === 'published' ? (
-                      <span className="text-[10px] text-emerald-700 font-medium">Published</span>
+                      <span className="text-[10px] text-stone-900 font-medium">Published</span>
                     ) : (
                       <span className="text-[10px] text-amber-700 font-medium">Draft</span>
                     )}
@@ -401,7 +401,7 @@ export function LearningPathsView({
                           key={step.id || idx}
                           className={`relative flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-2xl border p-5 transition-all ${
                             isCompleted
-                              ? 'border-emerald-200 bg-emerald-50/20'
+                              ? 'border-stone-200 bg-stone-100/20'
                               : isLocked
                               ? 'border-stone-200 bg-stone-50/50 opacity-80'
                               : 'border-stone-200 bg-white hover:border-stone-300 shadow-2xs'
@@ -412,7 +412,7 @@ export function LearningPathsView({
                             <div
                               className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl text-xs font-mono font-bold ${
                                 isCompleted
-                                  ? 'bg-emerald-600 text-white'
+                                  ? 'bg-black text-white'
                                   : isLocked
                                   ? 'bg-stone-200 text-stone-600'
                                   : 'bg-black text-white'
@@ -435,7 +435,7 @@ export function LearningPathsView({
                                 )}
 
                                 {isCompleted && (
-                                  <span className="inline-flex items-center gap-1 rounded bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-900 border border-emerald-200">
+                                  <span className="inline-flex items-center gap-1 rounded bg-stone-100 px-2 py-0.5 text-[10px] font-medium text-stone-900 border border-stone-200">
                                     <CheckCircle2 className="h-2.5 w-2.5" />
                                     Completed
                                   </span>

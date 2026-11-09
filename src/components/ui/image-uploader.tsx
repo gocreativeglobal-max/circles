@@ -233,7 +233,7 @@ export function ImageUploader<T extends string | string[]>({
 
               {/* Primary badge for first image in multi mode */}
               {multiple && idx === 0 && (
-                <span className="absolute top-2 left-2 rounded-md bg-emerald-800/90 px-2 py-0.5 text-[10px] font-bold text-white shadow-xs backdrop-blur-xs">
+                <span className="absolute top-2 left-2 rounded-md bg-black/90 px-2 py-0.5 text-[10px] font-bold text-white shadow-xs backdrop-blur-xs">
                   Cover Photo
                 </span>
               )}
@@ -261,7 +261,7 @@ export function ImageUploader<T extends string | string[]>({
           onClick={() => !uploading && fileInputRef.current?.click()}
           className={`relative cursor-pointer rounded-2xl border-2 border-dashed p-6 text-center transition-all duration-200 ${
             isDragOver
-              ? 'border-emerald-600 bg-emerald-50/50 scale-[0.99]'
+              ? 'border-black bg-stone-100 scale-[0.99]'
               : 'border-stone-200 hover:border-stone-400 bg-stone-50/50 hover:bg-stone-50'
           } ${uploading ? 'pointer-events-none opacity-70' : ''}`}
         >
@@ -275,7 +275,7 @@ export function ImageUploader<T extends string | string[]>({
           />
 
           <div className="flex flex-col items-center justify-center space-y-2">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white border border-stone-200 shadow-xs text-emerald-800">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white border border-stone-200 shadow-xs text-stone-900">
               {uploading ? (
                 <Loader2 className="h-5 w-5 animate-spin" />
               ) : (
@@ -308,7 +308,7 @@ export function ImageUploader<T extends string | string[]>({
           <button
             type="button"
             onClick={() => setShowUrlInput(!showUrlInput)}
-            className="inline-flex items-center gap-1 font-medium text-emerald-800 hover:text-emerald-950 transition-colors"
+            className="inline-flex items-center gap-1 font-medium text-stone-900 hover:text-stone-900 transition-colors"
           >
             <LinkIcon className="h-3 w-3" />
             <span>{showUrlInput ? 'Hide URL input' : 'Or enter image link directly'}</span>
@@ -329,7 +329,7 @@ export function ImageUploader<T extends string | string[]>({
                 }
               }}
               placeholder="https://images.unsplash.com/photo-..."
-              className="flex-1 rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-900 placeholder:text-stone-400 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600"
+              className="flex-1 rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-900 placeholder:text-stone-400 focus:border-black focus:ring-1 focus:ring-black"
             />
             <Button
               type="button"

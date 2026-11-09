@@ -199,7 +199,7 @@ export function CustomFeatureBuilderModal({
         {/* Header */}
         <div className="flex items-start justify-between border-b border-stone-100 pb-3">
           <div>
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-[#1B4332]">
+            <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wider text-stone-900">
               <Sparkles className="h-3 w-3" />
               <span>{isStaff ? 'No-Code Feature Studio' : 'Propose a Community Feature'}</span>
             </span>
@@ -233,13 +233,13 @@ export function CustomFeatureBuilderModal({
               value={promptText}
               onChange={(e) => setPromptText(e.target.value)}
               placeholder="e.g., Mentorship directory where seniors list expertise and charge for 30-min sessions..."
-              className="flex-1 rounded-xl border border-stone-200 bg-white px-3.5 py-2 text-xs text-stone-900 focus:border-[#1B4332] focus:outline-none"
+              className="flex-1 rounded-xl border border-stone-200 bg-white px-3.5 py-2 text-xs text-stone-900 focus:border-black focus:outline-none"
             />
             <button
               type="button"
               disabled={busy || !promptText.trim()}
               onClick={handleGenerateFromPrompt}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[#1B4332] px-3.5 py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F] disabled:opacity-40 shrink-0"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-black px-3.5 py-2 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-40 shrink-0"
             >
               <Wand2 className="h-3.5 w-3.5" />
               <span>Auto-Build</span>
@@ -252,7 +252,7 @@ export function CustomFeatureBuilderModal({
                 key={tpl.key}
                 type="button"
                 onClick={() => applyPreset(tpl)}
-                className="rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-stone-700 hover:border-[#1B4332] hover:text-[#1B4332] transition-colors"
+                className="rounded-full border border-stone-200 bg-white px-2.5 py-1 text-[11px] font-medium text-stone-700 hover:border-stone-900 hover:text-black transition-colors"
               >
                 + {tpl.name}
               </button>
@@ -278,7 +278,7 @@ export function CustomFeatureBuilderModal({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g., Mentorship Board, Prayer Wall, Startup Pitches"
-                className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-xs text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
+                className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-xs text-stone-900 focus:border-black focus:bg-white focus:outline-none"
               />
             </div>
 
@@ -287,7 +287,7 @@ export function CustomFeatureBuilderModal({
               <select
                 value={icon}
                 onChange={(e) => setIcon(e.target.value)}
-                className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
+                className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3 py-2 text-xs text-stone-900 focus:border-black focus:bg-white focus:outline-none"
               >
                 {ICON_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -304,7 +304,7 @@ export function CustomFeatureBuilderModal({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What can members do in this feature?"
-              className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-xs text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
+              className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-xs text-stone-900 focus:border-black focus:bg-white focus:outline-none"
             />
           </div>
 
@@ -329,11 +329,11 @@ export function CustomFeatureBuilderModal({
                     onClick={() => setLayoutType(lt.id as typeof layoutType)}
                     className={`flex flex-col items-start rounded-xl border p-2.5 text-left transition-all ${
                       active
-                        ? 'border-[#1B4332] bg-[#F4F3EE]/80'
+                        ? 'border-stone-900 bg-[#F4F3EE]/80'
                         : 'border-stone-200 bg-white hover:bg-stone-50'
                     }`}
                   >
-                    <Icon className="h-4 w-4 text-[#1B4332]" />
+                    <Icon className="h-4 w-4 text-stone-900" />
                     <span className="mt-1 text-xs font-semibold text-stone-900">{lt.label}</span>
                     <span className="text-[10px] text-stone-500">{lt.desc}</span>
                   </button>
@@ -353,7 +353,7 @@ export function CustomFeatureBuilderModal({
                 value={embedUrl}
                 onChange={(e) => setEmbedUrl(e.target.value)}
                 placeholder="https://airtable.com/embed/... or Google Form / Notion / Typeform URL"
-                className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-xs text-stone-900 focus:border-[#1B4332] focus:bg-white focus:outline-none"
+                className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50/50 px-3.5 py-2 text-xs text-stone-900 focus:border-black focus:bg-white focus:outline-none"
               />
             </div>
           ) : (
@@ -476,14 +476,14 @@ export function CustomFeatureBuilderModal({
               <div className="rounded-xl border border-stone-200 p-3.5 space-y-3">
                 <label className="flex items-center justify-between cursor-pointer">
                   <span className="inline-flex items-center gap-2 text-xs font-semibold text-stone-800">
-                    <Wallet className="h-4 w-4 text-[#1B4332]" />
+                    <Wallet className="h-4 w-4 text-stone-900" />
                     <span>Enable Payments, Tips, or Paid Bookings on Entries</span>
                   </span>
                   <input
                     type="checkbox"
                     checked={enablePayments}
                     onChange={(e) => setEnablePayments(e.target.checked)}
-                    className="rounded border-stone-300 text-[#1B4332]"
+                    className="rounded border-stone-300 text-stone-900"
                   />
                 </label>
 
@@ -528,7 +528,7 @@ export function CustomFeatureBuilderModal({
               type="checkbox"
               checked={isSharedTemplate}
               onChange={(e) => setIsSharedTemplate(e.target.checked)}
-              className="rounded border-stone-300 text-[#1B4332]"
+              className="rounded border-stone-300 text-stone-900"
             />
             <Share2 className="h-3.5 w-3.5 text-stone-400" />
             <span>
@@ -548,7 +548,7 @@ export function CustomFeatureBuilderModal({
             <button
               type="submit"
               disabled={busy || !name.trim()}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[#1B4332] px-5 py-2 text-xs font-semibold text-white hover:bg-[#2D6A4F] disabled:opacity-50"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-black px-5 py-2 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
             >
               <Check className="h-3.5 w-3.5" />
               <span>

@@ -357,7 +357,7 @@ export function EventsBoard({
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-stone-900">
               Events
             </h1>
-            <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-mono font-bold text-emerald-800 border border-emerald-200/60">
+            <span className="rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-mono font-bold text-stone-900 border border-stone-200">
               {filteredEvents.length} {filteredEvents.length === 1 ? 'EVENT' : 'EVENTS'}
             </span>
           </div>
@@ -370,7 +370,7 @@ export function EventsBoard({
           <Button
             type="button"
             onClick={handleOpenCreate}
-            className="rounded-xl bg-emerald-700 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-emerald-800 transition-all self-start sm:self-auto"
+            className="rounded-xl bg-black px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-zinc-800 transition-all self-start sm:self-auto"
           >
             <Plus className="mr-1.5 h-4 w-4" />
             New Event
@@ -428,7 +428,7 @@ export function EventsBoard({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search events or hosts..."
-                className="w-full rounded-xl border border-stone-200 bg-white pl-9 pr-3 py-1.5 text-xs text-stone-900 placeholder:text-stone-400 focus:border-emerald-600 focus:outline-none"
+                className="w-full rounded-xl border border-stone-200 bg-white pl-9 pr-3 py-1.5 text-xs text-stone-900 placeholder:text-stone-400 focus:border-black focus:outline-none"
               />
             </div>
 
@@ -467,7 +467,7 @@ export function EventsBoard({
         <div className="rounded-3xl border border-stone-200/90 bg-white p-6 shadow-xs">
           <div className="flex items-center justify-between pb-4 border-b border-stone-100">
             <div className="flex items-center gap-2">
-              <CalendarIcon className="h-5 w-5 text-emerald-700" />
+              <CalendarIcon className="h-5 w-5 text-stone-900" />
               <h2 className="text-base font-bold text-stone-900">
                 {calendarDate.toLocaleDateString([], { month: 'long', year: 'numeric' })}
               </h2>
@@ -525,19 +525,19 @@ export function EventsBoard({
                   key={dateStr}
                   onClick={() => dayEvents.length > 0 && setSelectedEventDetail(dayEvents[0])}
                   className={`bg-white min-h-[90px] p-2 transition-colors flex flex-col justify-between ${
-                    dayEvents.length > 0 ? 'cursor-pointer hover:bg-emerald-50/40' : ''
+                    dayEvents.length > 0 ? 'cursor-pointer hover:bg-stone-100/40' : ''
                   }`}
                 >
                   <div className="flex items-center justify-between">
                     <span
                       className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
-                        isToday ? 'bg-emerald-700 text-white' : 'text-stone-700'
+                        isToday ? 'bg-black text-white' : 'text-stone-700'
                       }`}
                     >
                       {day.getDate()}
                     </span>
                     {dayEvents.length > 0 && (
-                      <span className="text-[10px] font-bold text-emerald-800">
+                      <span className="text-[10px] font-bold text-stone-900">
                         {dayEvents.length} ev
                       </span>
                     )}
@@ -546,7 +546,7 @@ export function EventsBoard({
                     {dayEvents.slice(0, 2).map((ev) => (
                       <div
                         key={ev.id}
-                        className="truncate rounded bg-emerald-100/70 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-900 border border-emerald-200/50"
+                        className="truncate rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-semibold text-stone-900 border border-stone-200/50"
                       >
                         {formatTime(ev.starts_at)} {ev.title}
                       </div>
@@ -576,7 +576,7 @@ export function EventsBoard({
             <Button
               type="button"
               onClick={handleOpenCreate}
-              className="mt-5 rounded-xl bg-emerald-700 px-4 text-xs font-semibold text-white hover:bg-emerald-800 shadow-xs"
+              className="mt-5 rounded-xl bg-black px-4 text-xs font-semibold text-white hover:bg-zinc-800 shadow-xs"
             >
               <Plus className="mr-1.5 h-3.5 w-3.5" />
               Schedule Event
@@ -596,7 +596,7 @@ export function EventsBoard({
             return (
               <div
                 key={ev.id}
-                className="group relative overflow-hidden rounded-3xl border border-stone-200/90 bg-white shadow-xs hover:border-emerald-700/40 hover:shadow-md transition-all duration-200 flex flex-col md:flex-row"
+                className="group relative overflow-hidden rounded-3xl border border-stone-200/90 bg-white shadow-xs hover:border-black/40 hover:shadow-md transition-all duration-200 flex flex-col md:flex-row"
               >
                 {/* Left Banner or Cover Image */}
                 <div
@@ -611,12 +611,12 @@ export function EventsBoard({
                       className="h-44 md:h-full w-full object-cover group-hover:scale-105 transition-transform duration-300"
                     />
                   ) : (
-                    <div className="h-44 md:h-full w-full bg-gradient-to-br from-emerald-800 via-stone-800 to-stone-900 flex items-center justify-center p-6 text-white text-center">
+                    <div className="h-44 md:h-full w-full bg-gradient-to-br from-zinc-800 via-stone-850 to-stone-900 flex items-center justify-center p-6 text-white text-center">
                       <div>
                         {ev.location_type === 'in_person' ? (
-                          <MapPin className="h-8 w-8 mx-auto text-emerald-400/80 mb-2" />
+                          <MapPin className="h-8 w-8 mx-auto text-stone-300 mb-2" />
                         ) : (
-                          <Video className="h-8 w-8 mx-auto text-emerald-400/80 mb-2" />
+                          <Video className="h-8 w-8 mx-auto text-stone-300 mb-2" />
                         )}
                         <span className="text-xs font-mono font-bold uppercase tracking-wider text-white/70 block">
                           {platformLabel}
@@ -627,7 +627,7 @@ export function EventsBoard({
 
                   {/* Date Pill Overlay on Cover */}
                   <div className="absolute top-3 left-3 flex flex-col items-center overflow-hidden rounded-2xl border border-stone-200/80 bg-white shadow-md">
-                    <span className="w-full bg-emerald-800 px-2.5 py-0.5 text-center text-[9px] font-mono font-bold tracking-wider text-white">
+                    <span className="w-full bg-black px-2.5 py-0.5 text-center text-[9px] font-mono font-bold tracking-wider text-white">
                       {dateComp.month}
                     </span>
                     <span className="px-2.5 py-1 text-base font-extrabold text-stone-900 leading-none">
@@ -647,8 +647,8 @@ export function EventsBoard({
                           In-Person
                         </span>
                       ) : ev.location_type === 'hybrid' ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-mono font-bold text-emerald-800 border border-emerald-200">
-                          <Globe className="h-3 w-3 text-emerald-600" />
+                        <span className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2.5 py-0.5 text-[11px] font-mono font-bold text-stone-900 border border-stone-200">
+                          <Globe className="h-3 w-3 text-stone-700" />
                           Hybrid · {platformLabel}
                         </span>
                       ) : (
@@ -669,7 +669,7 @@ export function EventsBoard({
                     {/* Event Title */}
                     <h3
                       onClick={() => setSelectedEventDetail(ev)}
-                      className="text-base sm:text-lg font-bold text-stone-900 group-hover:text-emerald-800 transition-colors cursor-pointer"
+                      className="text-base sm:text-lg font-bold text-stone-900 group-hover:text-stone-900 transition-colors cursor-pointer"
                     >
                       {ev.title}
                     </h3>
@@ -754,9 +754,9 @@ export function EventsBoard({
                               size="sm"
                               variant="outline"
                               onClick={() => handleRsvp(ev.id, 'cancel')}
-                              className="h-8 rounded-xl border-emerald-600 bg-emerald-50 text-emerald-800 text-xs font-semibold hover:bg-rose-50 hover:border-rose-300 hover:text-rose-700 transition-all"
+                              className="h-8 rounded-xl border-black bg-stone-100 text-stone-900 text-xs font-semibold hover:bg-rose-50 hover:border-rose-300 hover:text-rose-700 transition-all"
                             >
-                              <Check className="mr-1 h-3.5 w-3.5 text-emerald-700" />
+                              <Check className="mr-1 h-3.5 w-3.5 text-stone-900" />
                               Going
                             </Button>
                           ) : isWaitlisted ? (
@@ -806,11 +806,11 @@ export function EventsBoard({
                   className="h-full w-full object-cover"
                 />
               ) : (
-                <div className="h-full w-full bg-gradient-to-br from-emerald-900 via-stone-900 to-black flex items-center justify-center">
+                <div className="h-full w-full bg-gradient-to-br from-zinc-900 via-stone-900 to-black flex items-center justify-center">
                   {selectedEventDetail.location_type === 'in_person' ? (
-                    <MapPin className="h-12 w-12 text-emerald-400/60" />
+                    <MapPin className="h-12 w-12 text-stone-400" />
                   ) : (
-                    <Video className="h-12 w-12 text-emerald-400/60" />
+                    <Video className="h-12 w-12 text-stone-400" />
                   )}
                 </div>
               )}
@@ -826,7 +826,7 @@ export function EventsBoard({
 
               {/* Top Meta Tag on Cover */}
               <div className="absolute bottom-4 left-4 flex items-center gap-2">
-                <span className="rounded-full bg-emerald-700 text-white px-3 py-1 text-xs font-mono font-bold uppercase tracking-wider shadow-md">
+                <span className="rounded-full bg-black text-white px-3 py-1 text-xs font-mono font-bold uppercase tracking-wider shadow-md">
                   {selectedEventDetail.location_type === 'hybrid'
                     ? `Hybrid · ${getMeetingPlatformLabel(selectedEventDetail)}`
                     : getMeetingPlatformLabel(selectedEventDetail)}
@@ -839,7 +839,7 @@ export function EventsBoard({
               {/* Title & Calendar Pill */}
               <div className="flex items-start gap-4">
                 <div className="hidden sm:flex flex-col items-center overflow-hidden rounded-2xl border border-stone-200 bg-white shadow-xs shrink-0">
-                  <span className="w-full bg-emerald-800 px-3 py-1 text-center text-[10px] font-mono font-bold tracking-wider text-white">
+                  <span className="w-full bg-black px-3 py-1 text-center text-[10px] font-mono font-bold tracking-wider text-white">
                     {formatDateComponents(selectedEventDetail.starts_at).month}
                   </span>
                   <span className="px-3 py-1.5 text-xl font-extrabold text-stone-900 leading-none">
@@ -873,8 +873,8 @@ export function EventsBoard({
                     <>
                       {selectedEventDetail.viewer_rsvp_status === 'going' ? (
                         <div className="flex items-center gap-2">
-                          <span className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-100 px-3 py-2 text-xs font-bold text-emerald-900 border border-emerald-300">
-                            <CheckCircle2 className="h-4 w-4 text-emerald-700" />
+                          <span className="inline-flex items-center gap-1.5 rounded-xl bg-stone-100 px-3 py-2 text-xs font-bold text-stone-900 border border-stone-300">
+                            <CheckCircle2 className="h-4 w-4 text-stone-900" />
                             You are Going!
                           </span>
                           <Button
@@ -891,7 +891,7 @@ export function EventsBoard({
                         <Button
                           type="button"
                           onClick={() => handleRsvp(selectedEventDetail.id, 'register')}
-                          className="h-9 rounded-xl bg-emerald-700 px-5 text-xs font-bold text-white hover:bg-emerald-800 shadow-xs"
+                          className="h-9 rounded-xl bg-black px-5 text-xs font-bold text-white hover:bg-zinc-800 shadow-xs"
                         >
                           RSVP: I&apos;m Going
                         </Button>
@@ -929,7 +929,7 @@ export function EventsBoard({
               <div className="rounded-2xl border border-stone-200/90 bg-white p-5 space-y-3">
                 <div className="flex items-center justify-between">
                   <h4 className="text-xs font-mono font-bold uppercase tracking-wider text-stone-500 flex items-center gap-1.5">
-                    <MapPin className="h-3.5 w-3.5 text-emerald-700" />
+                    <MapPin className="h-3.5 w-3.5 text-stone-900" />
                     Location & Access
                   </h4>
                   {selectedEventDetail.host_controls?.hide_location_from_non_attendees && (
@@ -990,7 +990,7 @@ export function EventsBoard({
                               title="Copy Meeting Link"
                             >
                               {copiedLink ? (
-                                <Check className="h-4 w-4 text-emerald-600" />
+                                <Check className="h-4 w-4 text-stone-700" />
                               ) : (
                                 <Copy className="h-4 w-4" />
                               )}
@@ -1109,7 +1109,7 @@ export function EventsBoard({
                       onClick={() => handleOpenRoster(selectedEventDetail)}
                       className="rounded-xl text-xs font-semibold"
                     >
-                      <UserCheck className="mr-1.5 h-3.5 w-3.5 text-emerald-700" />
+                      <UserCheck className="mr-1.5 h-3.5 w-3.5 text-stone-900" />
                       Check-in Roster
                     </Button>
                   </div>
@@ -1190,7 +1190,7 @@ export function EventsBoard({
               value={rosterSearch}
               onChange={(e) => setRosterSearch(e.target.value)}
               placeholder="Search registered attendees..."
-              className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs text-stone-900 focus:border-emerald-600 focus:bg-white focus:outline-none"
+              className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs text-stone-900 focus:border-black focus:bg-white focus:outline-none"
             />
 
             {loadingRoster ? (
@@ -1242,7 +1242,7 @@ export function EventsBoard({
                         }
                         className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
                           rsvp.attended
-                            ? 'bg-emerald-700 text-white'
+                            ? 'bg-black text-white'
                             : 'border border-stone-300 bg-white text-stone-700 hover:bg-stone-100'
                         }`}
                       >
