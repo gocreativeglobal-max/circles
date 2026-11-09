@@ -86,11 +86,22 @@ export function getRemotePgPool(): RemotePgPoolLike {
     return globalForPg.__circlesRemotePool;
   }
 
-  const maxConnections = Math.max(1, Number(process.env.PG_POOL_MAX || 10));
-  const idleTimeoutMillis = Math.max(1000, Number(process.env.PG_IDLE_TIMEOUT_MS || 30000));
+  const isServerless = Boolean(
+    process.env.VERCEL ||
+    process.env.AWS_LAMBDA_FUNCTION_NAME ||
+    process.env.LAMBDA_TASK_ROOT ||
+    process.env.NETLIFY
+  );
+
+  const defaultPoolMax = isServerless ? 2 : 10;
+  const defaultIdleTimeout = isServerless ? 1500 : 30000;
+  const defaultConnTimeout = isServerless ? 5000 : 10000;
+
+  const maxConnections = Math.max(1, Number(process.env.PG_POOL_MAX || defaultPoolMax));
+  const idleTimeoutMillis = Math.max(500, Number(process.env.PG_IDLE_TIMEOUT_MS || defaultIdleTimeout));
   const connectionTimeoutMillis = Math.max(
     1000,
-    Number(process.env.PG_CONNECTION_TIMEOUT_MS || 10000)
+    Number(process.env.PG_CONNECTION_TIMEOUT_MS || defaultConnTimeout)
   );
 
   const isLocalhost =
@@ -110,6 +121,7 @@ export function getRemotePgPool(): RemotePgPoolLike {
     max: maxConnections,
     idleTimeoutMillis,
     connectionTimeoutMillis,
+    allowExitOnIdle: isServerless,
     ...(sslConfig ? { ssl: sslConfig } : {}),
   });
 
@@ -240,6 +252,7 @@ async function withEmbeddedDbMutex<T>(fn: () => Promise<T>): Promise<T> {
 export async function ensureRemoteMigrationsApplied(): Promise<void> {
   if (globalForPg.__circlesCustomTestPool) return;
   if (getActiveDatabaseBackend() !== 'remote_pg') return;
+  if (process.env.AUTO_MIGRATE === 'false') return;
 
   if (!globalForPg.__circlesRemoteMigrationsPromise) {
     globalForPg.__circlesRemoteMigrationsPromise = (async () => {
@@ -273,8 +286,20 @@ async function executeRemoteRlsTransaction<T>(
 ): Promise<T> {
   await ensureRemoteMigrationsApplied();
   const pool = getRemotePgPool();
-  const client = await pool.connect();
+  let client: RemotePgClientLike;
+  try {
+    client = await pool.connect();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes('EMAXCONNSESSION') || msg.includes('max clients reached in session mode')) {
+      logger.error('CRITICAL: Supabase session pooler connection limit reached (EMAXCONNSESSION). Upgrade DATABASE_URL to Transaction Mode (port 6543) or set PG_POOL_MAX=1.', {
+        error: msg,
+      });
+    }
+    throw err;
+  }
 
+  let hasError = false;
   try {
     await client.query('BEGIN');
 
@@ -302,6 +327,7 @@ async function executeRemoteRlsTransaction<T>(
     await client.query('COMMIT');
     return result;
   } catch (err) {
+    hasError = true;
     try {
       await client.query('ROLLBACK');
     } catch {
@@ -309,7 +335,7 @@ async function executeRemoteRlsTransaction<T>(
     }
     throw err;
   } finally {
-    client.release();
+    client.release(hasError ? true : undefined);
   }
 }
 
@@ -318,8 +344,20 @@ async function executeRemoteServiceRoleTransaction<T>(
 ): Promise<T> {
   await ensureRemoteMigrationsApplied();
   const pool = getRemotePgPool();
-  const client = await pool.connect();
+  let client: RemotePgClientLike;
+  try {
+    client = await pool.connect();
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes('EMAXCONNSESSION') || msg.includes('max clients reached in session mode')) {
+      logger.error('CRITICAL: Supabase session pooler connection limit reached (EMAXCONNSESSION). Upgrade DATABASE_URL to Transaction Mode (port 6543) or set PG_POOL_MAX=1.', {
+        error: msg,
+      });
+    }
+    throw err;
+  }
 
+  let hasError = false;
   try {
     await client.query('BEGIN');
 
@@ -356,6 +394,7 @@ async function executeRemoteServiceRoleTransaction<T>(
     await client.query('COMMIT');
     return result;
   } catch (err) {
+    hasError = true;
     try {
       await client.query('ROLLBACK');
     } catch {
@@ -363,7 +402,7 @@ async function executeRemoteServiceRoleTransaction<T>(
     }
     throw err;
   } finally {
-    client.release();
+    client.release(hasError ? true : undefined);
   }
 }
 
@@ -483,6 +522,7 @@ export async function runDatabaseMigrations(
   if (mode === 'remote_pg') {
     const pool = getRemotePgPool();
     const client = await pool.connect();
+    let hasError = false;
     try {
       await client.query('BEGIN');
       const executor: DbTransaction = {
@@ -498,6 +538,7 @@ export async function runDatabaseMigrations(
       await client.query('COMMIT');
       return result;
     } catch (err) {
+      hasError = true;
       try {
         await client.query('ROLLBACK');
       } catch {
@@ -505,7 +546,7 @@ export async function runDatabaseMigrations(
       }
       throw err;
     } finally {
-      client.release();
+      client.release(hasError ? true : undefined);
     }
   }
 

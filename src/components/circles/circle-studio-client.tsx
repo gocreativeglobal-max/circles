@@ -20,6 +20,10 @@ import {
 } from 'lucide-react';
 import { StudioFinancesTab } from './studio-finances-tab';
 import {
+  BACHS_ACCEPTED_CURRENCIES,
+  getBachsCurrency,
+} from '@/lib/payments/currencies';
+import {
   AuditLogItem,
   Circle,
   CircleCapabilityState,
@@ -1208,28 +1212,35 @@ export function CircleStudioClient({
                           defaultCurrency: e.target.value,
                         }))
                       }
-                      className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 p-2 text-xs text-stone-900"
+                      className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 p-2 text-xs text-stone-900 focus:border-stone-400 focus:outline-none"
                     >
-                      {[
-                        'USD',
-                        'NGN',
-                        'GHS',
-                        'KES',
-                        'ZAR',
-                        'EUR',
-                        'GBP',
-                        'CAD',
-                        'UGX',
-                        'TZS',
-                        'RWF',
-                        'ZMW',
-                        'USDT',
-                        'USDC',
-                      ].map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
+                      <optgroup label="African Rails (Bank & Mobile Money)">
+                        {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'fiat_african').map(
+                          (c) => (
+                            <option key={c.code} value={c.code}>
+                              {c.code} ({c.symbol}) — {c.name}
+                            </option>
+                          )
+                        )}
+                      </optgroup>
+                      <optgroup label="Global Currencies">
+                        {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'fiat_global').map(
+                          (c) => (
+                            <option key={c.code} value={c.code}>
+                              {c.code} ({c.symbol}) — {c.name}
+                            </option>
+                          )
+                        )}
+                      </optgroup>
+                      <optgroup label="Crypto Stablecoins">
+                        {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'stablecoin').map(
+                          (c) => (
+                            <option key={c.code} value={c.code}>
+                              {c.code} ({c.symbol}) — {c.name}
+                            </option>
+                          )
+                        )}
+                      </optgroup>
                     </select>
                   </div>
 
@@ -1318,28 +1329,35 @@ export function CircleStudioClient({
                           defaultCurrency: e.target.value,
                         }))
                       }
-                      className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 p-2 text-xs text-stone-900"
+                      className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 p-2 text-xs text-stone-900 focus:border-stone-400 focus:outline-none"
                     >
-                      {[
-                        'USD',
-                        'NGN',
-                        'GHS',
-                        'KES',
-                        'ZAR',
-                        'EUR',
-                        'GBP',
-                        'CAD',
-                        'UGX',
-                        'TZS',
-                        'RWF',
-                        'ZMW',
-                        'USDT',
-                        'USDC',
-                      ].map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
+                      <optgroup label="African Rails (Bank & Mobile Money)">
+                        {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'fiat_african').map(
+                          (c) => (
+                            <option key={c.code} value={c.code}>
+                              {c.code} ({c.symbol}) — {c.name}
+                            </option>
+                          )
+                        )}
+                      </optgroup>
+                      <optgroup label="Global Currencies">
+                        {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'fiat_global').map(
+                          (c) => (
+                            <option key={c.code} value={c.code}>
+                              {c.code} ({c.symbol}) — {c.name}
+                            </option>
+                          )
+                        )}
+                      </optgroup>
+                      <optgroup label="Crypto Stablecoins">
+                        {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'stablecoin').map(
+                          (c) => (
+                            <option key={c.code} value={c.code}>
+                              {c.code} ({c.symbol}) — {c.name}
+                            </option>
+                          )
+                        )}
+                      </optgroup>
                     </select>
                   </div>
 
@@ -1395,21 +1413,96 @@ export function CircleStudioClient({
               )}
 
               {configCap.capability_key === 'payments_finances' && (
-                <div className="space-y-2.5">
+                <div className="space-y-3">
                   <div>
-                    <label className="block text-xs font-medium text-stone-700">Currency</label>
+                    <label className="block text-xs font-medium text-stone-700">
+                      Bachs Accepted Currency
+                    </label>
                     <select
                       value={String(capSettingsDraft.currency || 'USD')}
                       onChange={(e) =>
                         setCapSettingsDraft((prev) => ({ ...prev, currency: e.target.value }))
                       }
-                      className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 p-2 text-xs text-stone-900"
+                      className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 p-2 text-xs text-stone-900 focus:border-stone-400 focus:outline-none"
                     >
-                      <option value="USD">USD ($)</option>
-                      <option value="EUR">EUR (€)</option>
-                      <option value="GBP">GBP (£)</option>
-                      <option value="CAD">CAD ($)</option>
+                      <optgroup label="African Rails (Bank & Mobile Money)">
+                        {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'fiat_african').map(
+                          (c) => (
+                            <option key={c.code} value={c.code}>
+                              {c.code} ({c.symbol}) — {c.name}
+                            </option>
+                          )
+                        )}
+                      </optgroup>
+                      <optgroup label="Global Currencies">
+                        {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'fiat_global').map(
+                          (c) => (
+                            <option key={c.code} value={c.code}>
+                              {c.code} ({c.symbol}) — {c.name}
+                            </option>
+                          )
+                        )}
+                      </optgroup>
+                      <optgroup label="Crypto Stablecoins">
+                        {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'stablecoin').map(
+                          (c) => (
+                            <option key={c.code} value={c.code}>
+                              {c.code} ({c.symbol}) — {c.name}
+                            </option>
+                          )
+                        )}
+                      </optgroup>
                     </select>
+                    <p className="mt-1 text-[11px] text-stone-500">
+                      Payment rails: {getBachsCurrency(String(capSettingsDraft.currency || 'USD')).paymentMethodsDescription} via Bachs.io
+                    </p>
+                  </div>
+
+                  <label className="flex items-center gap-2 text-xs text-stone-800 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={capSettingsDraft.public_treasury_ledger !== false}
+                      onChange={(e) =>
+                        setCapSettingsDraft((prev) => ({
+                          ...prev,
+                          public_treasury_ledger: e.target.checked,
+                        }))
+                      }
+                    />
+                    <span>Public Treasury Ledger (visible to active members)</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 text-xs text-stone-800 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={capSettingsDraft.allow_offline_payments !== false}
+                      onChange={(e) =>
+                        setCapSettingsDraft((prev) => ({
+                          ...prev,
+                          allow_offline_payments: e.target.checked,
+                        }))
+                      }
+                    />
+                    <span>Allow manual & offline payment recording</span>
+                  </label>
+
+                  <div>
+                    <label className="block text-xs font-medium text-stone-700">
+                      Payment Grace Period (days)
+                    </label>
+                    <input
+                      type="number"
+                      min={0}
+                      max={90}
+                      value={Number(capSettingsDraft.grace_period_days ?? 14)}
+                      onChange={(e) =>
+                        setCapSettingsDraft((prev) => ({
+                          ...prev,
+                          grace_period_days: Math.max(0, parseInt(e.target.value, 10) || 0),
+                        }))
+                      }
+                      className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 p-2 text-xs text-stone-900"
+                    />
                   </div>
                 </div>
               )}

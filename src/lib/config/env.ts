@@ -47,7 +47,7 @@ export function getRemoteDatabaseUrl(): string | null {
   }
 
   // Strip wrapping quotes if entered in dashboard e.g. "postgres://..."
-  const cleaned = raw.replace(/^["']|["']$/g, '').trim();
+  let cleaned = raw.replace(/^["']|["']$/g, '').trim();
 
   if (cleaned === '[SENSITIVE]') {
     throw new ConfigurationError(
@@ -59,6 +59,23 @@ export function getRemoteDatabaseUrl(): string | null {
     throw new ConfigurationError(
       'Database configuration error: DATABASE_URL / SUPABASE_DB_URL must be a valid PostgreSQL connection string starting with postgres:// or postgresql://.'
     );
+  }
+
+  // Supabase Pooler Optimization:
+  // Supabase provides two pooler modes on *.pooler.supabase.com:
+  // - Port 5432: Session Mode (strictly capped at 15 clients across all lambdas -> triggers EMAXCONNSESSION).
+  // - Port 6543: Transaction Mode (supports thousands of concurrent serverless lambdas).
+  // In serverless/multi-instance environments, we automatically upgrade pooler.supabase.com:5432 to port 6543
+  // unless explicitly opted out via SUPABASE_POOL_MODE=session.
+  if (
+    process.env.SUPABASE_POOL_MODE !== 'session' &&
+    cleaned.includes('.pooler.supabase.com:5432')
+  ) {
+    cleaned = cleaned.replace('.pooler.supabase.com:5432', '.pooler.supabase.com:6543');
+    if (!cleaned.includes('pgbouncer=true')) {
+      const sep = cleaned.includes('?') ? '&' : '?';
+      cleaned = `${cleaned}${sep}pgbouncer=true`;
+    }
   }
 
   return cleaned;

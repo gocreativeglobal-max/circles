@@ -141,6 +141,7 @@ export function StudioFinancesTab({
   const [trType, setTrType] = useState<'revenue' | 'expense'>('expense');
   const [trCategory, setTrCategory] = useState<TreasuryCategory>('maintenance');
   const [trAmount, setTrAmount] = useState('350');
+  const [trCurrency, setTrCurrency] = useState('USD');
   const [trDescription, setTrDescription] = useState('');
   const [trIsPublic, setTrIsPublic] = useState(true);
 
@@ -283,6 +284,7 @@ export function StudioFinancesTab({
     setPlanSlug('');
     setPlanDescription('');
     setPlanAmount('75');
+    setPlanCurrency(treasurySummary?.currency || 'USD');
     setPlanBillingType('recurring');
     setPlanEntitlements([{ targetType: 'circle_membership' }]);
   }
@@ -401,7 +403,7 @@ export function StudioFinancesTab({
             entryType: trType,
             category: trCategory,
             amountCents,
-            currency: 'USD',
+            currency: trCurrency,
             description: trDescription,
             isPublicToMembers: trIsPublic,
           },
@@ -1956,19 +1958,59 @@ export function StudioFinancesTab({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-stone-700">
-                  Amount ($ USD)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  required
-                  value={trAmount}
-                  onChange={(e) => setTrAmount(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm focus:border-forest-600 focus:outline-none"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-stone-700">
+                    Amount ({getBachsCurrency(trCurrency).symbol})
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    required
+                    value={trAmount}
+                    onChange={(e) => setTrAmount(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm focus:border-stone-900 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-stone-700">
+                    Bachs Currency
+                  </label>
+                  <select
+                    value={trCurrency}
+                    onChange={(e) => setTrCurrency(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm focus:border-stone-900 focus:outline-none"
+                  >
+                    <optgroup label="African Rails (Bank & Mobile Money)">
+                      {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'fiat_african').map(
+                        (c) => (
+                          <option key={c.code} value={c.code}>
+                            {c.code} ({c.symbol}) — {c.name}
+                          </option>
+                        )
+                      )}
+                    </optgroup>
+                    <optgroup label="Global Currencies">
+                      {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'fiat_global').map(
+                        (c) => (
+                          <option key={c.code} value={c.code}>
+                            {c.code} ({c.symbol}) — {c.name}
+                          </option>
+                        )
+                      )}
+                    </optgroup>
+                    <optgroup label="Crypto Stablecoins">
+                      {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'stablecoin').map(
+                        (c) => (
+                          <option key={c.code} value={c.code}>
+                            {c.code} ({c.symbol}) — {c.name}
+                          </option>
+                        )
+                      )}
+                    </optgroup>
+                  </select>
+                </div>
               </div>
 
               <div>

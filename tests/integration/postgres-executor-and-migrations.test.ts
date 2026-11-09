@@ -309,6 +309,21 @@ describe('Phase 3: Remote PostgreSQL Pool Executor, Migration Tracking & Supabas
       process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key-value';
       process.env.DATABASE_URL = 'postgresql://postgres:password@db.example.supabase.co:5432/postgres';
       expect(getDatabaseBackendMode()).toBe('remote_pg');
+
+      // Supabase pooler :5432 auto-upgrades to :6543 transaction mode to prevent EMAXCONNSESSION
+      process.env.DATABASE_URL =
+        'postgresql://postgres.ref:password@aws-0-eu-central-1.pooler.supabase.com:5432/postgres';
+      delete process.env.SUPABASE_POOL_MODE;
+      expect(getRemoteDatabaseUrl()).toBe(
+        'postgresql://postgres.ref:password@aws-0-eu-central-1.pooler.supabase.com:6543/postgres?pgbouncer=true'
+      );
+
+      // Explicit SUPABASE_POOL_MODE=session preserves port 5432
+      process.env.SUPABASE_POOL_MODE = 'session';
+      expect(getRemoteDatabaseUrl()).toBe(
+        'postgresql://postgres.ref:password@aws-0-eu-central-1.pooler.supabase.com:5432/postgres'
+      );
+      delete process.env.SUPABASE_POOL_MODE;
     } finally {
       (process.env as Record<string, string | undefined>).NODE_ENV = prevNodeEnv;
       if (prevDbUrl !== undefined) process.env.DATABASE_URL = prevDbUrl;

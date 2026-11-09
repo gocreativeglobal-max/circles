@@ -155,7 +155,15 @@ export const recordTreasuryEntrySchema = z.object({
     'other',
   ]),
   amountCents: z.number().int().min(0),
-  currency: z.string().trim().length(3).default('USD'),
+  currency: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .refine(
+      (c) => isBachsSupportedCurrency(c),
+      'Currency must be an accepted Bachs currency (e.g. USD, NGN, GHS, KES, ZAR, EUR, GBP, CAD, USDT, USDC).'
+    )
+    .default('USD'),
   description: z.string().trim().min(3).max(500),
   isPublicToMembers: z.boolean().default(true),
   invoiceId: z.string().uuid().nullable().optional(),
@@ -1029,7 +1037,11 @@ export async function getTreasurySummary(
       other: 0,
     };
 
-    let currency = 'USD';
+    const capRes = await tx.query<{ settings: Record<string, unknown> }>(
+      `SELECT settings FROM public.circle_capabilities WHERE circle_id = $1 AND capability_key = 'payments_finances' LIMIT 1;`,
+      [circleId]
+    );
+    let currency = (capRes.rows[0]?.settings?.currency as string) || 'USD';
 
     for (const row of res.rows) {
       currency = row.currency;
