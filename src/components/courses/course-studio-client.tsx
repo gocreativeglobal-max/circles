@@ -981,12 +981,14 @@ export function CourseStudioClient({
                         Overview of course structure and student interaction.
                       </p>
                     </div>
-                    <Button
+                    <button
+                      type="button"
                       onClick={() => setActiveTab('lessons')}
-                      className="bg-stone-100 text-stone-900 hover:bg-stone-200 text-xs px-3 py-1.5 rounded-lg font-semibold inline-flex items-center gap-1"
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-stone-900 shadow-2xs hover:bg-stone-50 hover:border-stone-300 transition-all"
                     >
-                      View curriculum
-                    </Button>
+                      <BookOpen className="h-3.5 w-3.5 text-stone-600" />
+                      <span>View curriculum</span>
+                    </button>
                   </div>
 
                   <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -1326,13 +1328,14 @@ export function CourseStudioClient({
 
                 {/* Bottom Add Section Button */}
                 <div className="pt-2">
-                  <Button
+                  <button
+                    type="button"
                     onClick={openAddSectionModal}
-                    className="w-full border-2 border-dashed border-stone-300 bg-white hover:border-black hover:bg-stone-50 text-stone-800 text-xs py-3 rounded-xl font-bold inline-flex items-center justify-center gap-2 transition-all"
+                    className="w-full border-2 border-dashed border-stone-300 bg-white hover:border-black hover:bg-stone-50 text-stone-900 text-xs py-3 rounded-xl font-bold inline-flex items-center justify-center gap-2 transition-all"
                   >
-                    <Plus className="h-4 w-4" />
-                    + Add section
-                  </Button>
+                    <Plus className="h-4 w-4 text-stone-700" />
+                    <span>+ Add section</span>
+                  </button>
                 </div>
               </div>
             )}
@@ -1671,14 +1674,14 @@ export function CourseStudioClient({
                                 </option>
                               ))}
                           </select>
-                          <Button
+                          <button
                             type="button"
                             onClick={handleLinkExistingPlan}
                             disabled={!selectedExistingPlanId || isSaving}
-                            className="bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs px-3 py-2 rounded-lg font-semibold shrink-0"
+                            className="inline-flex items-center rounded-xl border border-stone-200 bg-stone-100 px-3.5 py-2 text-xs font-semibold text-stone-900 shadow-2xs hover:bg-stone-200 hover:border-stone-300 disabled:opacity-50 shrink-0 transition-all"
                           >
                             Attach Plan
-                          </Button>
+                          </button>
                         </div>
                       </div>
                     )}

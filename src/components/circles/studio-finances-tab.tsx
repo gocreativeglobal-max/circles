@@ -1145,14 +1145,14 @@ export function StudioFinancesTab({
 
                     <div className="mt-6 pt-2">
                       {isCurrent ? (
-                        <Button
+                        <button
+                          type="button"
                           disabled
-                          className="w-full bg-forest-900/10 text-forest-900 border border-forest-900/20 cursor-default"
-                          size="sm"
+                          className="w-full rounded-xl bg-stone-100 text-stone-900 border border-stone-200 py-2 text-xs font-semibold inline-flex items-center justify-center gap-1 cursor-default"
                         >
-                          <Check className="h-3.5 w-3.5 mr-1 text-forest-800" />
-                          Active Plan
-                        </Button>
+                          <Check className="h-3.5 w-3.5 mr-1 text-stone-900" />
+                          <span>Active Plan</span>
+                        </button>
                       ) : (
                         <Button
                           onClick={() => handleSwitchTier(tierKey)}
