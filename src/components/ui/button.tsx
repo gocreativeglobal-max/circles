@@ -19,11 +19,11 @@ export function Button({
     primary:
       'bg-black text-white hover:bg-zinc-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_1px_2px_rgba(0,0,0,0.15)] border border-black rounded-xl',
     secondary:
-      'bg-white text-zinc-900 hover:bg-zinc-50 border border-zinc-200 shadow-[0_1px_2px_rgba(0,0,0,0.04)] rounded-xl hover:border-zinc-300',
+      'bg-white text-zinc-900 hover:bg-zinc-50 border border-zinc-300 shadow-[0_1px_2px_rgba(0,0,0,0.04)] rounded-xl hover:border-zinc-400',
     outline:
-      'border border-zinc-200 bg-transparent text-zinc-700 hover:bg-zinc-100/70 hover:text-zinc-900 rounded-xl hover:border-zinc-300',
+      'border border-stone-300 bg-white text-stone-900 shadow-2xs hover:bg-stone-50 hover:border-stone-400 rounded-xl',
     ghost:
-      'text-zinc-600 hover:bg-zinc-100/70 hover:text-zinc-900 rounded-xl',
+      'border border-stone-200/80 bg-stone-50/70 text-stone-700 hover:bg-stone-100 hover:text-stone-900 hover:border-stone-300 rounded-xl',
     danger:
       'bg-red-600 text-white hover:bg-red-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_1px_2px_rgba(0,0,0,0.12)] border border-red-700 rounded-xl',
     gradient:

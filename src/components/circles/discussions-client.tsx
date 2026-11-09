@@ -491,10 +491,10 @@ export function DiscussionsClient({
             <button
               type="button"
               onClick={() => setResourcesOnly((v) => !v)}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
                 resourcesOnly
-                  ? 'bg-black text-white'
-                  : 'text-stone-500 hover:bg-stone-100 hover:text-stone-900'
+                  ? 'border-black bg-black text-white'
+                  : 'border-stone-200 bg-white text-stone-700 shadow-2xs hover:bg-stone-50 hover:border-stone-300'
               }`}
             >
               <BookOpen className="h-3.5 w-3.5" />
@@ -504,10 +504,10 @@ export function DiscussionsClient({
             <button
               type="button"
               onClick={() => setSavedOnly((v) => !v)}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
                 savedOnly
-                  ? 'bg-black text-white'
-                  : 'text-stone-500 hover:bg-stone-100 hover:text-stone-900'
+                  ? 'border-black bg-black text-white'
+                  : 'border-stone-200 bg-white text-stone-700 shadow-2xs hover:bg-stone-50 hover:border-stone-300'
               }`}
             >
               <Bookmark className="h-3.5 w-3.5" />

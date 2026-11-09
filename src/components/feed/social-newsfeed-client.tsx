@@ -759,7 +759,7 @@ export function SocialNewsfeedClient({
                 </Link>
                 <Link
                   href="/explore"
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-white/15 px-4 py-2.5 text-xs sm:text-sm font-medium text-stone-200 hover:text-white hover:border-white/30 transition-all"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-white/25 bg-white/10 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white hover:bg-white/20 hover:border-white/40 transition-all backdrop-blur-xs"
                 >
                   <Compass className="h-4 w-4" />
                   <span>Directory</span>
@@ -1187,8 +1187,8 @@ export function SocialNewsfeedClient({
                         onClick={() => setContentType(tab.key as ContentTypeFilter)}
                         className={`whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
                           active
-                            ? 'bg-white text-stone-900 shadow-2xs'
-                            : 'text-stone-500 hover:text-stone-900'
+                            ? 'bg-black text-white shadow-2xs'
+                            : 'text-stone-600 hover:bg-stone-200/70 hover:text-stone-900'
                         }`}
                       >
                         {tab.label}
@@ -1221,8 +1221,8 @@ export function SocialNewsfeedClient({
                       onClick={() => setSelectedCategory(cat.key)}
                       className={`whitespace-nowrap rounded-full px-3 py-1 text-[11px] font-medium transition-all ${
                         active
-                          ? 'bg-black text-white font-semibold shadow-2xs'
-                          : 'bg-[#F4F3EE] text-stone-600 hover:bg-stone-200/70 hover:text-stone-900'
+                          ? 'border border-black bg-black text-white font-semibold shadow-2xs'
+                          : 'border border-stone-200 bg-stone-50 text-stone-700 hover:bg-stone-100 hover:border-stone-300 hover:text-stone-900'
                       }`}
                     >
                       {cat.label}
@@ -1538,10 +1538,10 @@ export function SocialNewsfeedClient({
                               <button
                                 type="button"
                                 onClick={() => handleToggleLike(item.circle.id, post.id)}
-                                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+                                className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all ${
                                   post.viewer_has_liked
-                                    ? 'bg-rose-50 text-rose-600 border border-rose-200/80'
-                                    : 'text-stone-600 hover:bg-stone-100 hover:text-stone-900'
+                                    ? 'bg-rose-50 text-rose-600 border-rose-200 shadow-2xs'
+                                    : 'border-stone-200 bg-stone-50/80 text-stone-700 shadow-2xs hover:bg-stone-100 hover:border-stone-300 hover:text-stone-900'
                                 }`}
                               >
                                 <Heart
@@ -1557,10 +1557,10 @@ export function SocialNewsfeedClient({
                               <button
                                 type="button"
                                 onClick={() => handleToggleComments(item.circle.id, post.id)}
-                                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+                                className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all ${
                                   isCommentsOpen
-                                    ? 'bg-[#F4F3EE] text-stone-900'
-                                    : 'text-stone-600 hover:bg-stone-100 hover:text-stone-900'
+                                    ? 'border-stone-900 bg-stone-100 text-stone-900 shadow-2xs'
+                                    : 'border-stone-200 bg-stone-50/80 text-stone-700 shadow-2xs hover:bg-stone-100 hover:border-stone-300 hover:text-stone-900'
                                 }`}
                               >
                                 <MessageSquare className="h-4 w-4" />
@@ -1574,15 +1574,15 @@ export function SocialNewsfeedClient({
                               <button
                                 type="button"
                                 onClick={() => handleToggleSave(item.circle.id, post.id)}
-                                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${
+                                className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all ${
                                   post.viewer_has_saved
-                                    ? 'bg-[#F4F3EE] text-stone-900'
-                                    : 'text-stone-600 hover:bg-stone-100 hover:text-stone-900'
+                                    ? 'border-stone-900 bg-stone-100 text-stone-900 shadow-2xs'
+                                    : 'border-stone-200 bg-stone-50/80 text-stone-700 shadow-2xs hover:bg-stone-100 hover:border-stone-300 hover:text-stone-900'
                                 }`}
                               >
                                 <Bookmark
                                   className={`h-4 w-4 ${
-                                    post.viewer_has_saved ? 'fill-[#000000] text-stone-900' : ''
+                                    post.viewer_has_saved ? 'fill-stone-900 text-stone-900' : ''
                                   }`}
                                 />
                                 <span className="hidden sm:inline">
@@ -1600,7 +1600,7 @@ export function SocialNewsfeedClient({
                                   `/circles/${item.circle.slug}/discussions/${post.id}`
                                 )
                               }
-                              className="inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-medium text-stone-500 hover:bg-stone-100 hover:text-stone-900 transition-colors"
+                              className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-stone-50/80 px-2.5 py-1.5 text-xs font-medium text-stone-700 shadow-2xs hover:bg-stone-100 hover:border-stone-300 hover:text-stone-900 transition-colors"
                             >
                               {copiedItemId === item.id ? (
                                 <>

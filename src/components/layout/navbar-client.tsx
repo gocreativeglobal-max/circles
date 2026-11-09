@@ -173,7 +173,7 @@ export function NavbarClient({ user, unreadCount }: NavbarClientProps) {
             <div className="flex items-center gap-2">
               <Link
                 href="/login"
-                className="rounded-lg px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-100/80 hover:text-stone-900 transition-colors"
+                className="rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-800 shadow-2xs hover:bg-stone-50 hover:border-stone-300 transition-all"
               >
                 Sign in
               </Link>
