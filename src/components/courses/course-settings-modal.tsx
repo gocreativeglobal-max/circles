@@ -178,7 +178,7 @@ export function CourseSettingsModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full p-2 text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors"
+            className="rounded-full border border-stone-200 bg-stone-50 p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-900 transition-colors"
             aria-label="Close modal"
           >
             <X className="h-5 w-5" />

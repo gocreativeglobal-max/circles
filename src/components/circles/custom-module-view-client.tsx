@@ -617,7 +617,7 @@ export function CustomModuleViewClient({
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="rounded-xl px-4 py-2 text-xs font-medium text-stone-600 hover:bg-stone-100"
+                  className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-xs font-semibold text-stone-700 shadow-2xs hover:bg-stone-100 hover:border-stone-300 transition-colors"
                 >
                   Cancel
                 </button>
@@ -715,7 +715,7 @@ export function CustomModuleViewClient({
                 <button
                   type="button"
                   onClick={() => setPayTarget(null)}
-                  className="rounded-xl px-4 py-2 text-xs font-medium text-stone-600 hover:bg-stone-100"
+                  className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-xs font-semibold text-stone-700 shadow-2xs hover:bg-stone-100 hover:border-stone-300 transition-colors"
                 >
                   Cancel
                 </button>

@@ -70,24 +70,37 @@ export async function getPlatformFeatureFlags(): Promise<PlatformFeatureFlags> {
 
 export async function ensureOrVerifyPlatformAdmin(actorUserId: string): Promise<boolean> {
   return withServiceRoleTransaction(async (tx) => {
-    const userRes = await tx.query<{ is_platform_admin: boolean }>(
-      `SELECT is_platform_admin FROM public.profiles WHERE id = $1 LIMIT 1;`,
+    // 1. Check authoritative platform_roles table (aligned with PostgreSQL RLS is_platform_admin function)
+    const userRes = await tx.query<{ exists: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM public.platform_roles
+         WHERE user_id = $1 AND role IN ('platform_admin', 'trust_safety')
+       ) AS exists;`,
       [actorUserId]
     );
-    if (userRes.rows[0]?.is_platform_admin) {
+    if (userRes.rows[0]?.exists) {
       return true;
     }
 
-    // If no platform admin exists yet in the database, bootstrap the current user as the first Central Admin
-    const anyAdminRes = await tx.query<{ cnt: number }>(
-      `SELECT COUNT(*)::int AS cnt FROM public.profiles WHERE is_platform_admin = true;`
-    );
-    if ((anyAdminRes.rows[0]?.cnt ?? 0) === 0) {
-      await tx.query(
-        `UPDATE public.profiles SET is_platform_admin = true, updated_at = NOW() WHERE id = $1;`,
-        [actorUserId]
+    // 2. Check explicitly configured PLATFORM_ADMIN_EMAIL environment variable
+    const adminEmail = (process.env.PLATFORM_ADMIN_EMAIL || '').trim().toLowerCase();
+    if (adminEmail) {
+      const emailCheck = await tx.query<{ exists: boolean }>(
+        `SELECT EXISTS (
+           SELECT 1 FROM public.profiles
+           WHERE id = $1 AND LOWER(email) = $2
+         ) AS exists;`,
+        [actorUserId, adminEmail]
       );
-      return true;
+      if (emailCheck.rows[0]?.exists) {
+        await tx.query(
+          `INSERT INTO public.platform_roles (user_id, role)
+           VALUES ($1, 'platform_admin')
+           ON CONFLICT (user_id) DO UPDATE SET role = 'platform_admin';`,
+          [actorUserId]
+        );
+        return true;
+      }
     }
 
     return false;
@@ -128,7 +141,7 @@ export async function getCentralAdminDashboardData(actorUserId: string): Promise
         tx.query<{ cnt: number }>(`SELECT COUNT(*)::int AS cnt FROM public.profiles;`),
         tx.query<{ cnt: number }>(`SELECT COUNT(*)::int AS cnt FROM public.circles;`),
         tx.query<{ cnt: number }>(
-          `SELECT COUNT(*)::int AS cnt FROM public.posts WHERE is_Removed = false;`
+          `SELECT COUNT(*)::int AS cnt FROM public.posts WHERE status <> 'removed';`
         ),
         tx.query<{ cnt: number }>(
           `SELECT COUNT(*)::int AS cnt FROM public.marketplace_listings;`
@@ -154,17 +167,22 @@ export async function getCentralAdminDashboardData(actorUserId: string): Promise
     const circlesRes = await tx.query<CentralAdminCircleRow>(
       `SELECT c.id, c.name, c.slug, c.category, c.visibility, c.created_at,
          (SELECT COUNT(*)::int FROM public.circle_memberships m WHERE m.circle_id = c.id AND m.status = 'active') AS member_count,
-         (SELECT COUNT(*)::int FROM public.posts p WHERE p.circle_id = c.id AND p.is_removed = false) AS post_count
+         (SELECT COUNT(*)::int FROM public.posts p WHERE p.circle_id = c.id AND p.status <> 'removed') AS post_count
        FROM public.circles c
        ORDER BY c.created_at DESC
        LIMIT 100;`
     );
 
     const usersRes = await tx.query<CentralAdminUserRow>(
-      `SELECT u.id, u.username, u.display_name, u.email, u.is_platform_admin, u.created_at,
+      `SELECT u.id, u.username, u.display_name, u.email,
+         EXISTS (
+           SELECT 1 FROM public.platform_roles pr
+           WHERE pr.user_id = u.id AND pr.role IN ('platform_admin', 'trust_safety')
+         ) AS is_platform_admin,
+         u.created_at,
          (SELECT COUNT(*)::int FROM public.circle_memberships m WHERE m.user_id = u.id AND m.status = 'active') AS circle_count
        FROM public.profiles u
-       ORDER BY u.is_platform_admin DESC, u.created_at DESC
+       ORDER BY is_platform_admin DESC, u.created_at DESC
        LIMIT 100;`
     );
 
@@ -226,10 +244,19 @@ export async function toggleUserPlatformAdmin(
   }
 
   await withServiceRoleTransaction(async (tx) => {
-    await tx.query(
-      `UPDATE public.profiles SET is_platform_admin = $1, updated_at = NOW() WHERE id = $2;`,
-      [makeAdmin, targetUserId]
-    );
+    if (makeAdmin) {
+      await tx.query(
+        `INSERT INTO public.platform_roles (user_id, role)
+         VALUES ($1, 'platform_admin')
+         ON CONFLICT (user_id) DO UPDATE SET role = 'platform_admin';`,
+        [targetUserId]
+      );
+    } else {
+      await tx.query(
+        `DELETE FROM public.platform_roles WHERE user_id = $1;`,
+        [targetUserId]
+      );
+    }
   });
 }
 

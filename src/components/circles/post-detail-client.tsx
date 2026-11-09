@@ -138,22 +138,24 @@ export function PostDetailClient({
         )}
 
         <div className="mt-6 flex items-center justify-between border-t border-stone-100 pt-4 text-xs">
-          <div className="flex items-center gap-5">
+          <div className="flex items-center gap-3">
             <button
               type="button"
               onClick={handleToggleLike}
               disabled={!isActiveMember}
-              className={`inline-flex items-center gap-1.5 font-medium ${
-                post.viewer_has_liked ? 'text-stone-900 font-semibold' : 'text-stone-600'
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
+                post.viewer_has_liked
+                  ? 'border-stone-900 bg-stone-100 text-stone-900 font-semibold shadow-2xs'
+                  : 'border-stone-200 bg-stone-50/80 text-stone-700 shadow-2xs hover:bg-stone-100 hover:border-stone-300 hover:text-stone-900'
               }`}
             >
               <Heart
-                className={`h-4 w-4 ${post.viewer_has_liked ? 'fill-black text-stone-900' : ''}`}
+                className={`h-3.5 w-3.5 ${post.viewer_has_liked ? 'fill-black text-stone-900' : ''}`}
               />
               <span>{post.reaction_count} likes</span>
             </button>
-            <span className="inline-flex items-center gap-1.5 text-stone-600">
-              <MessageSquare className="h-4 w-4" />
+            <span className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-stone-50/80 px-3 py-1.5 text-xs font-medium text-stone-700 shadow-2xs">
+              <MessageSquare className="h-3.5 w-3.5" />
               <span>{comments.length} comments</span>
             </span>
           </div>
@@ -162,10 +164,14 @@ export function PostDetailClient({
             <button
               type="button"
               onClick={handleToggleSave}
-              className="inline-flex items-center gap-1 text-stone-600 hover:text-black"
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-all ${
+                post.viewer_has_saved
+                  ? 'border-stone-900 bg-stone-100 text-stone-900 font-semibold shadow-2xs'
+                  : 'border-stone-200 bg-stone-50/80 text-stone-700 shadow-2xs hover:bg-stone-100 hover:border-stone-300 hover:text-stone-900'
+              }`}
             >
               <Bookmark
-                className={`h-4 w-4 ${post.viewer_has_saved ? 'fill-black text-stone-900' : ''}`}
+                className={`h-3.5 w-3.5 ${post.viewer_has_saved ? 'fill-black text-stone-900' : ''}`}
               />
               <span>{post.viewer_has_saved ? 'Saved' : 'Save Post'}</span>
             </button>

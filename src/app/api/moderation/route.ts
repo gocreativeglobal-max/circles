@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
+  canUserAccessModeration,
   listModerationReports,
   moderateContent,
   reportContent,
@@ -9,12 +10,17 @@ import {
   handleApiError,
   resolveApiUser,
 } from '@/lib/auth/api-helpers';
-import { UnauthorizedError } from '@/lib/errors';
+import { ForbiddenError, UnauthorizedError } from '@/lib/errors';
 
 export async function GET(req: NextRequest) {
   try {
     const user = await resolveApiUser(req);
     if (!user) throw new UnauthorizedError();
+
+    const canModerate = await canUserAccessModeration(user.id);
+    if (!canModerate) {
+      throw new ForbiddenError('Only moderators and platform administrators can access the moderation queue.');
+    }
 
     const { searchParams } = new URL(req.url);
     const circleId = searchParams.get('circleId') || undefined;

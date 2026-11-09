@@ -1,9 +1,43 @@
 import crypto from 'crypto';
-import { withRlsTransaction } from '@/lib/db/postgres';
+import { withRlsTransaction, withServiceRoleTransaction } from '@/lib/db/postgres';
 import { createReportSchema } from '@/lib/validation';
 import { CircleRole, CircleVisibility, ContentReportItem, MembershipStatus } from '@/types/domain';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { assertCirclePermission } from '@/lib/authorization/permissions';
+
+export async function canUserAccessModeration(actorUserId: string): Promise<boolean> {
+  return withServiceRoleTransaction(async (tx) => {
+    const isPlatAdmin = await tx.query<{ exists: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM public.platform_roles
+         WHERE user_id = $1 AND role IN ('platform_admin', 'trust_safety')
+       ) AS exists;`,
+      [actorUserId]
+    );
+    if (isPlatAdmin.rows[0]?.exists) return true;
+
+    const adminEmail = (process.env.PLATFORM_ADMIN_EMAIL || '').trim().toLowerCase();
+    if (adminEmail) {
+      const emailCheck = await tx.query<{ exists: boolean }>(
+        `SELECT EXISTS (
+           SELECT 1 FROM public.profiles
+           WHERE id = $1 AND LOWER(email) = $2
+         ) AS exists;`,
+        [actorUserId, adminEmail]
+      );
+      if (emailCheck.rows[0]?.exists) return true;
+    }
+
+    const isStaff = await tx.query<{ exists: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM public.circle_memberships
+         WHERE user_id = $1 AND status = 'active' AND role IN ('owner', 'admin', 'moderator')
+       ) AS exists;`,
+      [actorUserId]
+    );
+    return Boolean(isStaff.rows[0]?.exists);
+  });
+}
 
 export async function reportContent(
   actorUserId: string,

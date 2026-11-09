@@ -25,6 +25,7 @@ import {
   MoveDown,
   Compass,
   Upload,
+  X,
 } from 'lucide-react';
 import {
   CourseItem,
@@ -1714,9 +1715,10 @@ export function CourseStudioClient({
                 <button
                   type="button"
                   onClick={() => setShowNewPaywallModal(false)}
-                  className="text-stone-400 hover:text-stone-700 text-xs font-semibold"
+                  className="rounded-lg border border-stone-200 bg-stone-50 p-1 text-stone-500 hover:bg-stone-100 hover:text-stone-900 transition-colors"
+                  aria-label="Close modal"
                 >
-                  ✕
+                  <X className="h-4 w-4" />
                 </button>
               </div>
 
@@ -1850,8 +1852,9 @@ export function CourseStudioClient({
                 <div className="pt-3 border-t border-stone-100 flex items-center justify-end gap-2">
                   <Button
                     type="button"
+                    variant="outline"
                     onClick={() => setShowNewPaywallModal(false)}
-                    className="bg-stone-100 text-stone-700 hover:bg-stone-200 text-xs px-3.5 py-2 rounded-lg font-semibold"
+                    className="text-xs px-3.5 py-2 font-semibold"
                   >
                     Cancel
                   </Button>
@@ -2099,8 +2102,9 @@ export function CourseStudioClient({
               <div className="pt-3 border-t border-stone-100 flex items-center justify-end gap-2">
                 <Button
                   type="button"
+                  variant="outline"
                   onClick={() => setShowSectionModal(false)}
-                  className="bg-stone-100 text-stone-700 hover:bg-stone-200 text-xs px-3 py-1.5 rounded-lg font-semibold"
+                  className="text-xs px-3 py-1.5 font-semibold"
                 >
                   Cancel
                 </Button>
@@ -2269,8 +2273,9 @@ export function CourseStudioClient({
               <div className="pt-3 border-t border-stone-100 flex items-center justify-end gap-2">
                 <Button
                   type="button"
+                  variant="outline"
                   onClick={() => setShowLessonModal(false)}
-                  className="bg-stone-100 text-stone-700 hover:bg-stone-200 text-xs px-3 py-1.5 rounded-lg font-semibold"
+                  className="text-xs px-3 py-1.5 font-semibold"
                 >
                   Cancel
                 </Button>

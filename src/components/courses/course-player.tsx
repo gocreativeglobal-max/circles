@@ -710,7 +710,7 @@ export function CoursePlayer({
           <button
             type="button"
             onClick={() => setToast(null)}
-            className="text-stone-400 hover:text-stone-700 p-0.5"
+            className="rounded-lg border border-stone-200/80 bg-white/80 p-1 text-stone-600 hover:bg-white hover:text-stone-900 transition-colors"
             aria-label="Dismiss notification"
           >
             <X className="h-3.5 w-3.5" />
@@ -2033,9 +2033,10 @@ export function CoursePlayer({
               <button
                 type="button"
                 onClick={() => setShowCheckoutModal(false)}
-                className="text-stone-400 hover:text-stone-700 text-xs font-semibold"
+                className="rounded-lg border border-stone-200 bg-stone-50 p-1 text-stone-500 hover:bg-stone-100 hover:text-stone-900 transition-colors"
+                aria-label="Close modal"
               >
-                ✕
+                <X className="h-4 w-4" />
               </button>
             </div>
 
@@ -2077,8 +2078,9 @@ export function CoursePlayer({
               <div className="pt-3 border-t border-stone-100 flex items-center justify-end gap-2">
                 <Button
                   type="button"
+                  variant="outline"
                   onClick={() => setShowCheckoutModal(false)}
-                  className="bg-stone-100 text-stone-700 hover:bg-stone-200 text-xs px-3.5 py-2 rounded-lg font-semibold"
+                  className="text-xs px-3.5 py-2 font-semibold"
                 >
                   Cancel
                 </Button>

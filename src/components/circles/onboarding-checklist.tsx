@@ -111,7 +111,7 @@ export function CircleOnboardingChecklist({
         <button
           type="button"
           onClick={handleDismiss}
-          className="rounded-md p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+          className="rounded-md border border-stone-200 bg-stone-50 p-1 text-stone-500 hover:bg-stone-100 hover:text-stone-900 transition-colors"
           aria-label="Dismiss"
         >
           <X className="h-4 w-4" />

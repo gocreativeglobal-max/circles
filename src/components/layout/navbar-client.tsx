@@ -21,9 +21,10 @@ import { UserProfile } from '@/types/domain';
 interface NavbarClientProps {
   user: UserProfile | null;
   unreadCount: number;
+  canModerate?: boolean;
 }
 
-export function NavbarClient({ user, unreadCount }: NavbarClientProps) {
+export function NavbarClient({ user, unreadCount, canModerate = false }: NavbarClientProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -63,8 +64,12 @@ export function NavbarClient({ user, unreadCount }: NavbarClientProps) {
       ? [
           { href: '/circles', label: 'My Circles', icon: Layers },
           { href: '/circles/new', label: 'Create', icon: PlusCircle },
-          { href: '/moderation', label: 'Moderation', icon: ShieldAlert },
-          { href: '/admin', label: 'Central Admin', icon: Settings },
+          ...(canModerate
+            ? [{ href: '/moderation', label: 'Moderation', icon: ShieldAlert }]
+            : []),
+          ...(user.is_platform_admin
+            ? [{ href: '/admin', label: 'Central Admin', icon: Settings }]
+            : []),
         ]
       : []),
   ];
@@ -162,10 +167,10 @@ export function NavbarClient({ user, unreadCount }: NavbarClientProps) {
                 type="button"
                 onClick={handleSignOut}
                 disabled={signingOut}
-                className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-stone-500 hover:bg-stone-100 hover:text-stone-800 transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-stone-200 bg-stone-50/80 px-2.5 py-1.5 text-xs font-semibold text-stone-700 shadow-2xs hover:bg-stone-100 hover:border-stone-300 hover:text-stone-900 transition-colors disabled:opacity-50"
                 title="Sign out"
               >
-                <LogOut className="h-3.5 w-3.5" />
+                <LogOut className="h-3.5 w-3.5 text-stone-600" />
                 <span>Exit</span>
               </button>
             </>

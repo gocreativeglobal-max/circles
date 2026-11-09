@@ -10,6 +10,13 @@ import {
 } from '@/app/api/circles/[circleId]/membership/route';
 import { PATCH as capabilitiesPatchRoute } from '@/app/api/circles/[circleId]/capabilities/route';
 import { POST as createPostRoute } from '@/app/api/circles/[circleId]/posts/route';
+import {
+  DELETE as adminDeleteRoute,
+  GET as adminGetRoute,
+  PATCH as adminPatchRoute,
+} from '@/app/api/admin/route';
+import { GET as moderationGetRoute } from '@/app/api/moderation/route';
+import { withServiceRoleTransaction } from '@/lib/db/postgres';
 
 function makeRequest(
   url: string,
@@ -165,5 +172,60 @@ describe('Direct API Route Security & Authorization Verification', () => {
     expect(discoverRes.status).toBe(200);
     const discoverBody = await discoverRes.json();
     expect(discoverBody.circles.some((c: { id: string }) => c.id === circle.id)).toBe(true);
+
+    // 10. Central Admin endpoints are protected: ordinary member is rejected with 403
+    const unauthAdminGet = await adminGetRoute(
+      makeRequest('http://localhost:3000/api/admin', 'GET', undefined, memberToken)
+    );
+    expect(unauthAdminGet.status).toBe(403);
+
+    const unauthAdminPatch = await adminPatchRoute(
+      makeRequest(
+        'http://localhost:3000/api/admin',
+        'PATCH',
+        { action: 'update_feature_flags', flags: { custom_features_builder: true } },
+        memberToken
+      )
+    );
+    expect(unauthAdminPatch.status).toBe(403);
+
+    const unauthAdminDelete = await adminDeleteRoute(
+      makeRequest(
+        `http://localhost:3000/api/admin?circleId=${circle.id}`,
+        'DELETE',
+        undefined,
+        memberToken
+      )
+    );
+    expect(unauthAdminDelete.status).toBe(403);
+
+    // 11. Moderation endpoint is protected: non-staff member is rejected with 403
+    const unauthModGet = await moderationGetRoute(
+      makeRequest('http://localhost:3000/api/moderation', 'GET', undefined, memberToken)
+    );
+    expect(unauthModGet.status).toBe(403);
+
+    // Circle owner has staff privileges and can access the moderation queue
+    const ownerModGet = await moderationGetRoute(
+      makeRequest('http://localhost:3000/api/moderation', 'GET', undefined, ownerToken)
+    );
+    expect(ownerModGet.status).toBe(200);
+
+    // 12. Verified platform admin can access Central Admin
+    await withServiceRoleTransaction(async (tx) => {
+      await tx.query(
+        `INSERT INTO public.platform_roles (user_id, role)
+         VALUES ($1, 'platform_admin')
+         ON CONFLICT (user_id) DO UPDATE SET role = 'platform_admin';`,
+        [ownerData.user.id]
+      );
+    });
+
+    const adminGetSuccess = await adminGetRoute(
+      makeRequest('http://localhost:3000/api/admin', 'GET', undefined, ownerToken)
+    );
+    expect(adminGetSuccess.status).toBe(200);
+    const adminData = await adminGetSuccess.json();
+    expect(adminData.isPlatformAdmin).toBe(true);
   });
 });

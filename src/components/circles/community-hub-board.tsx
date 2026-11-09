@@ -700,7 +700,8 @@ export function CommunityHubBoard({
               <button
                 type="button"
                 onClick={() => setShowCreateModal(false)}
-                className="rounded-lg p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                className="rounded-lg border border-stone-200 bg-stone-50 p-1 text-stone-500 hover:bg-stone-100 hover:text-stone-900 transition-colors"
+                aria-label="Close modal"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -917,7 +918,7 @@ export function CommunityHubBoard({
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="rounded-xl px-4 py-2 text-xs font-medium text-stone-600 hover:bg-stone-100"
+                  className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-xs font-semibold text-stone-700 shadow-2xs hover:bg-stone-100 hover:border-stone-300"
                 >
                   Cancel
                 </button>
@@ -1109,7 +1110,7 @@ export function CommunityHubBoard({
                 <button
                   type="button"
                   onClick={() => setDonateTarget(null)}
-                  className="rounded-xl px-4 py-2 text-xs font-medium text-stone-600 hover:bg-stone-100"
+                  className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-xs font-semibold text-stone-700 shadow-2xs hover:bg-stone-100 hover:border-stone-300"
                 >
                   Cancel
                 </button>
@@ -1287,7 +1288,8 @@ export function CommunityHubBoard({
               <button
                 type="button"
                 onClick={() => setShowSettingsModal(false)}
-                className="rounded-lg p-1 text-stone-400 hover:bg-stone-100"
+                className="rounded-lg border border-stone-200 bg-stone-50 p-1 text-stone-500 hover:bg-stone-100 hover:text-stone-900 transition-colors"
+                aria-label="Close modal"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -1366,7 +1368,7 @@ export function CommunityHubBoard({
                 <button
                   type="button"
                   onClick={() => setShowSettingsModal(false)}
-                  className="rounded-xl px-4 py-2 text-xs font-medium text-stone-600 hover:bg-stone-100"
+                  className="rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-xs font-semibold text-stone-700 shadow-2xs hover:bg-stone-100 hover:border-stone-300"
                 >
                   Cancel
                 </button>

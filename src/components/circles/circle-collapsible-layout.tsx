@@ -142,7 +142,7 @@ export function CircleCollapsibleLayout({
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}
-                className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                className="rounded-lg border border-stone-200 bg-stone-50 p-1.5 text-stone-600 hover:bg-stone-100 hover:text-stone-900 transition-colors"
                 aria-label="Close menu"
               >
                 <X className="h-4 w-4" />
@@ -200,7 +200,7 @@ export function CircleCollapsibleLayout({
               <button
                 type="button"
                 onClick={toggleCollapse}
-                className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                className="rounded-lg border border-stone-200 bg-stone-50/80 p-1.5 text-stone-600 hover:bg-stone-100 hover:border-stone-300 hover:text-stone-900 transition-colors shadow-2xs"
                 aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                 title={isCollapsed ? 'Expand' : 'Collapse'}
               >

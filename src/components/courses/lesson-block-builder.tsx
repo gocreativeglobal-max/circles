@@ -568,7 +568,8 @@ export function LessonBlockBuilder({
 
             <button
               onClick={onClose}
-              className="rounded-xl p-1.5 text-stone-400 hover:bg-stone-200/60 hover:text-stone-700 transition-colors"
+              className="rounded-xl border border-stone-200 bg-stone-50 p-1.5 text-stone-500 hover:bg-stone-100 hover:text-stone-900 transition-colors"
+              aria-label="Close modal"
             >
               <X className="h-5 w-5" />
             </button>
@@ -736,15 +737,14 @@ export function LessonBlockBuilder({
                   <button
                     type="button"
                     onClick={expandAllBlocks}
-                    className="inline-flex items-center gap-1 text-[11px] font-medium text-stone-500 hover:text-stone-900"
+                    className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1 text-[11px] font-semibold text-stone-700 shadow-2xs hover:bg-stone-100 hover:border-stone-300 hover:text-stone-900 transition-colors"
                   >
                     <Maximize2 className="h-3 w-3" /> Expand All
                   </button>
-                  <span className="text-stone-300">·</span>
                   <button
                     type="button"
                     onClick={collapseAllBlocks}
-                    className="inline-flex items-center gap-1 text-[11px] font-medium text-stone-500 hover:text-stone-900"
+                    className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-stone-50 px-2.5 py-1 text-[11px] font-semibold text-stone-700 shadow-2xs hover:bg-stone-100 hover:border-stone-300 hover:text-stone-900 transition-colors"
                   >
                     <Minimize2 className="h-3 w-3" /> Collapse All
                   </button>

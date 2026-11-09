@@ -366,7 +366,8 @@ export function EventSettingsModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-full p-2 text-stone-400 hover:bg-stone-200/60 transition-colors"
+              className="rounded-full border border-stone-200 bg-stone-50 p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-900 transition-colors"
+              aria-label="Close modal"
             >
               <X className="h-4 w-4" />
             </button>
@@ -871,10 +872,10 @@ export function EventSettingsModal({
         <div className="border-t border-stone-200 bg-stone-50 px-6 py-4 flex items-center justify-between">
           <Button
             type="button"
-            variant="ghost"
+            variant="outline"
             size="sm"
             onClick={onClose}
-            className="text-xs text-stone-500 hover:text-stone-800"
+            className="rounded-xl text-xs"
           >
             Cancel
           </Button>

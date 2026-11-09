@@ -753,13 +753,13 @@ export function SocialNewsfeedClient({
                 </Link>
                 <Link
                   href="/login"
-                  className="inline-flex items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white hover:bg-white/15 transition-all backdrop-blur-xs"
+                  className="inline-flex items-center gap-2 rounded-xl border border-stone-700 bg-stone-900/80 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white hover:bg-stone-800 hover:border-stone-500 transition-all"
                 >
                   <span>Sign In</span>
                 </Link>
                 <Link
                   href="/explore"
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-white/25 bg-white/10 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white hover:bg-white/20 hover:border-white/40 transition-all backdrop-blur-xs"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-stone-700 bg-stone-900/80 px-4 py-2.5 text-xs sm:text-sm font-semibold text-white hover:bg-stone-800 hover:border-stone-500 transition-all"
                 >
                   <Compass className="h-4 w-4" />
                   <span>Directory</span>

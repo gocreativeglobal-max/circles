@@ -6,7 +6,7 @@ import {
   updatePlatformFeatureFlags,
 } from '@/features/admin/service';
 import { handleApiError, resolveApiUser } from '@/lib/auth/api-helpers';
-import { UnauthorizedError, ValidationError } from '@/lib/errors';
+import { ForbiddenError, UnauthorizedError, ValidationError } from '@/lib/errors';
 
 export async function GET(req: NextRequest) {
   try {
@@ -14,6 +14,9 @@ export async function GET(req: NextRequest) {
     if (!user) throw new UnauthorizedError();
 
     const data = await getCentralAdminDashboardData(user.id);
+    if (!data.isPlatformAdmin) {
+      throw new ForbiddenError('Only Circles Central Administrators can access Central Admin.');
+    }
     return NextResponse.json(data);
   } catch (error) {
     return handleApiError(error);

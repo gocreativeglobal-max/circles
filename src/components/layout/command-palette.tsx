@@ -16,7 +16,6 @@ import {
   PlusCircle,
   Search,
   Settings,
-  ShieldAlert,
   ShoppingBag,
   Sliders,
   Users,
@@ -170,7 +169,6 @@ export function CommandPalette() {
       { title: 'Explore Communities', subtitle: 'Discover active public Circles', path: '/explore', icon: Compass },
       { title: 'My Circles', subtitle: 'View your memberships and owned spaces', path: '/circles', icon: Layers },
       { title: 'Create New Circle', subtitle: 'Provision a community from verified templates', path: '/circles/new', icon: PlusCircle },
-      { title: 'Moderation Queue', subtitle: 'Review flagged content and member reports', path: '/moderation', icon: ShieldAlert },
       { title: 'Profile & Privacy Settings', subtitle: 'Manage account visibility and bio', path: '/settings', icon: Settings },
     ];
 

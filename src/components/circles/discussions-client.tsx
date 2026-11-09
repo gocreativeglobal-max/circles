@@ -457,10 +457,10 @@ export function DiscussionsClient({
             <button
               type="button"
               onClick={() => setSelectedSpaceId(null)}
-              className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+              className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
                 selectedSpaceId === null
-                  ? 'bg-[#F4F3EE] text-stone-900 font-semibold'
-                  : 'text-stone-600 hover:bg-stone-100'
+                  ? 'border-black bg-black text-white font-semibold shadow-2xs'
+                  : 'border-stone-200/90 bg-stone-50/70 text-stone-700 hover:bg-stone-100 hover:border-stone-300'
               }`}
             >
               <Hash className="h-3.5 w-3.5 opacity-60" />
@@ -473,10 +473,10 @@ export function DiscussionsClient({
                   key={sp.id}
                   type="button"
                   onClick={() => setSelectedSpaceId(sp.id)}
-                  className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                  className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors ${
                     active
-                      ? 'bg-[#F4F3EE] text-stone-900 font-semibold'
-                      : 'text-stone-600 hover:bg-stone-100'
+                      ? 'border-black bg-black text-white font-semibold shadow-2xs'
+                      : 'border-stone-200/90 bg-stone-50/70 text-stone-700 hover:bg-stone-100 hover:border-stone-300'
                   }`}
                 >
                   <Hash className="h-3.5 w-3.5 opacity-60" />
@@ -519,7 +519,7 @@ export function DiscussionsClient({
                 type="button"
                 onClick={() => setAdminPopoverOpen((v) => !v)}
                 title="Chat settings"
-                className="rounded-lg p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                className="rounded-lg border border-stone-200 bg-stone-50/80 p-1.5 text-stone-600 hover:bg-stone-100 hover:border-stone-300 hover:text-stone-900 transition-colors"
               >
                 <Sliders className="h-3.5 w-3.5" />
               </button>

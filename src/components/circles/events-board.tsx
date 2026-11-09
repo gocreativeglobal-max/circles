@@ -880,9 +880,9 @@ export function EventsBoard({
                           <Button
                             type="button"
                             size="sm"
-                            variant="ghost"
+                            variant="outline"
                             onClick={() => handleRsvp(selectedEventDetail.id, 'cancel')}
-                            className="h-8 text-xs text-stone-500 hover:text-rose-600"
+                            className="h-8 text-xs font-semibold text-stone-700 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-700 transition-all"
                           >
                             Can&apos;t go
                           </Button>

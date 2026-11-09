@@ -1,4 +1,5 @@
 import React from 'react';
+import { cn } from '@/lib/utils';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger' | 'gradient';
@@ -8,7 +9,7 @@ export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElemen
 export function Button({
   variant = 'primary',
   size = 'md',
-  className = '',
+  className,
   children,
   ...props
 }: ButtonProps) {
@@ -19,7 +20,7 @@ export function Button({
     primary:
       'bg-black text-white hover:bg-zinc-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_1px_2px_rgba(0,0,0,0.15)] border border-black rounded-xl',
     secondary:
-      'bg-white text-zinc-900 hover:bg-zinc-50 border border-zinc-300 shadow-[0_1px_2px_rgba(0,0,0,0.04)] rounded-xl hover:border-zinc-400',
+      'bg-stone-100 text-stone-900 hover:bg-stone-200 border border-stone-300 shadow-2xs rounded-xl',
     outline:
       'border border-stone-300 bg-white text-stone-900 shadow-2xs hover:bg-stone-50 hover:border-stone-400 rounded-xl',
     ghost:
@@ -39,7 +40,7 @@ export function Button({
 
   return (
     <button
-      className={`${base} ${variants[variant]} ${sizes[size]} ${className}`.trim()}
+      className={cn(base, variants[variant], sizes[size], className)}
       {...props}
     >
       {children}

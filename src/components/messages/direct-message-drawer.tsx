@@ -145,7 +145,8 @@ export function DirectMessageDrawer({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-stone-400 hover:text-stone-700"
+            className="rounded-lg border border-stone-200 bg-stone-50 p-1.5 text-stone-500 hover:bg-stone-100 hover:text-stone-900 transition-colors"
+            aria-label="Close messages"
           >
             <X className="h-4 w-4" />
           </button>
@@ -162,7 +163,7 @@ export function DirectMessageDrawer({
                   setActiveConvo(null);
                   if (onSelectConversation) onSelectConversation(null);
                 }}
-                className="text-stone-500 hover:text-stone-900 font-medium"
+                className="inline-flex items-center gap-1 rounded-lg border border-stone-200 bg-stone-50 px-2 py-1 text-xs font-semibold text-stone-700 hover:bg-stone-100 hover:text-stone-900 transition-colors"
               >
                 ← Back to Inbox
               </button>
