@@ -47,9 +47,10 @@ export const createPricingPlanSchema = z.object({
     .toUpperCase()
     .refine(
       (c) => isBachsSupportedCurrency(c),
-      'Currency must be an accepted Bachs currency (e.g. USD, NGN, GHS, KES, ZAR, EUR, GBP, CAD, USDT, USDC).'
+      'Currency must be an accepted currency (e.g. USD, EUR, GBP, NGN, GHS, KES, ZAR, CAD, USDT, USDC).'
     )
     .default('USD'),
+  currencyPrices: z.record(z.number().int().min(0)).optional(),
   intervalUnit: z.enum(['day', 'week', 'month', 'quarter', 'year']).nullable().optional(),
   intervalCount: z.number().int().min(1).default(1),
   installmentCount: z.number().int().min(1).nullable().optional(),
@@ -103,9 +104,10 @@ export const createInvoiceSchema = z.object({
     .toUpperCase()
     .refine(
       (c) => isBachsSupportedCurrency(c),
-      'Currency must be an accepted Bachs currency (e.g. USD, NGN, GHS, KES, ZAR, EUR, GBP, CAD, USDT, USDC).'
+      'Currency must be an accepted currency (e.g. USD, EUR, GBP, NGN, GHS, KES, ZAR, CAD, USDT, USDC).'
     )
     .default('USD'),
+  currencyPrices: z.record(z.number().int().min(0)).optional(),
   paymentMethod: z
     .enum(['bachs', 'stripe', 'bank_transfer', 'cash', 'manual_credit', 'external_erp', 'free_grant'])
     .default('bachs'),
@@ -161,7 +163,7 @@ export const recordTreasuryEntrySchema = z.object({
     .toUpperCase()
     .refine(
       (c) => isBachsSupportedCurrency(c),
-      'Currency must be an accepted Bachs currency (e.g. USD, NGN, GHS, KES, ZAR, EUR, GBP, CAD, USDT, USDC).'
+      'Currency must be an accepted currency (e.g. USD, EUR, GBP, NGN, GHS, KES, ZAR, CAD, USDT, USDC).'
     )
     .default('USD'),
   description: z.string().trim().min(3).max(500),
@@ -234,6 +236,14 @@ export async function createPricingPlan(
     }
 
     const planId = crypto.randomUUID();
+    const planMetadata = {
+      ...input.metadata,
+      currency_prices:
+        input.currencyPrices ||
+        (input.metadata as Record<string, unknown>)?.currency_prices ||
+        {},
+    };
+
     const planRes = await tx.query<PricingPlanItem>(
       `INSERT INTO public.pricing_plans (
          id, circle_id, slug, name, description, billing_type, amount_cents, currency,
@@ -257,7 +267,7 @@ export async function createPricingPlan(
         input.suggestedAmountsCents,
         input.isActive,
         input.isPublic,
-        JSON.stringify(input.metadata),
+        JSON.stringify(planMetadata),
       ]
     );
 

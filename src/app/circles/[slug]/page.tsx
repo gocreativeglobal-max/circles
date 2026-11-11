@@ -42,7 +42,8 @@ export default async function CircleOverviewPage({
         items: [],
         upcomingEvents: [],
         featuredListings: [],
-        counts: { posts: 0, listings: 0, events: 0, polls: 0, all: 0 },
+        featuredCourses: [],
+        counts: { posts: 0, listings: 0, events: 0, polls: 0, courses: 0, resources: 0, all: 0 },
       };
 
   const isMember = circle.current_user_membership_status === 'active';
@@ -71,6 +72,7 @@ export default async function CircleOverviewPage({
             initialItems={streamData.items}
             upcomingEvents={streamData.upcomingEvents}
             featuredListings={streamData.featuredListings}
+            featuredCourses={streamData.featuredCourses}
             enabledCapabilityKeys={navigation.enabledCapabilityKeys}
             currentUserId={user?.id ?? null}
             isMember={isMember}

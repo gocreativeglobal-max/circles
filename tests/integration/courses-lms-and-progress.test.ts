@@ -22,7 +22,7 @@ import {
   updateCourse,
 } from '@/features/courses/service';
 import { withRlsTransaction } from '@/lib/db/postgres';
-import { CapabilityDisabledError, ForbiddenError, NotFoundError } from '@/lib/errors';
+import { CapabilityDisabledError, ConflictError, ForbiddenError, NotFoundError } from '@/lib/errors';
 
 describe('Courses, LMS Curriculum & Student Learning Progress Integration Suite', () => {
   it('enforces full course lifecycle, syllabus hierarchy, student progress tracking, and RLS multi-tenant boundaries', async () => {
@@ -548,5 +548,60 @@ describe('Courses, LMS Curriculum & Student Learning Progress Integration Suite'
     expect(leaderboard[0].total_xp).toBe(110);
     expect(leaderboard[0].current_level).toBe(2);
     expect(leaderboard[0].rank).toBe(1);
+  });
+
+  it('automatically disambiguates duplicate course slugs within the Circle and rejects conflicting updates', async () => {
+    const suffix = Date.now();
+    const instructor = (
+      await registerUser({
+        email: `slug-inst-${suffix}@example.com`,
+        username: `slug_inst_${suffix}`,
+        displayName: 'Slug Instructor',
+        password: 'Password123!',
+      })
+    ).user;
+
+    const circle = await createCircle(instructor.id, {
+      name: `Slug Academy ${suffix}`,
+      slug: `slug-academy-${suffix}`,
+      visibility: 'public',
+    });
+
+    await updateCircleCapability(instructor.id, circle.id, 'spaces', true);
+    await updateCircleCapability(instructor.id, circle.id, 'learning_resources', true);
+
+    // 1. Create first course
+    const course1 = await createCourse(instructor.id, {
+      circleId: circle.id,
+      title: 'Mastering Next.js',
+      slug: 'mastering-nextjs',
+      description: 'First edition.',
+    });
+    expect(course1.slug).toBe('mastering-nextjs');
+
+    // 2. Create second course with same slug -> should automatically disambiguate to mastering-nextjs-2
+    const course2 = await createCourse(instructor.id, {
+      circleId: circle.id,
+      title: 'Mastering Next.js (Advanced)',
+      slug: 'mastering-nextjs',
+      description: 'Second edition.',
+    });
+    expect(course2.slug).toBe('mastering-nextjs-2');
+
+    // 3. Create third course with same slug -> should automatically disambiguate to mastering-nextjs-3
+    const course3 = await createCourse(instructor.id, {
+      circleId: circle.id,
+      title: 'Mastering Next.js (Enterprise)',
+      slug: 'mastering-nextjs',
+      description: 'Third edition.',
+    });
+    expect(course3.slug).toBe('mastering-nextjs-3');
+
+    // 4. Updating course3 slug to course1 slug should throw ConflictError
+    await expect(
+      updateCourse(instructor.id, circle.id, course3.id, {
+        slug: 'mastering-nextjs',
+      })
+    ).rejects.toThrow(ConflictError);
   });
 });

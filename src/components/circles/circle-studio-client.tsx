@@ -9,20 +9,20 @@ import {
   CreditCard,
   History,
   LayoutGrid,
+  Link as LinkIcon,
   Mail,
   Plus,
   Settings,
   Settings2,
   Sliders,
   UserCheck,
+  UserPlus,
   Users,
   X,
 } from 'lucide-react';
 import { StudioFinancesTab } from './studio-finances-tab';
-import {
-  BACHS_ACCEPTED_CURRENCIES,
-  getBachsCurrency,
-} from '@/lib/payments/currencies';
+import { InviteModal } from './invite-modal';
+import { BACHS_ACCEPTED_CURRENCIES } from '@/lib/payments/currencies';
 import {
   AuditLogItem,
   Circle,
@@ -104,6 +104,7 @@ export function CircleStudioClient({
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<Exclude<CircleRole, 'owner'>>('member');
   const [lastIssuedToken, setLastIssuedToken] = useState<string | null>(null);
+  const [showInviteModal, setShowInviteModal] = useState(false);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -871,7 +872,28 @@ export function CircleStudioClient({
             </div>
           )}
 
-          {/* Invite */}
+          {/* Invite by Link Banner & Manager */}
+          <div className="rounded-2xl border border-stone-200/80 bg-stone-50/50 p-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <LinkIcon className="h-4 w-4 text-stone-700" />
+                <h3 className="text-sm font-semibold text-stone-900">Shareable Invite Link</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowInviteModal(true)}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-black px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800 transition-colors shadow-2xs"
+              >
+                <UserPlus className="h-3.5 w-3.5" />
+                <span>Invite Manager & Link Settings</span>
+              </button>
+            </div>
+            <p className="text-xs text-stone-500 font-normal">
+              Generate customizable invitation links that allow new members to join directly with assigned roles and usage limits.
+            </p>
+          </div>
+
+          {/* Email Invite */}
           <form
             onSubmit={handleInviteMember}
             className="rounded-2xl border border-stone-200/80 bg-white p-5 space-y-3"
@@ -1214,33 +1236,11 @@ export function CircleStudioClient({
                       }
                       className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 p-2 text-xs text-stone-900 focus:border-stone-400 focus:outline-none"
                     >
-                      <optgroup label="African Rails (Bank & Mobile Money)">
-                        {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'fiat_african').map(
-                          (c) => (
-                            <option key={c.code} value={c.code}>
-                              {c.code} ({c.symbol}) — {c.name}
-                            </option>
-                          )
-                        )}
-                      </optgroup>
-                      <optgroup label="Global Currencies">
-                        {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'fiat_global').map(
-                          (c) => (
-                            <option key={c.code} value={c.code}>
-                              {c.code} ({c.symbol}) — {c.name}
-                            </option>
-                          )
-                        )}
-                      </optgroup>
-                      <optgroup label="Crypto Stablecoins">
-                        {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'stablecoin').map(
-                          (c) => (
-                            <option key={c.code} value={c.code}>
-                              {c.code} ({c.symbol}) — {c.name}
-                            </option>
-                          )
-                        )}
-                      </optgroup>
+                      {BACHS_ACCEPTED_CURRENCIES.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.code} ({c.symbol}) — {c.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
@@ -1331,33 +1331,11 @@ export function CircleStudioClient({
                       }
                       className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 p-2 text-xs text-stone-900 focus:border-stone-400 focus:outline-none"
                     >
-                      <optgroup label="African Rails (Bank & Mobile Money)">
-                        {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'fiat_african').map(
-                          (c) => (
-                            <option key={c.code} value={c.code}>
-                              {c.code} ({c.symbol}) — {c.name}
-                            </option>
-                          )
-                        )}
-                      </optgroup>
-                      <optgroup label="Global Currencies">
-                        {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'fiat_global').map(
-                          (c) => (
-                            <option key={c.code} value={c.code}>
-                              {c.code} ({c.symbol}) — {c.name}
-                            </option>
-                          )
-                        )}
-                      </optgroup>
-                      <optgroup label="Crypto Stablecoins">
-                        {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'stablecoin').map(
-                          (c) => (
-                            <option key={c.code} value={c.code}>
-                              {c.code} ({c.symbol}) — {c.name}
-                            </option>
-                          )
-                        )}
-                      </optgroup>
+                      {BACHS_ACCEPTED_CURRENCIES.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.code} ({c.symbol}) — {c.name}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
@@ -1416,7 +1394,7 @@ export function CircleStudioClient({
                 <div className="space-y-3">
                   <div>
                     <label className="block text-xs font-medium text-stone-700">
-                      Bachs Accepted Currency
+                      Currency
                     </label>
                     <select
                       value={String(capSettingsDraft.currency || 'USD')}
@@ -1425,37 +1403,12 @@ export function CircleStudioClient({
                       }
                       className="mt-1 w-full rounded-xl border border-stone-200 bg-stone-50 p-2 text-xs text-stone-900 focus:border-stone-400 focus:outline-none"
                     >
-                      <optgroup label="African Rails (Bank & Mobile Money)">
-                        {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'fiat_african').map(
-                          (c) => (
-                            <option key={c.code} value={c.code}>
-                              {c.code} ({c.symbol}) — {c.name}
-                            </option>
-                          )
-                        )}
-                      </optgroup>
-                      <optgroup label="Global Currencies">
-                        {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'fiat_global').map(
-                          (c) => (
-                            <option key={c.code} value={c.code}>
-                              {c.code} ({c.symbol}) — {c.name}
-                            </option>
-                          )
-                        )}
-                      </optgroup>
-                      <optgroup label="Crypto Stablecoins">
-                        {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'stablecoin').map(
-                          (c) => (
-                            <option key={c.code} value={c.code}>
-                              {c.code} ({c.symbol}) — {c.name}
-                            </option>
-                          )
-                        )}
-                      </optgroup>
+                      {BACHS_ACCEPTED_CURRENCIES.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.code} ({c.symbol}) — {c.name}
+                        </option>
+                      ))}
                     </select>
-                    <p className="mt-1 text-[11px] text-stone-500">
-                      Payment rails: {getBachsCurrency(String(capSettingsDraft.currency || 'USD')).paymentMethodsDescription} via Bachs.io
-                    </p>
                   </div>
 
                   <label className="flex items-center gap-2 text-xs text-stone-800 cursor-pointer">
@@ -1527,6 +1480,13 @@ export function CircleStudioClient({
           </div>
         </div>
       )}
+
+      <InviteModal
+        circle={initialCircle}
+        isOpen={showInviteModal}
+        onClose={() => setShowInviteModal(false)}
+        isStaff={true}
+      />
     </div>
   );
 }

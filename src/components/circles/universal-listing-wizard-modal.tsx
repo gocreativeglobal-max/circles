@@ -112,6 +112,7 @@ export function UniversalListingWizardModal({
   const [priceMin, setPriceMin] = useState('');
   const [priceMax, setPriceMax] = useState('');
   const [priceCurrency, setPriceCurrency] = useState(defaultCurrency);
+  const [extraPrices, setExtraPrices] = useState<Array<{ currency: string; amount: string }>>([]);
 
   const [actionType, setActionType] = useState<ListingActionType>('checkout');
   const [actionUrl, setActionUrl] = useState('');
@@ -167,14 +168,26 @@ export function UniversalListingWizardModal({
       setActionUrl(editingListing.action_url || '');
 
       const cf = editingListing.custom_fields || {};
+      const { currency_prices, ...otherFields } = cf as Record<string, unknown>;
       setCustomFields(
-        Object.entries(cf).map(([k, v]) => ({ key: k, value: String(v ?? '') }))
+        Object.entries(otherFields).map(([k, v]) => ({ key: k, value: String(v ?? '') }))
       );
+      if (currency_prices && typeof currency_prices === 'object') {
+        setExtraPrices(
+          Object.entries(currency_prices as Record<string, number>).map(([c, v]) => ({
+            currency: c,
+            amount: String(v),
+          }))
+        );
+      } else {
+        setExtraPrices([]);
+      }
       setTags(Array.isArray(editingListing.tags) ? editingListing.tags : []);
     } else {
       const firstAllowed = visibleArchetypes[0]?.id || 'product';
       setCurrentStep(visibleArchetypes.length === 1 ? 2 : 1);
       setPriceCurrency(defaultCurrency);
+      setExtraPrices([]);
       applyArchetypeDefaults(firstAllowed);
     }
     setError(null);
@@ -271,11 +284,23 @@ export function UniversalListingWizardModal({
     setLoading(true);
     setError(null);
 
-    const customFieldsObject: Record<string, string> = {};
+    const customFieldsObject: Record<string, unknown> = {};
     for (const pair of customFields) {
       const k = pair.key.trim();
       const v = pair.value.trim();
       if (k && v) customFieldsObject[k] = v;
+    }
+
+    const currencyPrices: Record<string, number> = {};
+    for (const p of extraPrices) {
+      const code = p.currency.trim().toUpperCase();
+      const val = parseFloat(p.amount);
+      if (code && !isNaN(val) && val >= 0) {
+        currencyPrices[code] = val;
+      }
+    }
+    if (Object.keys(currencyPrices).length > 0) {
+      customFieldsObject.currency_prices = currencyPrices;
     }
 
     let legacyPricingUnit: 'fixed' | 'hourly' | 'daily' | 'monthly' | 'free' | 'negotiable' =
@@ -644,6 +669,82 @@ export function UniversalListingWizardModal({
                       placeholder={`Max (${activeCurrencyDef.symbol})`}
                       className="w-full rounded-xl border border-stone-200 px-3.5 py-2.5 text-sm text-stone-900 focus:border-black focus:outline-none"
                     />
+                  </div>
+                )}
+
+                {/* Optional Multi-Currency Pricing */}
+                {transactionType !== 'free' && (
+                  <div className="mt-3 space-y-2 rounded-xl border border-stone-200 bg-[#FAF9F6] p-3.5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="text-xs font-semibold text-stone-900">
+                          Additional Currency Prices (Optional)
+                        </span>
+                        <p className="text-[11px] text-stone-500">
+                          Specify custom prices for buyers using other currencies.
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExtraPrices((prev) => [
+                            ...prev,
+                            {
+                              currency:
+                                BACHS_ACCEPTED_CURRENCIES.find((c) => c.code !== priceCurrency)?.code || 'EUR',
+                              amount: '',
+                            },
+                          ])
+                        }
+                        className="inline-flex items-center gap-1 rounded-lg border border-stone-300 bg-white px-2.5 py-1 text-xs font-semibold text-stone-700 hover:bg-stone-50 transition-colors shadow-2xs"
+                      >
+                        <Plus className="h-3 w-3" />
+                        <span>Add price</span>
+                      </button>
+                    </div>
+
+                    {extraPrices.map((extra, idx) => (
+                      <div key={idx} className="flex items-center gap-2 pt-1">
+                        <select
+                          value={extra.currency}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setExtraPrices((prev) =>
+                              prev.map((item, i) => (i === idx ? { ...item, currency: val } : item))
+                            );
+                          }}
+                          className="w-32 rounded-lg border border-stone-300 bg-white px-2.5 py-1.5 text-xs text-stone-900 focus:outline-none"
+                        >
+                          {BACHS_ACCEPTED_CURRENCIES.map((c) => (
+                            <option key={c.code} value={c.code}>
+                              {c.code} ({c.symbol})
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="number"
+                          min="0"
+                          step="any"
+                          placeholder="Price amount"
+                          value={extra.amount}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setExtraPrices((prev) =>
+                              prev.map((item, i) => (i === idx ? { ...item, amount: val } : item))
+                            );
+                          }}
+                          className="flex-1 rounded-lg border border-stone-300 bg-white px-2.5 py-1.5 text-xs text-stone-900 focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setExtraPrices((prev) => prev.filter((_, i) => i !== idx))}
+                          className="p-1.5 text-stone-400 hover:text-rose-600 transition-colors"
+                          title="Remove currency"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>

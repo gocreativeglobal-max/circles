@@ -6,7 +6,11 @@ import {
   formatBachsAmount,
 } from '@/lib/payments/currencies';
 import { createCoursePaywallSchema } from '@/features/courses/service';
-import { createPricingPlanSchema, createInvoiceSchema } from '@/features/finances/service';
+import {
+  createPricingPlanSchema,
+  createInvoiceSchema,
+  recordTreasuryEntrySchema,
+} from '@/features/finances/service';
 
 describe('Bachs Accepted Currencies Suite', () => {
   it('1. Recognizes all accepted Bachs currencies across global fiat, African rails & crypto stablecoins', () => {
@@ -105,5 +109,68 @@ describe('Bachs Accepted Currencies Suite', () => {
       currency: 'RUB',
     });
     expect(invalidPlan.success).toBe(false);
+  });
+
+  it('5. Validates treasury ledger entries with NGN and Bachs accepted currencies', () => {
+    const validTreasuryNgn = recordTreasuryEntrySchema.safeParse({
+      circleId: 'd4e33259-d91e-499b-b222-bfa5865bb225',
+      entryType: 'revenue',
+      category: 'dues',
+      amountCents: 25000000,
+      currency: 'NGN',
+      description: 'Annual estate maintenance dues (Lagos hub)',
+    });
+    expect(validTreasuryNgn.success).toBe(true);
+
+    const validTreasuryUsdt = recordTreasuryEntrySchema.safeParse({
+      circleId: 'd4e33259-d91e-499b-b222-bfa5865bb225',
+      entryType: 'expense',
+      category: 'utilities',
+      amountCents: 50000,
+      currency: 'USDT',
+      description: 'Cloud hosting payment in USDT',
+    });
+    expect(validTreasuryUsdt.success).toBe(true);
+
+    const invalidTreasury = recordTreasuryEntrySchema.safeParse({
+      circleId: 'd4e33259-d91e-499b-b222-bfa5865bb225',
+      entryType: 'revenue',
+      category: 'dues',
+      amountCents: 10000,
+      currency: 'INVALID_CURRENCY',
+      description: 'Invalid currency entry',
+    });
+    expect(invalidTreasury.success).toBe(false);
+  });
+
+  it('6. Supports optional multi-currency prices for courses and pricing plans', () => {
+    const courseWithMultiCurrency = createCoursePaywallSchema.safeParse({
+      name: 'Full Stack Web Dev in Lagos',
+      amountCents: 5000,
+      currency: 'USD',
+      currencyPrices: {
+        NGN: 7500000,
+        EUR: 4500,
+        GBP: 4000,
+      },
+    });
+    expect(courseWithMultiCurrency.success).toBe(true);
+    if (courseWithMultiCurrency.success) {
+      expect(courseWithMultiCurrency.data.currencyPrices?.NGN).toBe(7500000);
+    }
+
+    const planWithMultiCurrency = createPricingPlanSchema.safeParse({
+      circleId: 'd4e33259-d91e-499b-b222-bfa5865bb225',
+      slug: 'membership-multi',
+      name: 'Global Membership',
+      billingType: 'recurring',
+      amountCents: 10000,
+      currency: 'USD',
+      currencyPrices: {
+        NGN: 15000000,
+        EUR: 9000,
+      },
+    });
+    expect(planWithMultiCurrency.success).toBe(true);
   });
 });

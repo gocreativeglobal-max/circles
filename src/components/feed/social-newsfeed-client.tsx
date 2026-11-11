@@ -11,17 +11,21 @@ import {
   Calendar,
   Check,
   CheckCircle2,
+  ChevronRight,
   Clock,
   Compass,
   ExternalLink,
   Globe,
+  GraduationCap,
   Hash,
   Heart,
+  HeartHandshake,
   Layers,
   Lock,
   MapPin,
   MessageSquare,
   Pin,
+  Play,
   Plus,
   PlusCircle,
   Search,
@@ -66,7 +70,7 @@ export interface SocialNewsfeedClientProps {
 }
 
 type FeedScope = 'public' | 'my_circles' | 'saved';
-type ContentTypeFilter = 'all' | 'posts' | 'events' | 'marketplace';
+type ContentTypeFilter = 'all' | 'posts' | 'courses' | 'events' | 'marketplace';
 
 interface AttachedResourceMeta {
   title: string;
@@ -261,6 +265,7 @@ export function SocialNewsfeedClient({
 
       // 2. Content Type filter
       if (contentType === 'posts' && item.itemType !== 'post') return false;
+      if (contentType === 'courses' && item.itemType !== 'course') return false;
       if (contentType === 'events' && item.itemType !== 'event') return false;
       if (contentType === 'marketplace' && item.itemType !== 'listing') return false;
 
@@ -278,11 +283,24 @@ export function SocialNewsfeedClient({
           const inBody = item.data.body.toLowerCase().includes(q);
           const inAuthor = (item.data.author?.display_name || '').toLowerCase().includes(q);
           if (!inCircleName && !inTitle && !inBody && !inAuthor) return false;
+        } else if (item.itemType === 'course') {
+          const inTitle = item.data.title.toLowerCase().includes(q);
+          const inDesc = (item.data.description || '').toLowerCase().includes(q);
+          const inInstructor = (item.data.instructor?.display_name || '').toLowerCase().includes(q);
+          if (!inCircleName && !inTitle && !inDesc && !inInstructor) return false;
         } else if (item.itemType === 'event') {
           const inTitle = item.data.title.toLowerCase().includes(q);
           const inDesc = (item.data.description || '').toLowerCase().includes(q);
           if (!inCircleName && !inTitle && !inDesc) return false;
         } else if (item.itemType === 'listing') {
+          const inTitle = item.data.title.toLowerCase().includes(q);
+          const inDesc = (item.data.description || '').toLowerCase().includes(q);
+          if (!inCircleName && !inTitle && !inDesc) return false;
+        } else if (item.itemType === 'resource') {
+          const inTitle = item.data.title.toLowerCase().includes(q);
+          const inSummary = (item.data.summary || '').toLowerCase().includes(q);
+          if (!inCircleName && !inTitle && !inSummary) return false;
+        } else if (item.itemType === 'cause') {
           const inTitle = item.data.title.toLowerCase().includes(q);
           const inDesc = (item.data.description || '').toLowerCase().includes(q);
           if (!inCircleName && !inTitle && !inDesc) return false;
@@ -1176,6 +1194,7 @@ export function SocialNewsfeedClient({
                   {[
                     { key: 'all', label: 'All Activity' },
                     { key: 'posts', label: 'Posts & Polls' },
+                    { key: 'courses', label: 'Courses' },
                     { key: 'events', label: 'Events' },
                     { key: 'marketplace', label: 'Marketplace' },
                   ].map((tab) => {
@@ -1957,6 +1976,283 @@ export function SocialNewsfeedClient({
                           >
                             <ShoppingBag className="h-3.5 w-3.5" />
                             <span>View Listing</span>
+                          </Link>
+                        </div>
+                      </article>
+                    );
+                  }
+
+                  /* --------------------------------------------------------- */
+                  /* D. COMMUNITY COURSE CARD IN GLOBAL FEED                   */
+                  /* --------------------------------------------------------- */
+                  if (item.itemType === 'course') {
+                    const course = item.data;
+                    const isPaid = course.access_rule === 'paywall';
+                    const totalLessons = course.total_lessons_count ?? 0;
+                    const duration = course.estimated_duration_hours ? `~${course.estimated_duration_hours}h` : null;
+                    const difficulty = course.difficulty_level ? course.difficulty_level.replace('_', ' ') : 'All levels';
+
+                    return (
+                      <article
+                        key={item.id}
+                        className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white p-5 shadow-xs transition-all hover:border-stone-300/90 space-y-3.5"
+                      >
+                        {/* Circle Header */}
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <Link
+                              href={`/circles/${item.circle.slug}`}
+                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black text-xs font-bold text-white shadow-2xs"
+                            >
+                              {item.circle.name.slice(0, 1).toUpperCase()}
+                            </Link>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <Link
+                                  href={`/circles/${item.circle.slug}`}
+                                  className="text-xs sm:text-sm font-bold text-stone-900 hover:text-black truncate"
+                                >
+                                  {item.circle.name}
+                                </Link>
+                                <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-mono font-bold uppercase text-stone-900 border border-stone-200">
+                                  Course
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-stone-500">
+                                By {course.instructor?.display_name || 'Instructor'} · {formatRelativeTime(item.timestamp)}
+                              </p>
+                            </div>
+                          </div>
+
+                          <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-mono font-semibold border ${
+                            isPaid
+                              ? 'bg-amber-50 text-amber-800 border-amber-200'
+                              : 'bg-stone-50 text-stone-700 border-stone-200'
+                          }`}>
+                            {isPaid ? 'PAID ACCESS' : 'OPEN ENROLLMENT'}
+                          </span>
+                        </div>
+
+                        {/* Course Body */}
+                        <div className="flex flex-col sm:flex-row gap-4 rounded-xl border border-stone-200/80 bg-[#FAF9F6] p-3.5">
+                          {course.thumbnail_url && (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={course.thumbnail_url}
+                              alt={course.title}
+                              className="h-32 sm:h-24 sm:w-36 rounded-lg object-cover shrink-0 border border-stone-200"
+                            />
+                          )}
+                          <div className="min-w-0 flex-1 space-y-1.5">
+                            <Link
+                              href={`/circles/${item.circle.slug}/courses/${course.id}`}
+                              className="block text-sm sm:text-base font-bold text-stone-900 hover:text-black"
+                            >
+                              {course.title}
+                            </Link>
+                            {course.description && (
+                              <p className="line-clamp-2 text-xs text-stone-600 leading-relaxed">
+                                {course.description}
+                              </p>
+                            )}
+                            <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-stone-500 font-medium">
+                              <span className="inline-flex items-center gap-1 rounded bg-white px-2 py-0.5 border border-stone-200">
+                                <BookOpen className="h-3 w-3 text-stone-600" />
+                                {totalLessons} {totalLessons === 1 ? 'lesson' : 'lessons'}
+                              </span>
+                              {duration && (
+                                <span className="inline-flex items-center gap-1 rounded bg-white px-2 py-0.5 border border-stone-200">
+                                  <Clock className="h-3 w-3 text-stone-600" />
+                                  {duration}
+                                </span>
+                              )}
+                              <span className="inline-flex items-center gap-1 rounded bg-white px-2 py-0.5 border border-stone-200 capitalize">
+                                <GraduationCap className="h-3 w-3 text-stone-600" />
+                                {difficulty}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Card Actions */}
+                        <div className="flex items-center justify-between gap-3 border-t border-stone-100 pt-3">
+                          <Link
+                            href={`/circles/${item.circle.slug}/courses`}
+                            className="text-xs text-stone-500 hover:text-stone-900 font-medium flex items-center gap-1"
+                          >
+                            <span>More courses in {item.circle.name}</span>
+                            <ChevronRight className="h-3.5 w-3.5" />
+                          </Link>
+                          <Link
+                            href={`/circles/${item.circle.slug}/courses/${course.id}`}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-black px-3.5 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-stone-800 transition-colors"
+                          >
+                            <Play className="h-3.5 w-3.5 fill-current" />
+                            <span>View Curriculum</span>
+                          </Link>
+                        </div>
+                      </article>
+                    );
+                  }
+
+                  /* --------------------------------------------------------- */
+                  /* E. LEARNING RESOURCE & GUIDE CARD IN GLOBAL FEED          */
+                  /* --------------------------------------------------------- */
+                  if (item.itemType === 'resource') {
+                    const res = item.data;
+                    return (
+                      <article
+                        key={item.id}
+                        className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white p-5 shadow-xs transition-all hover:border-stone-300/90 space-y-3.5"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <Link
+                              href={`/circles/${item.circle.slug}`}
+                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black text-xs font-bold text-white shadow-2xs"
+                            >
+                              {item.circle.name.slice(0, 1).toUpperCase()}
+                            </Link>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <Link
+                                  href={`/circles/${item.circle.slug}`}
+                                  className="text-xs sm:text-sm font-bold text-stone-900 hover:text-black truncate"
+                                >
+                                  {item.circle.name}
+                                </Link>
+                                <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-mono font-bold uppercase text-stone-900 border border-stone-200">
+                                  {res.category || 'Guide'}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-stone-500">
+                                Published by {res.author?.display_name || 'Member'} · {formatRelativeTime(item.timestamp)}
+                              </p>
+                            </div>
+                          </div>
+
+                          {res.difficulty_level && (
+                            <span className="rounded-full bg-stone-50 px-2 py-0.5 text-[10px] font-mono font-bold capitalize text-stone-700 border border-stone-200">
+                              {res.difficulty_level}
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="rounded-xl border border-stone-200/80 bg-[#FAF9F6] p-3.5 space-y-1.5">
+                          <Link
+                            href={`/circles/${item.circle.slug}/resources`}
+                            className="block text-sm sm:text-base font-bold text-stone-900 hover:text-black"
+                          >
+                            {res.title}
+                          </Link>
+                          {res.summary && (
+                            <p className="line-clamp-2 text-xs text-stone-600 leading-relaxed">
+                              {res.summary}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="flex items-center justify-between pt-1">
+                          <Link
+                            href={`/circles/${item.circle.slug}/resources`}
+                            className="text-xs text-stone-500 hover:text-stone-900 font-medium flex items-center gap-1"
+                          >
+                            <span>Browse resources</span>
+                            <ChevronRight className="h-3.5 w-3.5" />
+                          </Link>
+                          <Link
+                            href={`/circles/${item.circle.slug}/resources`}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-black px-3.5 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-stone-800 transition-colors"
+                          >
+                            <BookOpen className="h-3.5 w-3.5" />
+                            <span>Read Guide</span>
+                          </Link>
+                        </div>
+                      </article>
+                    );
+                  }
+
+                  /* --------------------------------------------------------- */
+                  /* F. COMMUNITY CAUSE / FUNDRAISER CARD IN GLOBAL FEED       */
+                  /* --------------------------------------------------------- */
+                  if (item.itemType === 'cause') {
+                    const cause = item.data;
+                    const pledgedTotal = cause.pledged_total ?? 0;
+                    const pledgeCount = cause.pledge_count ?? 0;
+                    const pct =
+                      cause.goal_amount > 0
+                        ? Math.min(100, Math.round((pledgedTotal / cause.goal_amount) * 100))
+                        : 0;
+
+                    return (
+                      <article
+                        key={item.id}
+                        className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white p-5 shadow-xs transition-all hover:border-stone-300/90 space-y-3.5"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <Link
+                              href={`/circles/${item.circle.slug}`}
+                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black text-xs font-bold text-white shadow-2xs"
+                            >
+                              {item.circle.name.slice(0, 1).toUpperCase()}
+                            </Link>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <Link
+                                  href={`/circles/${item.circle.slug}`}
+                                  className="text-xs sm:text-sm font-bold text-stone-900 hover:text-black truncate"
+                                >
+                                  {item.circle.name}
+                                </Link>
+                                <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-mono font-bold uppercase text-stone-900 border border-stone-200">
+                                  Cause
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-stone-500">
+                                Community Campaign · {formatRelativeTime(item.timestamp)}
+                              </p>
+                            </div>
+                          </div>
+
+                          <span className="rounded-xl bg-[#F4F3EE] px-3 py-1 text-xs sm:text-sm font-extrabold text-stone-900">
+                            {cause.currency} {pledgedTotal.toLocaleString()}
+                          </span>
+                        </div>
+
+                        <div className="rounded-xl border border-stone-200/80 bg-[#FAF9F6] p-3.5 space-y-2">
+                          <Link
+                            href={`/circles/${item.circle.slug}/community`}
+                            className="block text-sm sm:text-base font-bold text-stone-900 hover:text-black"
+                          >
+                            {cause.title}
+                          </Link>
+                          {cause.description && (
+                            <p className="line-clamp-2 text-xs text-stone-600 leading-relaxed">
+                              {cause.description}
+                            </p>
+                          )}
+                          <div className="space-y-1 pt-1">
+                            <div className="flex justify-between text-[11px] text-stone-500 font-mono">
+                              <span>Goal: {cause.currency} {cause.goal_amount.toLocaleString()}</span>
+                              <span>{pct}% funded</span>
+                            </div>
+                            <div className="h-1.5 w-full rounded-full bg-stone-200 overflow-hidden">
+                              <div className="h-full bg-black rounded-full transition-all" style={{ width: `${pct}%` }} />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-1">
+                          <span className="text-xs text-stone-500 font-medium">
+                            {pledgeCount} {pledgeCount === 1 ? 'supporter' : 'supporters'}
+                          </span>
+                          <Link
+                            href={`/circles/${item.circle.slug}/community`}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-black px-3.5 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-stone-800 transition-colors"
+                          >
+                            <HeartHandshake className="h-3.5 w-3.5" />
+                            <span>Support Cause</span>
                           </Link>
                         </div>
                       </article>

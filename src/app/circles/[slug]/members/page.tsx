@@ -6,6 +6,7 @@ import { getCircleBySlugOrId } from '@/features/circles/service';
 import { isCapabilityEnabledForCircle } from '@/features/capabilities/service';
 import { listCircleMembers } from '@/features/memberships/service';
 import { canReadCircleContent } from '@/lib/authorization/permissions';
+import { InviteMembersButton } from '@/components/circles/invite-members-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -93,7 +94,19 @@ export default async function CircleMembersPage({
           </p>
         </div>
 
-        <form method="GET" className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {circle.current_user_membership_status === 'active' && (
+            <InviteMembersButton
+              circle={circle}
+              isStaff={
+                circle.current_user_role === 'owner' ||
+                circle.current_user_role === 'admin' ||
+                circle.current_user_role === 'moderator'
+              }
+            />
+          )}
+
+          <form method="GET" className="flex flex-wrap items-center gap-2">
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-2.5 h-3.5 w-3.5 text-stone-400" />
             <input
@@ -123,6 +136,7 @@ export default async function CircleMembersPage({
           </button>
         </form>
       </div>
+    </div>
 
       <div className="divide-y divide-stone-100">
         {activeMembers.map((m) => (

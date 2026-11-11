@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getGlobalFeedData } from '@/features/feed/service';
 import { handleApiError, resolveApiUser } from '@/lib/auth/api-helpers';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET(req: NextRequest) {
   try {
     const user = await resolveApiUser(req);

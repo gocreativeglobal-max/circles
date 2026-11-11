@@ -9,6 +9,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { compressImage } from '@/lib/media/compressor';
 
 export interface ImageUploaderProps<T extends string | string[] = string | string[]> {
   circleId?: string;
@@ -87,23 +88,26 @@ export function ImageUploader<T extends string | string[]>({
             throw new Error(`"${file.name}" exceeds the 10MB size limit.`);
           }
 
-          // Convert to base64
-          const base64Data = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = () => reject(new Error('Failed to read file.'));
-            reader.readAsDataURL(file);
+          setUploadProgress(`Optimizing ${i + 1} of ${fileList.length}...`);
+
+          // Automatically compress raster images to efficient WebP client-side
+          const compressed = await compressImage(file, {
+            maxWidth: 1920,
+            maxHeight: 1920,
+            quality: 0.82,
           });
+
+          setUploadProgress(`Uploading ${i + 1} of ${fileList.length}...`);
 
           const res = await fetch('/api/uploads', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               circleId: circleId || null,
-              originalFilename: file.name,
-              mimeType: file.type,
+              originalFilename: compressed.filename,
+              mimeType: compressed.mimeType,
               visibility: 'public',
-              contentBase64: base64Data,
+              contentBase64: compressed.base64,
             }),
           });
 

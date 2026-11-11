@@ -33,6 +33,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { CourseLessonItem, LessonContentBlock } from '@/types/domain';
 import { ContentBlockRenderer } from './content-block-renderer';
+import { compressImage } from '@/lib/media/compressor';
 
 interface LessonBlockBuilderProps {
   circleId: string;
@@ -944,34 +945,31 @@ export function LessonBlockBuilder({
                                           onChange={async (e) => {
                                             const file = e.target.files?.[0];
                                             if (!file) return;
-                                            const reader = new FileReader();
-                                            reader.onload = async () => {
-                                              const base64 = reader.result;
-                                              if (typeof base64 !== 'string') return;
-                                              try {
-                                                const res = await fetch('/api/uploads', {
-                                                  method: 'POST',
-                                                  headers: { 'Content-Type': 'application/json' },
-                                                  body: JSON.stringify({
-                                                    circleId,
-                                                    originalFilename: file.name,
-                                                    mimeType: file.type || 'image/png',
-                                                    visibility: 'public',
-                                                    contentBase64: base64,
-                                                  }),
-                                                });
-                                                const data = await res.json();
-                                                const url = res.ok && data.upload?.signed_download_url ? data.upload.signed_download_url : base64;
-                                                setBlocks((prev) =>
-                                                  prev.map((b, i) => (i === idx && b.type === 'image' ? { ...b, url } : b))
-                                                );
-                                              } catch {
-                                                setBlocks((prev) =>
-                                                  prev.map((b, i) => (i === idx && b.type === 'image' ? { ...b, url: base64 } : b))
-                                                );
-                                              }
-                                            };
-                                            reader.readAsDataURL(file);
+                                            try {
+                                              const compressed = await compressImage(file, {
+                                                maxWidth: 1920,
+                                                maxHeight: 1920,
+                                                quality: 0.82,
+                                              });
+                                              const res = await fetch('/api/uploads', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({
+                                                  circleId,
+                                                  originalFilename: compressed.filename,
+                                                  mimeType: compressed.mimeType,
+                                                  visibility: 'public',
+                                                  contentBase64: compressed.base64,
+                                                }),
+                                              });
+                                              const data = await res.json();
+                                              const url = res.ok && data.upload?.signed_download_url ? data.upload.signed_download_url : compressed.base64;
+                                              setBlocks((prev) =>
+                                                prev.map((b, i) => (i === idx && b.type === 'image' ? { ...b, url } : b))
+                                              );
+                                            } catch {
+                                              // Fallback: don't break block editing
+                                            }
                                           }}
                                         />
                                       </label>

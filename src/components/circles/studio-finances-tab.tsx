@@ -22,6 +22,7 @@ import {
   Crown,
   Check,
   HardDrive,
+  Trash2,
 } from 'lucide-react';
 import {
   BillingType,
@@ -113,6 +114,7 @@ export function StudioFinancesTab({
   const [planBillingType, setPlanBillingType] = useState<BillingType>('recurring');
   const [planAmount, setPlanAmount] = useState('75');
   const [planCurrency, setPlanCurrency] = useState('USD');
+  const [extraPrices, setExtraPrices] = useState<Array<{ currency: string; amount: string }>>([]);
   const [planIntervalUnit, setPlanIntervalUnit] = useState<'month' | 'quarter' | 'year'>('month');
   const [planInstallmentCount, setPlanInstallmentCount] = useState('3');
   const [planMinAmount, setPlanMinAmount] = useState('10');
@@ -240,6 +242,16 @@ export function StudioFinancesTab({
           ent.targetType === 'resource_quota' ? parseInt(planQuotaQuantity, 10) || 10 : undefined,
       }));
 
+      const currencyPrices: Record<string, number> = {};
+      for (const p of extraPrices) {
+        const code = p.currency.trim().toUpperCase();
+        const val = parseFloat(p.amount);
+        if (code && !isNaN(val) && val >= 0) {
+          const isZeroDec = ['JPY', 'UGX', 'RWF', 'TZS'].includes(code);
+          currencyPrices[code] = isZeroDec ? Math.round(val) : Math.round(val * 100);
+        }
+      }
+
       const res = await fetch(`/api/circles/${circle.id}/finances`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -252,6 +264,7 @@ export function StudioFinancesTab({
             billingType: planBillingType,
             amountCents,
             currency: planCurrency,
+            currencyPrices: Object.keys(currencyPrices).length > 0 ? currencyPrices : undefined,
             intervalUnit: planBillingType === 'recurring' ? planIntervalUnit : undefined,
             installmentCount:
               planBillingType === 'installments'
@@ -285,6 +298,7 @@ export function StudioFinancesTab({
     setPlanDescription('');
     setPlanAmount('75');
     setPlanCurrency(treasurySummary?.currency || 'USD');
+    setExtraPrices([]);
     setPlanBillingType('recurring');
     setPlanEntitlements([{ targetType: 'circle_membership' }]);
   }
@@ -711,6 +725,25 @@ export function StudioFinancesTab({
                         </>
                       )}
                     </div>
+
+                    {Boolean(
+                      plan.metadata?.currency_prices &&
+                      typeof plan.metadata.currency_prices === 'object' &&
+                      Object.keys(plan.metadata.currency_prices as Record<string, unknown>).length > 0
+                    ) && (
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {Object.entries(plan.metadata.currency_prices as Record<string, number>).map(
+                            ([code, val]) => (
+                              <span
+                                key={code}
+                                className="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-semibold text-stone-700 border border-stone-200"
+                              >
+                                {formatBachsAmount(val, code)}
+                              </span>
+                            )
+                          )}
+                        </div>
+                      )}
 
                     {/* Entitlements preview */}
                     <div className="mt-4 border-t border-stone-100 pt-3">
@@ -1445,46 +1478,95 @@ export function StudioFinancesTab({
 
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-stone-700">
-                    Bachs Currency
+                    Currency
                   </label>
                   <select
                     value={planCurrency}
                     onChange={(e) => setPlanCurrency(e.target.value)}
-                    className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm focus:border-forest-600 focus:outline-none"
+                    className="mt-1 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm focus:border-stone-900 focus:outline-none"
                   >
-                    <optgroup label="Global Currencies">
-                      {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'fiat_global').map(
-                        (c) => (
-                          <option key={c.code} value={c.code}>
-                            {c.code} ({c.symbol}) — {c.name}
-                          </option>
-                        )
-                      )}
-                    </optgroup>
-                    <optgroup label="African Rails (Bank & Mobile Money)">
-                      {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'fiat_african').map(
-                        (c) => (
-                          <option key={c.code} value={c.code}>
-                            {c.code} ({c.symbol}) — {c.name}
-                          </option>
-                        )
-                      )}
-                    </optgroup>
-                    <optgroup label="Crypto Stablecoins">
-                      {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'stablecoin').map(
-                        (c) => (
-                          <option key={c.code} value={c.code}>
-                            {c.code} ({c.symbol}) — {c.name}
-                          </option>
-                        )
-                      )}
-                    </optgroup>
+                    {BACHS_ACCEPTED_CURRENCIES.map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {c.code} ({c.symbol}) — {c.name}
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
-              <p className="text-[11px] text-stone-500 -mt-2">
-                Supported via Bachs: {getBachsCurrency(planCurrency).paymentMethodsDescription}
-              </p>
+
+              {/* Multi-Currency Pricing (Optional) */}
+              <div className="space-y-2 rounded-xl border border-stone-200 bg-stone-50/70 p-3.5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-semibold text-stone-900">
+                      Additional Currency Prices (Optional)
+                    </span>
+                    <p className="text-[11px] text-stone-500">
+                      Add prices in alternative currencies for international members.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setExtraPrices((prev) => [
+                        ...prev,
+                        {
+                          currency:
+                            BACHS_ACCEPTED_CURRENCIES.find((c) => c.code !== planCurrency)?.code || 'EUR',
+                          amount: '',
+                        },
+                      ])
+                    }
+                    className="inline-flex items-center gap-1 rounded-lg border border-stone-300 bg-white px-2.5 py-1 text-xs font-semibold text-stone-700 hover:bg-stone-50 transition-colors shadow-2xs"
+                  >
+                    <Plus className="h-3 w-3" />
+                    <span>Add price</span>
+                  </button>
+                </div>
+
+                {extraPrices.map((extra, idx) => (
+                  <div key={idx} className="flex items-center gap-2 pt-1">
+                    <select
+                      value={extra.currency}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setExtraPrices((prev) =>
+                          prev.map((item, i) => (i === idx ? { ...item, currency: val } : item))
+                        );
+                      }}
+                      className="w-36 rounded-lg border border-stone-300 bg-white px-2.5 py-1.5 text-xs text-stone-900 focus:outline-none"
+                    >
+                      {BACHS_ACCEPTED_CURRENCIES.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.code} ({c.symbol})
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="Price amount"
+                      value={extra.amount}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setExtraPrices((prev) =>
+                          prev.map((item, i) => (i === idx ? { ...item, amount: val } : item))
+                        );
+                      }}
+                      className="flex-1 rounded-lg border border-stone-300 bg-white px-2.5 py-1.5 text-xs text-stone-900 focus:outline-none"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setExtraPrices((prev) => prev.filter((_, i) => i !== idx))}
+                      className="p-1.5 text-stone-400 hover:text-rose-600 transition-colors"
+                      title="Remove currency"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
 
                 {planBillingType === 'recurring' && (
                   <div>
@@ -1736,7 +1818,7 @@ export function StudioFinancesTab({
                 </div>
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-stone-700">
-                    Bachs Currency
+                    Currency
                   </label>
                   <select
                     value={invCurrency}
@@ -1975,7 +2057,7 @@ export function StudioFinancesTab({
                 </div>
                 <div>
                   <label className="block text-xs font-semibold uppercase tracking-wider text-stone-700">
-                    Bachs Currency
+                    Currency
                   </label>
                   <select
                     value={trCurrency}

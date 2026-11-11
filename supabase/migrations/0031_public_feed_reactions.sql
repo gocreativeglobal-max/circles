@@ -7,4 +7,5 @@ CREATE POLICY reactions_insert ON public.reactions
     user_id = auth.uid()
     AND public.can_read_circle_content(circle_id, auth.uid())
     AND public.is_capability_enabled(circle_id, 'discussions')
+    AND public.is_capability_setting_enabled(circle_id, 'discussions', 'allowReactions', true)
   );

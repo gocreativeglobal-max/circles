@@ -2,8 +2,25 @@
 
 import React, { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { CheckCircle2, MapPin, MessageSquare, Pin, Plus, User, Users } from 'lucide-react';
-import { Circle, CircleEventItem, MarketplaceListingItem } from '@/types/domain';
+import {
+  BookOpen,
+  CheckCircle2,
+  FileText,
+  FolderGit2,
+  HeartHandshake,
+  MapPin,
+  MessageSquare,
+  Pin,
+  Plus,
+  User,
+  Users,
+} from 'lucide-react';
+import {
+  Circle,
+  CircleEventItem,
+  CourseItem,
+  MarketplaceListingItem,
+} from '@/types/domain';
 import { ActivityStreamItem } from '@/features/circles/activity-stream';
 import { DirectMessageDrawer } from '@/components/messages/direct-message-drawer';
 
@@ -12,32 +29,37 @@ export interface CommunityActivityStreamProps {
   initialItems: ActivityStreamItem[];
   upcomingEvents: CircleEventItem[];
   featuredListings: MarketplaceListingItem[];
+  featuredCourses?: CourseItem[];
   enabledCapabilityKeys: string[];
   currentUserId?: string | null;
   isMember: boolean;
 }
 
-type StreamFilter = 'all' | 'posts' | 'marketplace' | 'events' | 'polls';
+type StreamFilter = 'all' | 'posts' | 'courses' | 'events' | 'marketplace' | 'polls' | 'resources';
 
 const FILTERS: Array<{ key: StreamFilter; label: string; capability?: string }> = [
-  { key: 'all', label: 'All' },
+  { key: 'all', label: 'All Updates' },
   { key: 'posts', label: 'Posts', capability: 'discussions' },
-  { key: 'marketplace', label: 'Listings', capability: 'marketplace' },
+  { key: 'courses', label: 'Courses', capability: 'learning_resources' },
   { key: 'events', label: 'Events', capability: 'events' },
+  { key: 'marketplace', label: 'Listings', capability: 'marketplace' },
   { key: 'polls', label: 'Polls', capability: 'polls_decisions' },
+  { key: 'resources', label: 'Resources', capability: 'learning_resources' },
 ];
 
 const ITEM_TYPE_BY_FILTER: Record<Exclude<StreamFilter, 'all'>, ActivityStreamItem['itemType']> = {
   posts: 'post',
-  marketplace: 'listing',
+  courses: 'course',
   events: 'event',
+  marketplace: 'listing',
   polls: 'poll',
+  resources: 'resource',
 };
 
 function formatPrice(listing: MarketplaceListingItem): string {
   if (listing.price_amount === null || listing.price_amount === undefined) return 'Free';
   const amount = Number(listing.price_amount);
-  const text = `$${Number.isInteger(amount) ? amount : amount.toFixed(2)}`;
+  const text = `${listing.price_currency || '$'}${Number.isInteger(amount) ? amount : amount.toFixed(2)}`;
   return listing.pricing_unit && listing.pricing_unit !== 'fixed' ? `${text}/${listing.pricing_unit}` : text;
 }
 
@@ -46,6 +68,7 @@ export function CommunityActivityStream({
   initialItems,
   upcomingEvents,
   featuredListings,
+  featuredCourses = [],
   enabledCapabilityKeys,
   currentUserId,
   isMember,
@@ -63,7 +86,11 @@ export function CommunityActivityStream({
     (f) =>
       !f.capability ||
       enabledCapabilityKeys.includes(f.capability) ||
-      (f.capability === 'marketplace' && enabledCapabilityKeys.includes('listings_discovery'))
+      (f.capability === 'marketplace' && enabledCapabilityKeys.includes('listings_discovery')) ||
+      (f.capability === 'courses' &&
+        (enabledCapabilityKeys.includes('learning_resources') ||
+          enabledCapabilityKeys.includes('courses_learning') ||
+          items.some((i) => i.itemType === 'course')))
   );
 
   const visibleItems = useMemo(() => {
@@ -98,9 +125,11 @@ export function CommunityActivityStream({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'vote', pollId, optionId }),
       });
-      if (res.ok) setVotedPolls((prev) => ({ ...prev, [pollId]: optionId }));
+      if (res.ok) {
+        setVotedPolls((prev) => ({ ...prev, [pollId]: optionId }));
+      }
     } catch (err) {
-      console.error('Failed to vote in poll:', err);
+      console.error('Failed to vote on poll:', err);
     } finally {
       setVotingLoading((prev) => ({ ...prev, [pollId]: false }));
     }
@@ -115,9 +144,11 @@ export function CommunityActivityStream({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'rsvp', eventId, status }),
       });
-      if (res.ok) setRsvpStatuses((prev) => ({ ...prev, [eventId]: status }));
+      if (res.ok) {
+        setRsvpStatuses((prev) => ({ ...prev, [eventId]: status }));
+      }
     } catch (err) {
-      console.error('Failed to RSVP:', err);
+      console.error('Failed to update event RSVP:', err);
     } finally {
       setRsvpLoading((prev) => ({ ...prev, [eventId]: false }));
     }
@@ -125,28 +156,35 @@ export function CommunityActivityStream({
 
   const showEvents = enabledCapabilityKeys.includes('events');
   const showListings =
-    enabledCapabilityKeys.includes('marketplace') || enabledCapabilityKeys.includes('listings_discovery');
+    enabledCapabilityKeys.includes('marketplace') ||
+    enabledCapabilityKeys.includes('listings_discovery');
+  const showCourses =
+    enabledCapabilityKeys.includes('learning_resources') ||
+    enabledCapabilityKeys.includes('courses_learning') ||
+    featuredCourses.length > 0 ||
+    items.some((i) => i.itemType === 'course');
 
   return (
-    <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
-      {/* Feed */}
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+      {/* Main feed */}
       <div className="space-y-4 lg:col-span-8">
-        <div className="flex items-center justify-between gap-4 border-b border-stone-200">
-          <div className="-mb-px flex gap-5 overflow-x-auto">
-            {visibleFilters.map((tab) => {
-              const active = activeFilter === tab.key;
+        {/* Filter bar */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 pb-3">
+          <div className="flex flex-wrap gap-1">
+            {visibleFilters.map((f) => {
+              const active = activeFilter === f.key;
               return (
                 <button
-                  key={tab.key}
+                  key={f.key}
                   type="button"
-                  onClick={() => setActiveFilter(tab.key)}
-                  className={`whitespace-nowrap border-b-2 pb-2.5 text-sm transition-colors ${
+                  onClick={() => setActiveFilter(f.key)}
+                  className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
                     active
-                      ? 'border-stone-900 font-medium text-stone-900'
-                      : 'border-transparent text-stone-500 hover:text-stone-800'
+                      ? 'bg-black text-white shadow-2xs'
+                      : 'bg-stone-50 text-stone-600 hover:bg-stone-100 hover:text-stone-900 border border-stone-200'
                   }`}
                 >
-                  {tab.label}
+                  {f.label}
                 </button>
               );
             })}
@@ -155,20 +193,20 @@ export function CommunityActivityStream({
           {isMember && (
             <Link
               href={`/circles/${circle.slug}/discussions`}
-              className="mb-2 inline-flex shrink-0 items-center gap-1 rounded-lg bg-black px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-black px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800 transition-colors shadow-2xs"
             >
-              <Plus className="h-4 w-4" />
-              New post
+              <Plus className="h-3.5 w-3.5" />
+              <span>New post</span>
             </Link>
           )}
         </div>
 
         {visibleItems.length === 0 ? (
           <div className="rounded-xl border border-dashed border-stone-200 bg-white py-16 text-center text-sm text-stone-500">
-            Nothing here yet.
+            No updates in this section yet.
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-3.5">
             {visibleItems.map((item) => (
               <StreamCard
                 key={item.id}
@@ -201,8 +239,36 @@ export function CommunityActivityStream({
           </RailCard>
         )}
 
+        {showCourses && featuredCourses.length > 0 && (
+          <RailCard title="Featured Courses" href={`/circles/${circle.slug}/courses`}>
+            <ul className="space-y-2.5">
+              {featuredCourses.map((crs) => (
+                <li key={crs.id}>
+                  <Link
+                    href={`/circles/${circle.slug}/courses/${crs.id}`}
+                    className="flex items-start justify-between gap-2.5 text-sm hover:text-stone-900 group"
+                  >
+                    <div className="min-w-0">
+                      <span className="truncate font-semibold text-stone-900 group-hover:underline block">
+                        {crs.title}
+                      </span>
+                      <span className="text-[11px] text-stone-500">
+                        {crs.total_lessons_count || 0} lessons ·{' '}
+                        {crs.difficulty_level ? crs.difficulty_level.replace('_', ' ') : 'All levels'}
+                      </span>
+                    </div>
+                    <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded border border-stone-200 bg-stone-50 text-stone-700">
+                      {crs.access_rule === 'paywall' ? 'Paid' : 'Free'}
+                    </span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </RailCard>
+        )}
+
         {showEvents && upcomingEvents.length > 0 && (
-          <RailCard title="Upcoming" href={`/circles/${circle.slug}/events`}>
+          <RailCard title="Upcoming Events" href={`/circles/${circle.slug}/events`}>
             <ul className="space-y-3">
               {upcomingEvents.map((evt) => {
                 const date = new Date(evt.starts_at);
@@ -223,7 +289,7 @@ export function CommunityActivityStream({
         )}
 
         {showListings && featuredListings.length > 0 && (
-          <RailCard title="Listings" href={`/circles/${circle.slug}/marketplace`}>
+          <RailCard title="Marketplace" href={`/circles/${circle.slug}/marketplace`}>
             <ul className="space-y-2.5">
               {featuredListings.map((listing) => (
                 <li key={listing.id}>
@@ -255,11 +321,11 @@ export function CommunityActivityStream({
 
 function RailCard({ title, href, children }: { title: string; href?: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-xl border border-stone-200 bg-white p-4">
+    <section className="rounded-xl border border-stone-200 bg-white p-4 shadow-2xs">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-stone-900">{title}</h3>
+        <h3 className="text-xs font-bold uppercase tracking-wider text-stone-900">{title}</h3>
         {href && (
-          <Link href={href} className="text-xs text-stone-500 hover:text-stone-900">
+          <Link href={href} className="text-xs font-medium text-stone-500 hover:text-stone-900 transition-colors">
             See all
           </Link>
         )}
@@ -271,18 +337,18 @@ function RailCard({ title, href, children }: { title: string; href?: string; chi
 
 function DateBadge({ date }: { date: Date }) {
   return (
-    <div className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg bg-[#F4F3EE] text-stone-900">
-      <span className="text-[9px] font-semibold uppercase leading-none">
+    <div className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg bg-stone-100 text-stone-900 border border-stone-200">
+      <span className="text-[9px] font-bold uppercase leading-none">
         {date.toLocaleString('en-US', { month: 'short' })}
       </span>
-      <span className="mt-0.5 text-sm font-semibold leading-none">{date.getDate()}</span>
+      <span className="mt-0.5 text-sm font-bold leading-none">{date.getDate()}</span>
     </div>
   );
 }
 
 function Avatar({ url, name }: { url?: string | null; name?: string | null }) {
   return (
-    <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-stone-100">
+    <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-full bg-stone-100 border border-stone-200">
       {url ? (
         /* eslint-disable-next-line @next/next/no-img-element */
         <img src={url} alt={name ?? ''} className="h-full w-full object-cover" />
@@ -297,11 +363,13 @@ function CardHeader({
   avatarUrl,
   name,
   meta,
+  badge,
   right,
 }: {
   avatarUrl?: string | null;
   name: string;
   meta: string;
+  badge?: string;
   right?: React.ReactNode;
 }) {
   return (
@@ -309,8 +377,15 @@ function CardHeader({
       <div className="flex min-w-0 items-center gap-2.5">
         <Avatar url={avatarUrl} name={name} />
         <div className="min-w-0 text-sm">
-          <span className="font-medium text-stone-900">{name}</span>
-          <span className="ml-1.5 text-xs text-stone-400">{meta}</span>
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-stone-900">{name}</span>
+            {badge && (
+              <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-semibold text-stone-700 border border-stone-200">
+                {badge}
+              </span>
+            )}
+          </div>
+          <span className="text-xs text-stone-400">{meta}</span>
         </div>
       </div>
       {right}
@@ -332,9 +407,10 @@ interface StreamCardProps {
   rsvpLoading?: boolean;
 }
 
-const cardClass = 'space-y-3 rounded-xl border border-stone-200 bg-white p-4 transition-colors hover:border-stone-300';
+const cardClass =
+  'space-y-3 rounded-xl border border-stone-200 bg-white p-4 transition-all hover:border-stone-300 shadow-2xs';
 const ghostBtn =
-  'rounded-lg border border-stone-200 px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-50 disabled:opacity-50';
+  'rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 transition-colors disabled:opacity-50';
 
 function StreamCard({
   item,
@@ -351,6 +427,7 @@ function StreamCard({
 }: StreamCardProps) {
   const time = new Date(item.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' });
 
+  // 1. Discussion Posts
   if (item.itemType === 'post') {
     const post = item.data;
     const href = `/circles/${circle.slug}/discussions/${post.id}`;
@@ -359,21 +436,125 @@ function StreamCard({
         <CardHeader
           avatarUrl={post.author?.avatar_url}
           name={post.author?.display_name || 'Member'}
-          meta={`${post.space?.name ? `in ${post.space.name} · ` : ''}${time}`}
-          right={post.is_pinned ? <Pin className="h-3.5 w-3.5 text-stone-400" aria-label="Pinned" /> : undefined}
+          badge="Post"
+          meta={`${post.space?.name ? `in #${post.space.name} · ` : ''}${time}`}
+          right={post.is_pinned ? <Pin className="h-3.5 w-3.5 text-stone-500" aria-label="Pinned" /> : undefined}
         />
-        <Link href={href} className="block">
-          <h3 className="font-semibold text-stone-900">{post.title}</h3>
+        <Link href={href} className="block group">
+          <h3 className="font-semibold text-stone-900 group-hover:underline">{post.title}</h3>
           <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-sm leading-relaxed text-stone-600">{post.body}</p>
         </Link>
         <Link href={href} className="inline-flex items-center gap-1.5 text-xs text-stone-500 hover:text-stone-900">
           <MessageSquare className="h-3.5 w-3.5" />
-          {post.comment_count ?? 0}
+          <span>{post.comment_count ?? 0} comments</span>
         </Link>
       </article>
     );
   }
 
+  // 2. Courses (New or Updated Course)
+  if (item.itemType === 'course') {
+    const course = item.data;
+    const href = `/circles/${circle.slug}/courses/${course.id}`;
+    const accessLabel =
+      course.access_rule === 'paywall'
+        ? 'Paid / Paywall'
+        : course.access_rule === 'members_only'
+          ? 'Members Only'
+          : 'Open Access';
+
+    return (
+      <article className={cardClass}>
+        <CardHeader
+          avatarUrl={course.instructor?.avatar_url || course.instructor_avatar_url || null}
+          name={course.instructor?.display_name || course.instructor_display_name || 'Instructor'}
+          badge="Course"
+          meta={`Updated · ${time}`}
+          right={
+            <span className="rounded-full bg-stone-900 px-2.5 py-0.5 text-[11px] font-semibold text-white">
+              {accessLabel}
+            </span>
+          }
+        />
+        <Link href={href} className="block group">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-stone-100 text-stone-800 border border-stone-200">
+              <BookOpen className="h-5 w-5" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h3 className="font-semibold text-stone-900 group-hover:underline">{course.title}</h3>
+              {course.description && (
+                <p className="mt-1 line-clamp-2 text-sm text-stone-600 leading-relaxed">{course.description}</p>
+              )}
+            </div>
+          </div>
+        </Link>
+
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-stone-100 pt-3">
+          <div className="flex items-center gap-3 text-xs text-stone-500">
+            <span>{course.total_lessons_count || 0} lessons</span>
+            {course.estimated_duration_hours ? (
+              <span>~{course.estimated_duration_hours}h duration</span>
+            ) : null}
+            {course.difficulty_level ? (
+              <span className="capitalize">{course.difficulty_level.replace('_', ' ')}</span>
+            ) : null}
+          </div>
+
+          <Link
+            href={href}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-black px-3 py-1.5 text-xs font-semibold text-white hover:bg-stone-800 transition-colors shadow-2xs"
+          >
+            <span>View Course</span>
+          </Link>
+        </div>
+      </article>
+    );
+  }
+
+  // 3. Events (New or Updated)
+  if (item.itemType === 'event') {
+    const event = item.data;
+    const date = new Date(event.starts_at);
+    const isGoing = rsvpStatus === 'going';
+    return (
+      <article className={cardClass}>
+        <div className="flex items-start gap-3">
+          <DateBadge date={date} />
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-semibold text-stone-700 border border-stone-200">
+                Event
+              </span>
+              <span className="text-xs text-stone-400">Updated · {time}</span>
+            </div>
+            <h3 className="font-semibold text-stone-900 mt-0.5">{event.title}</h3>
+            <p className="text-xs text-stone-500 mt-0.5">
+              {date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} · {event.going_count ?? 0} attending
+            </p>
+          </div>
+          {isMember && (
+            <button
+              type="button"
+              disabled={rsvpLoading}
+              onClick={() => onRsvp(event.id, isGoing ? 'declined' : 'going')}
+              className={
+                isGoing
+                  ? 'inline-flex items-center gap-1 rounded-lg bg-stone-900 px-3 py-1.5 text-xs font-semibold text-white shadow-2xs'
+                  : ghostBtn
+              }
+            >
+              {isGoing && <CheckCircle2 className="h-3.5 w-3.5" />}
+              {isGoing ? 'Going' : 'RSVP'}
+            </button>
+          )}
+        </div>
+        {event.description && <p className="line-clamp-2 text-sm text-stone-600">{event.description}</p>}
+      </article>
+    );
+  }
+
+  // 4. Marketplace & Housing Listings
   if (item.itemType === 'listing') {
     const listing = item.data;
     const canMessage = isMember && listing.seller_id !== currentUserId;
@@ -382,16 +563,17 @@ function StreamCard({
         <CardHeader
           avatarUrl={listing.seller?.avatar_url}
           name={listing.seller?.display_name || 'Member'}
-          meta={`listed · ${time}`}
-          right={<span className="text-sm font-semibold text-stone-900">{formatPrice(listing)}</span>}
+          badge="Listing"
+          meta={`Listed · ${time}`}
+          right={<span className="text-sm font-bold text-stone-900">{formatPrice(listing)}</span>}
         />
-        <Link href={`/circles/${circle.slug}/marketplace/${listing.id}`} className="block">
-          <h3 className="font-semibold text-stone-900">{listing.title}</h3>
+        <Link href={`/circles/${circle.slug}/marketplace/${listing.id}`} className="block group">
+          <h3 className="font-semibold text-stone-900 group-hover:underline">{listing.title}</h3>
           {listing.description && (
             <p className="mt-1 line-clamp-2 text-sm text-stone-600">{listing.description}</p>
           )}
         </Link>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between border-t border-stone-100 pt-2.5">
           {listing.location ? (
             <span className="inline-flex items-center gap-1 text-xs text-stone-500">
               <MapPin className="h-3 w-3" />
@@ -410,46 +592,18 @@ function StreamCard({
     );
   }
 
-  if (item.itemType === 'event') {
-    const event = item.data;
-    const date = new Date(event.starts_at);
-    const isGoing = rsvpStatus === 'going';
-    return (
-      <article className={cardClass}>
-        <div className="flex items-start gap-3">
-          <DateBadge date={date} />
-          <div className="min-w-0 flex-1">
-            <h3 className="font-semibold text-stone-900">{event.title}</h3>
-            <p className="text-xs text-stone-500">
-              {date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} · {event.going_count ?? 0} going
-            </p>
-          </div>
-          {isMember && (
-            <button
-              type="button"
-              disabled={rsvpLoading}
-              onClick={() => onRsvp(event.id, isGoing ? 'declined' : 'going')}
-              className={
-                isGoing
-                  ? 'inline-flex items-center gap-1 rounded-lg bg-[#F4F3EE] px-3 py-1.5 text-xs font-medium text-stone-900'
-                  : ghostBtn
-              }
-            >
-              {isGoing && <CheckCircle2 className="h-3.5 w-3.5" />}
-              {isGoing ? 'Going' : 'RSVP'}
-            </button>
-          )}
-        </div>
-        {event.description && <p className="line-clamp-2 text-sm text-stone-600">{event.description}</p>}
-      </article>
-    );
-  }
-
+  // 5. Polls
   if (item.itemType === 'poll') {
     const poll = item.data;
     const hasVoted = Boolean(votedOption);
     return (
       <article className={cardClass}>
+        <div className="flex items-center justify-between">
+          <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-semibold text-stone-700 border border-stone-200">
+            Poll
+          </span>
+          <span className="text-xs text-stone-400">{time}</span>
+        </div>
         <h3 className="font-semibold text-stone-900">{poll.question}</h3>
         <div className="space-y-1.5">
           {poll.options.map((opt) => {
@@ -462,19 +616,129 @@ function StreamCard({
                 onClick={() => onVote(poll.id, opt.id)}
                 className={`flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left text-sm transition-colors ${
                   isSelected
-                    ? 'border-stone-900 bg-[#F4F3EE] font-medium text-stone-900'
+                    ? 'border-stone-900 bg-stone-100 font-semibold text-stone-900'
                     : 'border-stone-200 text-stone-700 hover:bg-stone-50'
                 }`}
               >
-                {opt.label}
+                <span>{opt.label}</span>
                 {isSelected && <CheckCircle2 className="h-4 w-4" />}
               </button>
             );
           })}
         </div>
         <p className="text-xs text-stone-400">
-          {poll.total_votes ?? 0} votes · {time}
+          {poll.total_votes ?? 0} votes
         </p>
+      </article>
+    );
+  }
+
+  // 6. Learning Resources / Documents
+  if (item.itemType === 'resource') {
+    const res = item.data;
+    return (
+      <article className={cardClass}>
+        <div className="flex items-center justify-between">
+          <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-semibold text-stone-700 border border-stone-200">
+            Resource
+          </span>
+          <span className="text-xs text-stone-400">{time}</span>
+        </div>
+        <div className="flex items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-stone-100 text-stone-800 border border-stone-200">
+            <FileText className="h-4 w-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="font-semibold text-stone-900">{res.title}</h3>
+            {res.summary && (
+              <p className="mt-1 line-clamp-2 text-sm text-stone-600">{res.summary}</p>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center justify-between border-t border-stone-100 pt-2.5">
+          <span className="text-xs text-stone-500 capitalize">{res.category || 'General'}</span>
+          <Link
+            href={`/circles/${circle.slug}/resources`}
+            className="text-xs font-semibold text-stone-900 hover:underline"
+          >
+            Read Guide →
+          </Link>
+        </div>
+      </article>
+    );
+  }
+
+  // 7. Causes / Crowdfunding
+  if (item.itemType === 'cause') {
+    const cause = item.data;
+    const goal = cause.goal_amount || 0;
+    const pledged = cause.pledged_total || 0;
+    const pct = goal > 0 ? Math.min(100, Math.round((pledged / goal) * 100)) : 0;
+    return (
+      <article className={cardClass}>
+        <div className="flex items-center justify-between">
+          <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-semibold text-stone-700 border border-stone-200">
+            Fundraiser
+          </span>
+          <span className="text-xs text-stone-400">{time}</span>
+        </div>
+        <div className="flex items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-stone-100 text-stone-800 border border-stone-200">
+            <HeartHandshake className="h-4 w-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="font-semibold text-stone-900">{cause.title}</h3>
+            {cause.description && (
+              <p className="mt-1 line-clamp-2 text-sm text-stone-600">{cause.description}</p>
+            )}
+          </div>
+        </div>
+        <div className="space-y-1.5 border-t border-stone-100 pt-2.5">
+          <div className="flex justify-between text-xs font-medium text-stone-700">
+            <span>
+              {cause.currency} {pledged.toLocaleString()} raised
+            </span>
+            <span>{pct}% of goal</span>
+          </div>
+          <div className="h-1.5 w-full overflow-hidden rounded-full bg-stone-100">
+            <div className="h-full bg-stone-900 rounded-full" style={{ width: `${pct}%` }} />
+          </div>
+        </div>
+      </article>
+    );
+  }
+
+  // 8. Projects
+  if (item.itemType === 'project') {
+    const proj = item.data;
+    return (
+      <article className={cardClass}>
+        <div className="flex items-center justify-between">
+          <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-semibold text-stone-700 border border-stone-200">
+            Project
+          </span>
+          <span className="text-xs text-stone-400">{time}</span>
+        </div>
+        <div className="flex items-start gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-stone-100 text-stone-800 border border-stone-200">
+            <FolderGit2 className="h-4 w-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h3 className="font-semibold text-stone-900">{proj.name}</h3>
+            {proj.description && (
+              <p className="mt-1 line-clamp-2 text-sm text-stone-600">{proj.description}</p>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center justify-between border-t border-stone-100 pt-2.5">
+          <span className="text-xs text-stone-500">Status: {proj.status}</span>
+          <Link
+            href={`/circles/${circle.slug}/projects`}
+            className="text-xs font-semibold text-stone-900 hover:underline"
+          >
+            View Project →
+          </Link>
+        </div>
       </article>
     );
   }

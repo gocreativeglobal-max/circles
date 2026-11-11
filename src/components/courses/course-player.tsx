@@ -42,6 +42,7 @@ import { ContentBlockRenderer } from './content-block-renderer';
 import { QuizRunner } from './quiz-runner';
 import { LessonBlockBuilder } from './lesson-block-builder';
 import { CourseSettingsModal } from './course-settings-modal';
+import { CourseLandingView } from './course-landing-view';
 import { formatBachsAmount, getBachsCurrency } from '@/lib/payments/currencies';
 
 export function CoursePlayer({
@@ -50,14 +51,20 @@ export function CoursePlayer({
   initialCourse,
   isMember,
   isStaff,
+  initialViewMode = 'overview',
+  initialLessonId,
 }: {
   circleId: string;
   circleSlug: string;
   initialCourse: CourseItem;
   isMember: boolean;
   isStaff: boolean;
+  initialViewMode?: 'overview' | 'classroom';
+  initialLessonId?: string;
 }) {
   const [course, setCourse] = useState<CourseItem>(initialCourse);
+  const [viewMode, setViewMode] = useState<'overview' | 'classroom'>(initialViewMode);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   // Student Preview Mode state for instructors
   const [previewAsStudent, setPreviewAsStudent] = useState(false);
@@ -75,17 +82,45 @@ export function CoursePlayer({
   });
 
   const firstUncompleted = allLessons.find((l) => !l.is_completed);
-  const [activeLessonId, setActiveLessonId] = useState<string>(
-    firstUncompleted ? firstUncompleted.id : allLessons[0]?.id || ''
-  );
+  const [activeLessonId, setActiveLessonId] = useState<string>(() => {
+    if (initialLessonId && allLessons.some((l) => l.id === initialLessonId)) {
+      return initialLessonId;
+    }
+    return firstUncompleted ? firstUncompleted.id : allLessons[0]?.id || '';
+  });
 
   const activeLesson = allLessons.find((l) => l.id === activeLessonId) || allLessons[0];
   const activeIndex = allLessons.findIndex((l) => l.id === activeLesson?.id);
   const prevLesson = activeIndex > 0 ? allLessons[activeIndex - 1] : null;
   const nextLesson = activeIndex < allLessons.length - 1 ? allLessons[activeIndex + 1] : null;
 
-  // Active sub-tab under player: resources, personal notes, assignment, discussion
-  const [activeTab, setActiveTab] = useState<'resources' | 'notes' | 'assignment' | 'discussion'>('resources');
+  // Active sub-tab under player: overview, resources, personal notes, assignment, discussion
+  const [activeTab, setActiveTab] = useState<'overview' | 'resources' | 'notes' | 'assignment' | 'discussion'>('overview');
+
+  function handleStartLearning(lessonId?: string) {
+    if (lessonId && allLessons.some((l) => l.id === lessonId)) {
+      setActiveLessonId(lessonId);
+    }
+    setViewMode('classroom');
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('learn', 'true');
+      if (lessonId) {
+        url.searchParams.set('lessonId', lessonId);
+      }
+      window.history.pushState({}, '', url.toString());
+    }
+  }
+
+  function handleBackToOverview() {
+    setViewMode('overview');
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('learn');
+      url.searchParams.delete('lessonId');
+      window.history.pushState({}, '', url.toString());
+    }
+  }
 
   // Aggregated downloadable resources across modern content blocks and legacy attachment columns
   const lessonResources = useMemo(() => {
@@ -636,58 +671,337 @@ export function CoursePlayer({
   const isLessonPaywallLocked = isPaywalled && !hasCoursePaywallAccess && !activeLesson?.is_free_preview;
 
   if (course.viewer_can_access === false && !effectiveIsStaff && course.access_rule !== 'paywall') {
-    return (
-      <div className="space-y-6">
-        <div className="rounded-2xl border border-stone-200/80 bg-white p-5 shadow-xs">
-          <Link
-            href={`/circles/${circleSlug}/courses`}
-            className="hover:text-stone-900 text-xs text-stone-500 font-medium transition-colors flex items-center gap-1"
-          >
-            <ChevronLeft className="h-3.5 w-3.5" />
-            Back to Courses
-          </Link>
-        </div>
-
-        <div className="mx-auto max-w-xl rounded-2xl border border-stone-200 bg-white p-8 text-center shadow-xs">
-          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-stone-100 text-stone-900 border border-stone-200">
-            <Lock className="h-6 w-6" />
-          </div>
-          <h2 className="mt-4 text-lg font-bold text-stone-900">Community Level Gated</h2>
-          <p className="mt-2 text-xs text-stone-600 leading-relaxed">
-            This course requires <strong>Community Level {course.min_level_required}</strong> to access.
-            Your current level is <strong>Level {course.viewer_level ?? 1}</strong>.
-          </p>
-
-          <div className="mt-6 rounded-xl border border-stone-200/80 bg-stone-50 p-4 text-left">
-            <h4 className="text-xs font-bold text-stone-900">How to earn XP and level up:</h4>
-            <ul className="mt-2 space-y-1.5 text-xs text-stone-600">
-              <li className="flex items-center gap-2">
-                <span className="font-mono font-bold text-black">+10 XP</span> Complete lessons in beginner courses
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="font-mono font-bold text-black">+25 XP</span> Submit homework assignments
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="font-mono font-bold text-black">+50 XP</span> Receive approved homework reviews
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="font-mono font-bold text-black">+5 XP</span> Ask and answer questions in lesson discussions
-              </li>
-            </ul>
-          </div>
-
-          <div className="mt-6">
+    if (viewMode === 'classroom') {
+      return (
+        <div className="space-y-6">
+          <div className="rounded-2xl border border-stone-200/80 bg-white p-5 shadow-xs flex items-center justify-between">
+            <button
+              onClick={handleBackToOverview}
+              className="hover:text-stone-900 text-xs text-stone-500 font-medium transition-colors flex items-center gap-1"
+            >
+              <ChevronLeft className="h-3.5 w-3.5" />
+              Back to Overview
+            </button>
             <Link
               href={`/circles/${circleSlug}/courses`}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-black px-4 py-2 text-xs font-medium text-white hover:bg-stone-800 transition-colors shadow-xs"
+              className="text-xs text-stone-500 hover:text-stone-900"
             >
-              Explore Open Courses
+              All Courses
             </Link>
           </div>
+
+          <div className="mx-auto max-w-xl rounded-2xl border border-stone-200 bg-white p-8 text-center shadow-xs">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-stone-100 text-stone-900 border border-stone-200">
+              <Lock className="h-6 w-6" />
+            </div>
+            <h2 className="mt-4 text-lg font-bold text-stone-900">Community Level Gated</h2>
+            <p className="mt-2 text-xs text-stone-600 leading-relaxed">
+              This course requires <strong>Community Level {course.min_level_required}</strong> to access.
+              Your current level is <strong>Level {course.viewer_level ?? 1}</strong>.
+            </p>
+
+            <div className="mt-6 rounded-xl border border-stone-200/80 bg-stone-50 p-4 text-left">
+              <h4 className="text-xs font-bold text-stone-900">How to earn XP and level up:</h4>
+              <ul className="mt-2 space-y-1.5 text-xs text-stone-600">
+                <li className="flex items-center gap-2">
+                  <span className="font-mono font-bold text-black">+10 XP</span> Complete lessons in beginner courses
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="font-mono font-bold text-black">+25 XP</span> Submit homework assignments
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="font-mono font-bold text-black">+50 XP</span> Receive approved homework reviews
+                </li>
+                <li className="flex items-center gap-2">
+                  <span className="font-mono font-bold text-black">+5 XP</span> Ask and answer questions in lesson discussions
+                </li>
+              </ul>
+            </div>
+
+            <div className="mt-6 flex items-center justify-center gap-3">
+              <Button
+                onClick={handleBackToOverview}
+                variant="outline"
+                className="rounded-xl text-xs"
+              >
+                View Syllabus
+              </Button>
+              <Link
+                href={`/circles/${circleSlug}/courses`}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-black px-4 py-2 text-xs font-medium text-white hover:bg-stone-800 transition-colors shadow-xs"
+              >
+                Explore Open Courses
+              </Link>
+            </div>
+          </div>
+        </div>
+      );
+    }
+  }
+
+  const renderCurriculumSidebar = () => (
+    <div className="lg:col-span-4 rounded-2xl border border-stone-200/80 bg-white p-4 shadow-xs space-y-4">
+      <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+        <div className="flex items-center gap-1.5">
+          <BookOpen className="h-4 w-4 text-stone-700" />
+          <h3 className="text-xs font-bold uppercase tracking-wider text-stone-700">
+            Course Content
+          </h3>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] font-mono text-stone-500">
+            {completedLessons}/{totalLessons} DONE
+          </span>
+          <button
+            type="button"
+            onClick={() => setIsSidebarOpen(false)}
+            className="rounded-lg p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors"
+            title="Collapse sidebar (Theater Mode)"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
         </div>
       </div>
-    );
-  }
+
+      {!course.modules || course.modules.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-stone-200 p-6 text-center text-xs text-stone-500">
+          No modules in this course yet.
+          {effectiveIsStaff && (
+            <button
+              onClick={() => setShowAddModule(true)}
+              className="mt-2 block w-full text-center text-black font-semibold hover:underline"
+            >
+              + Add First Module
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {course.modules.map((module, mIdx) => {
+            const isModuleLocked = Boolean(module.is_locked) && !effectiveIsStaff;
+            return (
+              <div key={module.id} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 truncate mr-2">
+                    <span className="text-xs font-bold text-stone-900 truncate">
+                      Module {mIdx + 1}: {module.title}
+                    </span>
+                    {module.is_locked && (
+                      <span className="inline-flex items-center gap-1 rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-mono text-stone-600 border border-stone-200 shrink-0">
+                        <Lock className="h-2.5 w-2.5" />
+                        {module.unlocks_at
+                          ? `Unlocks ${new Date(module.unlocks_at).toLocaleDateString()}`
+                          : 'Drip Locked'}
+                      </span>
+                    )}
+                  </div>
+                  {effectiveIsStaff && (
+                    <button
+                      onClick={() => {
+                        setInlineAddingModuleId(
+                          inlineAddingModuleId === module.id ? null : module.id
+                        );
+                        setInlineLessonTitle('');
+                      }}
+                      className="text-[11px] font-medium text-stone-500 hover:text-black flex items-center gap-0.5 shrink-0 transition-colors"
+                    >
+                      <Plus className="h-3 w-3" /> Lesson
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-1">
+                  {module.lessons.map((lesson) => {
+                    const isActive = lesson.id === activeLesson?.id;
+                    const isLessonLocked = Boolean(lesson.is_locked) && !effectiveIsStaff;
+
+                    if (isModuleLocked || isLessonLocked) {
+                      return (
+                        <div
+                          key={lesson.id}
+                          onClick={() => {
+                            setActiveLessonId(lesson.id);
+                          }}
+                          className={`flex items-center justify-between rounded-xl px-3 py-2 text-xs border select-none cursor-pointer transition-all ${
+                            isActive
+                              ? 'bg-amber-50/70 border-amber-300 text-amber-900 font-medium'
+                              : 'bg-stone-50 text-stone-400 border-stone-100 hover:bg-stone-100/60'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 truncate mr-2">
+                            <Lock className="h-3 w-3 shrink-0 text-stone-400" />
+                            <span className="truncate">{lesson.title}</span>
+                          </div>
+                          <span className="text-[10px] font-mono text-stone-400">Locked</span>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div
+                        key={lesson.id}
+                        className={`group flex items-center justify-between rounded-xl px-3 py-2 text-xs transition-all ${
+                          isActive
+                            ? 'bg-stone-900 text-white font-medium shadow-xs'
+                            : 'bg-stone-50 text-stone-700 hover:bg-stone-100'
+                        }`}
+                      >
+                        <button
+                          onClick={() => {
+                            setActiveLessonId(lesson.id);
+                            setActiveTab('overview');
+                          }}
+                          className="flex items-center gap-2.5 text-left flex-1 truncate mr-2"
+                        >
+                          {lesson.thumbnail_url ? (
+                            <img
+                              src={lesson.thumbnail_url}
+                              alt=""
+                              className="h-6 w-9 shrink-0 rounded object-cover border border-stone-200/80"
+                            />
+                          ) : (
+                            <Play
+                              className={`h-3 w-3 shrink-0 ${
+                                isActive ? 'text-white fill-current' : 'text-stone-400'
+                              }`}
+                            />
+                          )}
+                          <span className="truncate">{lesson.title}</span>
+                          {lesson.is_optional && (
+                            <span
+                              className={`rounded px-1 py-0.2 text-[9px] font-mono uppercase ${
+                                isActive
+                                  ? 'bg-stone-800 text-stone-300'
+                                  : 'bg-stone-200 text-stone-600'
+                              }`}
+                            >
+                              Opt
+                            </span>
+                          )}
+                          {lesson.is_free_preview && (
+                            <span
+                              className={`rounded px-1.5 py-0.2 text-[9px] font-bold uppercase tracking-wider ${
+                                isActive
+                                  ? 'bg-black text-white'
+                                  : 'bg-stone-100 text-stone-900 border border-stone-200'
+                              }`}
+                            >
+                              Preview
+                            </span>
+                          )}
+                          {isPaywalled && !hasCoursePaywallAccess && !lesson.is_free_preview && (
+                            <Lock className="h-3 w-3 text-stone-400 shrink-0" />
+                          )}
+                        </button>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {effectiveIsStaff && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDuplicateLesson(lesson.id, module.id);
+                              }}
+                              title="Duplicate lesson"
+                              className={`rounded p-1 opacity-0 group-hover:opacity-100 transition-opacity ${
+                                isActive ? 'text-stone-300 hover:text-white' : 'text-stone-400 hover:text-stone-900'
+                              }`}
+                            >
+                              <Copy className="h-3 w-3" />
+                            </button>
+                          )}
+
+                          {lesson.duration_minutes > 0 && (
+                            <span
+                              className={`text-[10px] font-mono ${
+                                isActive ? 'text-stone-300' : 'text-stone-400'
+                              }`}
+                            >
+                              {lesson.duration_minutes}m
+                            </span>
+                          )}
+
+                          {isMember && !previewAsStudent && (
+                            <button
+                              onClick={() =>
+                                handleToggleComplete(lesson.id, Boolean(lesson.is_completed))
+                              }
+                              disabled={savingProgress}
+                              title={lesson.is_completed ? 'Mark incomplete' : 'Mark complete'}
+                              className="transition-transform active:scale-90"
+                            >
+                              {lesson.is_completed ? (
+                                <CheckCircle2
+                                  className={`h-4 w-4 ${
+                                    isActive
+                                      ? 'text-white fill-white text-stone-900'
+                                      : 'text-stone-900'
+                                  }`}
+                                />
+                              ) : (
+                                <Circle
+                                  className={`h-4 w-4 ${
+                                    isActive ? 'text-stone-400' : 'text-stone-300'
+                                  }`}
+                                />
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Minimal Inline Lesson Outliner Input */}
+                  {effectiveIsStaff && inlineAddingModuleId === module.id && (
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        handleQuickCreateLesson(module.id);
+                      }}
+                      className="flex items-center gap-1.5 rounded-xl border border-stone-300 bg-white p-1.5 shadow-xs animate-in fade-in duration-150"
+                    >
+                      <input
+                        type="text"
+                        autoFocus
+                        required
+                        placeholder="Lesson title... (press Enter)"
+                        value={inlineLessonTitle}
+                        onChange={(e) => setInlineLessonTitle(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') {
+                            setInlineAddingModuleId(null);
+                            setInlineLessonTitle('');
+                          }
+                        }}
+                        className="flex-1 bg-transparent px-2 py-1 text-xs text-stone-900 focus:outline-hidden"
+                      />
+                      <Button
+                        type="submit"
+                        disabled={isCreatingLesson || !inlineLessonTitle.trim()}
+                        className="h-7 rounded-lg bg-black px-2.5 text-[11px] font-semibold text-white hover:bg-stone-800"
+                      >
+                        {isCreatingLesson ? 'Adding...' : 'Add'}
+                      </Button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setInlineAddingModuleId(null);
+                          setInlineLessonTitle('');
+                        }}
+                        className="rounded-lg p-1 text-stone-400 hover:text-stone-700 transition-colors"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    </form>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -718,376 +1032,170 @@ export function CoursePlayer({
         </div>
       )}
 
-      {/* Student Preview Mode Banner for Instructors */}
-      {previewAsStudent && (
-        <div className="flex items-center justify-between rounded-2xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-xs text-amber-900 shadow-2xs">
-          <div className="flex items-center gap-2">
-            <Eye className="h-4 w-4 text-amber-700" />
-            <span>
-              <strong>Student Preview Mode Active:</strong> You are experiencing this curriculum exactly as an enrolled student. Admin controls and draft features are hidden.
-            </span>
-          </div>
-          <button
-            onClick={() => setPreviewAsStudent(false)}
-            className="font-bold underline hover:text-amber-950 ml-2"
-          >
-            Exit Preview
-          </button>
-        </div>
-      )}
-
-      {/* Top Breadcrumb & Progress Banner */}
-      <div className="flex flex-col justify-between gap-4 rounded-2xl border border-stone-200/80 bg-white p-5 shadow-xs sm:flex-row sm:items-center">
-        <div>
-          <div className="flex items-center gap-2 text-xs text-stone-500 font-medium">
-            <Link
-              href={`/circles/${circleSlug}/courses`}
-              className="hover:text-stone-900 transition-colors flex items-center gap-1"
-            >
-              <ChevronLeft className="h-3.5 w-3.5" />
-              All Courses
-            </Link>
-            <span>/</span>
-            <span className="text-stone-900 font-bold truncate max-w-xs">{course.title}</span>
-            {isStaff && (
-              <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-mono text-stone-600">
-                v{course.published_version || 1}
-              </span>
-            )}
-          </div>
-
-          <h2 className="mt-1 text-lg font-bold text-stone-900 tracking-tight">
-            {activeLesson?.title || course.title}
-          </h2>
-        </div>
-
-        {/* Progress Bar & Actions */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="text-right">
-            <div className="flex items-center justify-end gap-2 text-xs font-medium">
-              <span className="text-stone-500">Progress</span>
-              <span className="font-mono font-bold text-stone-900">{progressPercent}%</span>
+      {viewMode === 'overview' ? (
+        <CourseLandingView
+          circleId={circleId}
+          circleSlug={circleSlug}
+          course={course}
+          isMember={isMember}
+          isStaff={effectiveIsStaff}
+          onStartLearning={handleStartLearning}
+          onOpenCheckout={(plan) => {
+            setSelectedPaywallPlan(plan || course.paywall_plans?.[0] || null);
+            setShowCheckoutModal(true);
+          }}
+          onOpenSettings={() => setShowCourseSettings(true)}
+        />
+      ) : (
+        <div className="space-y-6">
+          {/* Student Preview Mode Banner for Instructors */}
+          {previewAsStudent && (
+            <div className="flex items-center justify-between rounded-2xl border border-amber-300 bg-amber-50 px-4 py-2.5 text-xs text-amber-900 shadow-2xs">
+              <div className="flex items-center gap-2">
+                <Eye className="h-4 w-4 text-amber-700" />
+                <span>
+                  <strong>Student Preview Mode Active:</strong> You are experiencing this curriculum exactly as an enrolled student. Admin controls and draft features are hidden.
+                </span>
+              </div>
+              <button
+                onClick={() => setPreviewAsStudent(false)}
+                className="font-bold underline hover:text-amber-950 ml-2"
+              >
+                Exit Preview
+              </button>
             </div>
-            <div className="mt-1 h-2 w-32 overflow-hidden rounded-full bg-stone-100 border border-stone-200/60">
-              <div
-                className="h-full bg-black transition-all duration-300"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
-          </div>
+          )}
 
-          {/* Instructor Controls */}
-          {isStaff && (
-            <div className="flex items-center gap-2">
+          {/* Top Breadcrumb & Progress Banner */}
+          <div className="flex flex-col justify-between gap-4 rounded-2xl border border-stone-200/80 bg-white p-5 shadow-xs sm:flex-row sm:items-center">
+            <div className="flex items-center gap-3">
               <Button
                 variant="outline"
-                onClick={() => setPreviewAsStudent(!previewAsStudent)}
-                className={`rounded-xl text-xs flex items-center gap-1 ${
-                  previewAsStudent ? 'bg-amber-100 text-amber-900 border-amber-300' : ''
-                }`}
-                title="Preview course as a learner"
+                onClick={handleBackToOverview}
+                className="rounded-xl text-xs flex items-center gap-1.5 text-stone-700 hover:text-black hover:border-black transition-colors"
+                title="Return to Course Landing Page & Syllabus"
               >
-                <Eye className="h-3.5 w-3.5" />
-                {previewAsStudent ? 'Exit Preview' : 'Student View'}
+                <ChevronLeft className="h-3.5 w-3.5" />
+                <span>Overview</span>
               </Button>
 
-              {!previewAsStudent && (
-                <>
+              <div>
+                <div className="flex items-center gap-2 text-xs text-stone-500 font-medium">
                   <Link
-                    href={`/circles/${circleSlug}/courses/${course.id}/studio`}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 hover:border-black transition-colors shadow-2xs"
-                    title="Open Circle Course Studio"
+                    href={`/circles/${circleSlug}/courses`}
+                    className="hover:text-stone-900 transition-colors"
                   >
-                    <BookOpen className="h-3.5 w-3.5 text-stone-500" />
-                    <span>Studio</span>
+                    Courses
                   </Link>
+                  <span>/</span>
+                  <span className="text-stone-900 font-bold truncate max-w-xs">{course.title}</span>
+                  {isStaff && (
+                    <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-mono text-stone-600">
+                      v{course.published_version || 1}
+                    </span>
+                  )}
+                </div>
 
+                <h2 className="mt-1 text-lg font-bold text-stone-900 tracking-tight">
+                  {activeLesson?.title || course.title}
+                </h2>
+              </div>
+            </div>
+
+            {/* Progress Bar & Actions */}
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="text-right">
+                <div className="flex items-center justify-end gap-2 text-xs font-medium">
+                  <span className="text-stone-500">Progress</span>
+                  <span className="font-mono font-bold text-stone-900">{progressPercent}%</span>
+                </div>
+                <div className="mt-1 h-2 w-32 overflow-hidden rounded-full bg-stone-100 border border-stone-200/60">
+                  <div
+                    className="h-full bg-black transition-all duration-300"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Sidebar Theater Mode Toggle Button */}
+              <Button
+                variant="outline"
+                onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+                className={`rounded-xl text-xs flex items-center gap-1.5 transition-colors ${
+                  !isSidebarOpen
+                    ? 'bg-stone-100 text-black font-bold border-stone-300'
+                    : 'text-stone-700 hover:border-black'
+                }`}
+                title={isSidebarOpen ? 'Hide curriculum sidebar (theater mode)' : 'Show curriculum sidebar'}
+              >
+                <BookOpen className="h-3.5 w-3.5 text-stone-500" />
+                <span>{isSidebarOpen ? 'Hide Content' : 'Course Content'}</span>
+                <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-mono text-stone-600">
+                  {completedLessons}/{totalLessons}
+                </span>
+              </Button>
+
+              {/* Instructor Controls */}
+              {isStaff && (
+                <div className="flex items-center gap-2">
                   <Button
-                    onClick={() => setShowCourseSettings(true)}
                     variant="outline"
-                    className="rounded-xl text-xs flex items-center gap-1.5 text-stone-700 hover:border-black"
-                    title="Edit course title, slug, thumbnail, access rules, and status"
+                    onClick={() => setPreviewAsStudent(!previewAsStudent)}
+                    className={`rounded-xl text-xs flex items-center gap-1 ${
+                      previewAsStudent ? 'bg-amber-100 text-amber-900 border-amber-300' : ''
+                    }`}
+                    title="Preview course as a learner"
                   >
-                    <Settings className="h-3.5 w-3.5 text-stone-500" />
-                    <span>Edit Course</span>
+                    <Eye className="h-3.5 w-3.5" />
+                    {previewAsStudent ? 'Exit Preview' : 'Student View'}
                   </Button>
 
-                  <Button
-                    onClick={() => setShowAddModule(true)}
-                    variant="outline"
-                    className="rounded-xl text-xs"
-                  >
-                    <Plus className="h-3.5 w-3.5 mr-1" />
-                    Module
-                  </Button>
-                </>
+                  {!previewAsStudent && (
+                    <>
+                      <Link
+                        href={`/circles/${circleSlug}/courses/${course.id}/studio`}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 hover:border-black transition-colors shadow-2xs"
+                        title="Open Circle Course Studio"
+                      >
+                        <BookOpen className="h-3.5 w-3.5 text-stone-500" />
+                        <span>Studio</span>
+                      </Link>
+
+                      <Button
+                        onClick={() => setShowCourseSettings(true)}
+                        variant="outline"
+                        className="rounded-xl text-xs flex items-center gap-1.5 text-stone-700 hover:border-black"
+                        title="Edit course title, slug, thumbnail, access rules, and status"
+                      >
+                        <Settings className="h-3.5 w-3.5 text-stone-500" />
+                        <span>Edit Course</span>
+                      </Button>
+
+                      <Button
+                        onClick={() => setShowAddModule(true)}
+                        variant="outline"
+                        className="rounded-xl text-xs"
+                      >
+                        <Plus className="h-3.5 w-3.5 mr-1" />
+                        Module
+                      </Button>
+                    </>
+                  )}
+                </div>
               )}
             </div>
-          )}
-        </div>
-      </div>
-
-      {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-600">
-          {error}
-        </div>
-      )}
-
-      {/* Main LMS Layout: Left Sidebar Curriculum, Right Player Pane */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
-        {/* Left Curriculum Sidebar */}
-        <div className="lg:col-span-4 rounded-2xl border border-stone-200/80 bg-white p-4 shadow-xs space-y-4">
-          <div className="flex items-center justify-between border-b border-stone-100 pb-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-stone-700">
-              Curriculum Syllabus
-            </h3>
-            <span className="text-[11px] font-mono text-stone-500">
-              {completedLessons}/{totalLessons} DONE
-            </span>
           </div>
 
-          {!course.modules || course.modules.length === 0 ? (
-            <div className="rounded-xl border border-dashed border-stone-200 p-6 text-center text-xs text-stone-500">
-              No modules in this course yet.
-              {effectiveIsStaff && (
-                <button
-                  onClick={() => setShowAddModule(true)}
-                  className="mt-2 block w-full text-center text-black font-semibold hover:underline"
-                >
-                  + Add First Module
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {course.modules.map((module, mIdx) => {
-                const isModuleLocked = Boolean(module.is_locked) && !effectiveIsStaff;
-                return (
-                  <div key={module.id} className="space-y-2">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 truncate mr-2">
-                        <span className="text-xs font-bold text-stone-900 truncate">
-                          Module {mIdx + 1}: {module.title}
-                        </span>
-                        {module.is_locked && (
-                          <span className="inline-flex items-center gap-1 rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-mono text-stone-600 border border-stone-200 shrink-0">
-                            <Lock className="h-2.5 w-2.5" />
-                            {module.unlocks_at
-                              ? `Unlocks ${new Date(module.unlocks_at).toLocaleDateString()}`
-                              : 'Drip Locked'}
-                          </span>
-                        )}
-                      </div>
-                      {effectiveIsStaff && (
-                        <button
-                          onClick={() => {
-                            setInlineAddingModuleId(
-                              inlineAddingModuleId === module.id ? null : module.id
-                            );
-                            setInlineLessonTitle('');
-                          }}
-                          className="text-[11px] font-medium text-stone-500 hover:text-black flex items-center gap-0.5 shrink-0 transition-colors"
-                        >
-                          <Plus className="h-3 w-3" /> Lesson
-                        </button>
-                      )}
-                    </div>
-
-                    <div className="space-y-1">
-                      {module.lessons.map((lesson) => {
-                        const isActive = lesson.id === activeLesson?.id;
-                        const isLessonLocked = Boolean(lesson.is_locked) && !effectiveIsStaff;
-
-                        if (isModuleLocked || isLessonLocked) {
-                          return (
-                            <div
-                              key={lesson.id}
-                              onClick={() => {
-                                // Allow clicking to inspect the "Why is this locked?" reason
-                                setActiveLessonId(lesson.id);
-                              }}
-                              className={`flex items-center justify-between rounded-xl px-3 py-2 text-xs border select-none cursor-pointer transition-all ${
-                                isActive
-                                  ? 'bg-amber-50/70 border-amber-300 text-amber-900 font-medium'
-                                  : 'bg-stone-50 text-stone-400 border-stone-100 hover:bg-stone-100/60'
-                              }`}
-                            >
-                              <div className="flex items-center gap-2.5 truncate mr-2">
-                                <Lock className="h-3 w-3 shrink-0 text-stone-400" />
-                                <span className="truncate">{lesson.title}</span>
-                              </div>
-                              <span className="text-[10px] font-mono text-stone-400">Locked</span>
-                            </div>
-                          );
-                        }
-
-                        return (
-                          <div
-                            key={lesson.id}
-                            className={`group flex items-center justify-between rounded-xl px-3 py-2 text-xs transition-all ${
-                              isActive
-                                ? 'bg-stone-900 text-white font-medium shadow-xs'
-                                : 'bg-stone-50 text-stone-700 hover:bg-stone-100'
-                            }`}
-                          >
-                            <button
-                              onClick={() => {
-                                setActiveLessonId(lesson.id);
-                                setActiveTab('resources');
-                              }}
-                              className="flex items-center gap-2.5 text-left flex-1 truncate mr-2"
-                            >
-                              {lesson.thumbnail_url ? (
-                                <img
-                                  src={lesson.thumbnail_url}
-                                  alt=""
-                                  className="h-6 w-9 shrink-0 rounded object-cover border border-stone-200/80"
-                                />
-                              ) : (
-                                <Play
-                                  className={`h-3 w-3 shrink-0 ${
-                                    isActive ? 'text-white fill-current' : 'text-stone-400'
-                                  }`}
-                                />
-                              )}
-                              <span className="truncate">{lesson.title}</span>
-                              {lesson.is_optional && (
-                                <span
-                                  className={`rounded px-1 py-0.2 text-[9px] font-mono uppercase ${
-                                    isActive
-                                      ? 'bg-stone-800 text-stone-300'
-                                      : 'bg-stone-200 text-stone-600'
-                                  }`}
-                                >
-                                  Opt
-                                </span>
-                              )}
-                              {lesson.is_free_preview && (
-                                <span
-                                  className={`rounded px-1.5 py-0.2 text-[9px] font-bold uppercase tracking-wider ${
-                                    isActive
-                                      ? 'bg-black text-white'
-                                      : 'bg-stone-100 text-stone-900 border border-stone-200'
-                                  }`}
-                                >
-                                  Preview
-                                </span>
-                              )}
-                              {isPaywalled && !hasCoursePaywallAccess && !lesson.is_free_preview && (
-                                <Lock className="h-3 w-3 text-stone-400 shrink-0" />
-                              )}
-                            </button>
-
-                            <div className="flex items-center gap-2 shrink-0">
-                              {effectiveIsStaff && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDuplicateLesson(lesson.id, module.id);
-                                  }}
-                                  title="Duplicate lesson"
-                                  className={`rounded p-1 opacity-0 group-hover:opacity-100 transition-opacity ${
-                                    isActive ? 'text-stone-300 hover:text-white' : 'text-stone-400 hover:text-stone-900'
-                                  }`}
-                                >
-                                  <Copy className="h-3 w-3" />
-                                </button>
-                              )}
-
-                              {lesson.duration_minutes > 0 && (
-                                <span
-                                  className={`text-[10px] font-mono ${
-                                    isActive ? 'text-stone-300' : 'text-stone-400'
-                                  }`}
-                                >
-                                  {lesson.duration_minutes}m
-                                </span>
-                              )}
-
-                              {isMember && !previewAsStudent && (
-                                <button
-                                  onClick={() =>
-                                    handleToggleComplete(lesson.id, Boolean(lesson.is_completed))
-                                  }
-                                  disabled={savingProgress}
-                                  title={lesson.is_completed ? 'Mark incomplete' : 'Mark complete'}
-                                  className="transition-transform active:scale-90"
-                                >
-                                  {lesson.is_completed ? (
-                                    <CheckCircle2
-                                      className={`h-4 w-4 ${
-                                        isActive
-                                          ? 'text-white fill-white text-stone-900'
-                                          : 'text-stone-900'
-                                      }`}
-                                    />
-                                  ) : (
-                                    <Circle
-                                      className={`h-4 w-4 ${
-                                        isActive ? 'text-stone-400' : 'text-stone-300'
-                                      }`}
-                                    />
-                                  )}
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-
-                      {/* Minimal Inline Lesson Outliner Input */}
-                      {effectiveIsStaff && inlineAddingModuleId === module.id && (
-                        <form
-                          onSubmit={(e) => {
-                            e.preventDefault();
-                            handleQuickCreateLesson(module.id);
-                          }}
-                          className="flex items-center gap-1.5 rounded-xl border border-stone-300 bg-white p-1.5 shadow-xs animate-in fade-in duration-150"
-                        >
-                          <input
-                            type="text"
-                            autoFocus
-                            required
-                            placeholder="Lesson title... (press Enter)"
-                            value={inlineLessonTitle}
-                            onChange={(e) => setInlineLessonTitle(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Escape') {
-                                setInlineAddingModuleId(null);
-                                setInlineLessonTitle('');
-                              }
-                            }}
-                            className="flex-1 bg-transparent px-2 py-1 text-xs text-stone-900 focus:outline-hidden"
-                          />
-                          <Button
-                            type="submit"
-                            disabled={isCreatingLesson || !inlineLessonTitle.trim()}
-                            className="h-7 rounded-lg bg-black px-2.5 text-[11px] font-semibold text-white hover:bg-stone-800"
-                          >
-                            {isCreatingLesson ? 'Adding...' : 'Add'}
-                          </Button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setInlineAddingModuleId(null);
-                              setInlineLessonTitle('');
-                            }}
-                            className="rounded-lg p-1 text-stone-400 hover:text-stone-700 transition-colors"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
-                        </form>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+          {error && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-600">
+              {error}
             </div>
           )}
-        </div>
 
-        {/* Right Lesson Player Pane */}
-        <div className="lg:col-span-8 space-y-6">
+          {/* Main LMS Layout: Left Player Stage (8/12 cols), Right Sidebar Curriculum (4 cols) */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
+            {/* Left Lesson Player Pane (8 cols or 12 cols when theater mode) */}
+            <div className={isSidebarOpen ? "lg:col-span-8 space-y-6" : "lg:col-span-12 space-y-6"}>
           {isActiveModuleLocked ? (
             <div className="rounded-2xl border border-stone-200/80 bg-white p-12 text-center shadow-xs">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-stone-100 text-stone-800 border border-stone-200">
@@ -1362,8 +1470,20 @@ export function CoursePlayer({
                 />
               </div>
 
-              {/* Interactivity Sub-Tabs: Resources | My Notes | Homework | Q&A Discussion */}
+              {/* Interactivity Sub-Tabs: Overview | Resources | My Notes | Homework | Q&A Discussion */}
               <div className="flex items-center gap-2 sm:gap-4 border-b border-stone-100 pt-2 overflow-x-auto">
+                <button
+                  onClick={() => setActiveTab('overview')}
+                  className={`pb-3 text-xs font-semibold border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap ${
+                    activeTab === 'overview'
+                      ? 'border-black text-stone-900'
+                      : 'border-transparent text-stone-500 hover:text-stone-800'
+                  }`}
+                >
+                  <BookOpen className="h-3.5 w-3.5" />
+                  <span>Overview</span>
+                </button>
+
                 <button
                   onClick={() => setActiveTab('resources')}
                   className={`pb-3 text-xs font-semibold border-b-2 transition-colors flex items-center gap-1.5 whitespace-nowrap ${
@@ -1424,6 +1544,56 @@ export function CoursePlayer({
                   <span>Discussion ({comments.length})</span>
                 </button>
               </div>
+
+              {/* Tab 0: Lesson Overview & Key Takeaways */}
+              {activeTab === 'overview' && (
+                <div className="space-y-4 pt-1">
+                  <div>
+                    <h3 className="text-sm font-bold text-stone-900">About this lecture</h3>
+                    <p className="mt-1 text-xs text-stone-600 leading-relaxed whitespace-pre-line">
+                      {activeLesson.description ||
+                        course.description ||
+                        'In this session, explore core concepts, practical techniques, and milestone steps.'}
+                    </p>
+                  </div>
+
+                  {course.learning_objectives && course.learning_objectives.length > 0 && (
+                    <div className="rounded-xl border border-stone-100 bg-stone-50/70 p-4 space-y-2.5">
+                      <h4 className="text-xs font-bold text-stone-800 uppercase tracking-wider">
+                        Key Learning Takeaways
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-stone-600">
+                        {course.learning_objectives.map((obj, i) => (
+                          <div key={i} className="flex items-start gap-2">
+                            <CheckCircle2 className="h-3.5 w-3.5 text-stone-900 shrink-0 mt-0.5" />
+                            <span>{obj}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {course.instructor && (
+                    <div className="flex items-center gap-3 border-t border-stone-100 pt-3">
+                      <div className="h-9 w-9 rounded-full bg-stone-200 flex items-center justify-center font-bold text-xs text-stone-800 overflow-hidden">
+                        {course.instructor.avatar_url ? (
+                          <img
+                            src={course.instructor.avatar_url}
+                            alt={course.instructor.display_name}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          course.instructor.display_name?.slice(0, 1).toUpperCase() || 'I'
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-stone-900">{course.instructor.display_name}</p>
+                        <p className="text-[11px] text-stone-500">Instructor</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Tab 1: Resources & Downloadable Assets */}
               {activeTab === 'resources' && (
@@ -1769,9 +1939,14 @@ export function CoursePlayer({
             </div>
           )}
         </div>
-      </div>
 
-      {/* Quiz Runner Modal */}
+        {/* Right Curriculum Sidebar */}
+        {isSidebarOpen && renderCurriculumSidebar()}
+      </div>
+    </div>
+  )}
+
+  {/* Quiz Runner Modal */}
       {activeQuizId && (
         <QuizRunner
           circleId={circleId}

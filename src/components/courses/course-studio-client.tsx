@@ -36,10 +36,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { ImageUploader } from '@/components/ui/image-uploader';
 import { LessonBlockBuilder } from './lesson-block-builder';
+import { compressImage } from '@/lib/media/compressor';
 import {
   BACHS_ACCEPTED_CURRENCIES,
   formatBachsAmount,
-  getBachsCurrency,
 } from '@/lib/payments/currencies';
 
 interface CourseStudioClientProps {
@@ -137,6 +137,7 @@ export function CourseStudioClient({
   const [newPlanDescription, setNewPlanDescription] = useState('');
   const [newPlanPrice, setNewPlanPrice] = useState('49');
   const [newPlanCurrency, setNewPlanCurrency] = useState('USD');
+  const [extraPaywallPrices, setExtraPaywallPrices] = useState<Array<{ currency: string; amount: string }>>([]);
   const [newPlanBillingType, setNewPlanBillingType] = useState<'one_time' | 'recurring'>('one_time');
   const [newPlanBillingPeriod, setNewPlanBillingPeriod] = useState<'monthly' | 'yearly'>('monthly');
 
@@ -307,34 +308,35 @@ export function CourseStudioClient({
     if (!file) return;
     setIsUploadingLessonImage(true);
     try {
-      const reader = new FileReader();
-      reader.onload = async () => {
-        const base64 = reader.result as string;
-        try {
-          const res = await fetch('/api/uploads', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              circleId,
-              originalFilename: file.name,
-              mimeType: file.type || 'image/png',
-              visibility: 'public',
-              contentBase64: base64,
-            }),
-          });
-          const data = await res.json();
-          if (res.ok && data.upload?.signed_download_url) {
-            setLessonThumbnailUrl(data.upload.signed_download_url);
-          } else {
-            setLessonThumbnailUrl(base64);
-          }
-        } catch {
-          setLessonThumbnailUrl(base64);
-        } finally {
-          setIsUploadingLessonImage(false);
+      const compressed = await compressImage(file, {
+        maxWidth: 1920,
+        maxHeight: 1920,
+        quality: 0.82,
+      });
+
+      try {
+        const res = await fetch('/api/uploads', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            circleId,
+            originalFilename: compressed.filename,
+            mimeType: compressed.mimeType,
+            visibility: 'public',
+            contentBase64: compressed.base64,
+          }),
+        });
+        const data = await res.json();
+        if (res.ok && data.upload?.signed_download_url) {
+          setLessonThumbnailUrl(data.upload.signed_download_url);
+        } else {
+          setLessonThumbnailUrl(compressed.base64);
         }
-      };
-      reader.readAsDataURL(file);
+      } catch {
+        setLessonThumbnailUrl(compressed.base64);
+      } finally {
+        setIsUploadingLessonImage(false);
+      }
     } catch {
       setIsUploadingLessonImage(false);
     }
@@ -671,6 +673,16 @@ export function CourseStudioClient({
   async function handleCreatePaywall(e: React.FormEvent) {
     e.preventDefault();
     if (!newPlanName.trim()) return;
+    const currencyPrices: Record<string, number> = {};
+    for (const p of extraPaywallPrices) {
+      const code = p.currency.trim().toUpperCase();
+      const val = parseFloat(p.amount);
+      if (code && !isNaN(val) && val >= 0) {
+        const isZeroDec = ['JPY', 'UGX', 'RWF', 'TZS'].includes(code);
+        currencyPrices[code] = isZeroDec ? Math.round(val) : Math.round(val * 100);
+      }
+    }
+
     setIsSaving(true);
     try {
       const res = await fetch(`/api/circles/${circleId}/courses/${course.id}`, {
@@ -683,6 +695,7 @@ export function CourseStudioClient({
             description: newPlanDescription.trim(),
             amountCents: Math.round((parseFloat(newPlanPrice) || 0) * 100),
             currency: newPlanCurrency,
+            currencyPrices: Object.keys(currencyPrices).length > 0 ? currencyPrices : undefined,
             billingType: newPlanBillingType,
             intervalUnit: newPlanBillingType === 'recurring' ? 'month' : null,
           },
@@ -696,6 +709,7 @@ export function CourseStudioClient({
         setNewPlanName('');
         setNewPlanDescription('');
         setNewPlanPrice('49');
+        setExtraPaywallPrices([]);
         setAccessRule('paywall');
         showFeedback('success', 'Paywall created and linked to this course.');
       }
@@ -1639,6 +1653,20 @@ export function CourseStudioClient({
                                 <span className="text-sm font-bold text-stone-900">
                                   {formatBachsAmount(plan.amount_cents, plan.currency)}
                                 </span>
+                                {plan.currency_prices &&
+                                  typeof plan.currency_prices === 'object' &&
+                                  Object.keys(plan.currency_prices).length > 0 && (
+                                    <div className="mt-1 flex flex-wrap justify-end gap-1">
+                                      {Object.entries(plan.currency_prices).map(([code, val]) => (
+                                        <span
+                                          key={code}
+                                          className="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-semibold text-stone-700 border border-stone-200"
+                                        >
+                                          {formatBachsAmount(val, code)}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  )}
                               </div>
                               <button
                                 type="button"
@@ -1766,45 +1794,94 @@ export function CourseStudioClient({
 
                   <div>
                     <label className="block text-xs font-bold text-stone-800">
-                      Bachs Accepted Currency
+                      Currency
                     </label>
                     <select
                       value={newPlanCurrency}
                       onChange={(e) => setNewPlanCurrency(e.target.value)}
                       className="mt-1 w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs text-stone-900 focus:border-black focus:outline-none"
                     >
-                      <optgroup label="Global Currencies">
-                        {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'fiat_global').map(
-                          (c) => (
-                            <option key={c.code} value={c.code}>
-                              {c.code} ({c.symbol}) — {c.name}
-                            </option>
-                          )
-                        )}
-                      </optgroup>
-                      <optgroup label="African Rails (Bank & Mobile Money)">
-                        {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'fiat_african').map(
-                          (c) => (
-                            <option key={c.code} value={c.code}>
-                              {c.code} ({c.symbol}) — {c.name}
-                            </option>
-                          )
-                        )}
-                      </optgroup>
-                      <optgroup label="Crypto Stablecoins">
-                        {BACHS_ACCEPTED_CURRENCIES.filter((c) => c.category === 'stablecoin').map(
-                          (c) => (
-                            <option key={c.code} value={c.code}>
-                              {c.code} ({c.symbol}) — {c.name}
-                            </option>
-                          )
-                        )}
-                      </optgroup>
+                      {BACHS_ACCEPTED_CURRENCIES.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.code} ({c.symbol}) — {c.name}
+                        </option>
+                      ))}
                     </select>
-                    <p className="mt-1 text-[10px] text-stone-500">
-                      {getBachsCurrency(newPlanCurrency).paymentMethodsDescription}
-                    </p>
                   </div>
+                </div>
+
+                {/* Multi-Currency Pricing (Optional) */}
+                <div className="space-y-2 rounded-xl border border-stone-200 bg-stone-50/70 p-3.5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <span className="text-xs font-bold text-stone-900">
+                        Additional Currency Prices (Optional)
+                      </span>
+                      <p className="text-[11px] text-stone-500">
+                        Set fixed prices for students paying with other currencies.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setExtraPaywallPrices((prev) => [
+                          ...prev,
+                          {
+                            currency:
+                              BACHS_ACCEPTED_CURRENCIES.find((c) => c.code !== newPlanCurrency)?.code || 'EUR',
+                            amount: '',
+                          },
+                        ])
+                      }
+                      className="inline-flex items-center gap-1 rounded-lg border border-stone-300 bg-white px-2.5 py-1 text-xs font-semibold text-stone-700 hover:bg-stone-50 transition-colors shadow-2xs"
+                    >
+                      <Plus className="h-3 w-3" />
+                      <span>Add price</span>
+                    </button>
+                  </div>
+
+                  {extraPaywallPrices.map((extra, idx) => (
+                    <div key={idx} className="flex items-center gap-2 pt-1">
+                      <select
+                        value={extra.currency}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setExtraPaywallPrices((prev) =>
+                            prev.map((item, i) => (i === idx ? { ...item, currency: val } : item))
+                          );
+                        }}
+                        className="w-36 rounded-lg border border-stone-300 bg-white px-2.5 py-1.5 text-xs text-stone-900 focus:outline-none"
+                      >
+                        {BACHS_ACCEPTED_CURRENCIES.map((c) => (
+                          <option key={c.code} value={c.code}>
+                            {c.code} ({c.symbol})
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="Price amount"
+                        value={extra.amount}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setExtraPaywallPrices((prev) =>
+                            prev.map((item, i) => (i === idx ? { ...item, amount: val } : item))
+                          );
+                        }}
+                        className="flex-1 rounded-lg border border-stone-300 bg-white px-2.5 py-1.5 text-xs text-stone-900 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setExtraPaywallPrices((prev) => prev.filter((_, i) => i !== idx))}
+                        className="p-1.5 text-stone-400 hover:text-rose-600 transition-colors"
+                        title="Remove currency"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  ))}
                 </div>
 
                 <div>

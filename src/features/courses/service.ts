@@ -32,6 +32,7 @@ import {
 } from '@/types/domain';
 import {
   CapabilityDisabledError,
+  ConflictError,
   ForbiddenError,
   NotFoundError,
   ValidationError,
@@ -538,8 +539,8 @@ export async function getCourseWithCurriculum(
       }
     }
 
-    const paywallPlansRes = await tx.query<CoursePaywallPlan>(
-      `SELECT p.id, p.circle_id, p.slug, p.name, p.description, p.billing_type, p.amount_cents, p.currency, p.interval_unit, p.is_active, pe.id as entitlement_id
+    const paywallPlansRes = await tx.query<CoursePaywallPlan & { metadata?: Record<string, unknown> }>(
+      `SELECT p.id, p.circle_id, p.slug, p.name, p.description, p.billing_type, p.amount_cents, p.currency, p.interval_unit, p.is_active, p.metadata, pe.id as entitlement_id
        FROM public.pricing_plans p
        INNER JOIN public.pricing_plan_entitlements pe ON pe.plan_id = p.id
        WHERE pe.circle_id = $1 AND pe.target_type = 'course_access' AND pe.target_id = $2 AND p.is_active = true
@@ -666,7 +667,10 @@ export async function getCourseWithCurriculum(
       in_progress_students_count: inProgressStudentsCount,
       completed_students_count: completedStudentsCount,
       completion_rate_percentage: completionRatePercentage,
-      paywall_plans: paywallPlansRes.rows,
+      paywall_plans: paywallPlansRes.rows.map((plan) => ({
+        ...plan,
+        currency_prices: (plan.metadata?.currency_prices as Record<string, number>) || {},
+      })),
       has_paywall_access: hasPaywallAccess,
     };
   });
@@ -702,37 +706,112 @@ export async function createCourse(
       throw new ForbiddenError('Only active Circle members can create courses.');
     }
 
-    const courseId = crypto.randomUUID();
-    const res = await tx.query<CourseItem>(
-      `INSERT INTO public.courses (
-         id, circle_id, instructor_id, title, slug, description,
-         thumbnail_url, difficulty_level, estimated_duration_hours,
-         pacing_format, schedule_type, cohort_start_date, cohort_end_date,
-         require_sequential_completion, access_rule, min_level_required, status
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-       RETURNING *;`,
-      [
-        courseId,
-        parsed.circleId,
-        actorUserId,
-        parsed.title,
-        parsed.slug,
-        parsed.description,
-        parsed.thumbnailUrl || null,
-        parsed.difficultyLevel || null,
-        parsed.estimatedDurationHours,
-        parsed.pacingFormat,
-        parsed.scheduleType,
-        parsed.cohortStartDate ? new Date(parsed.cohortStartDate).toISOString() : null,
-        parsed.cohortEndDate ? new Date(parsed.cohortEndDate).toISOString() : null,
-        parsed.requireSequentialCompletion,
-        parsed.accessRule,
-        parsed.minLevelRequired,
-        parsed.status,
-      ]
+    // Ensure slug uniqueness within the Circle
+    let candidateSlug = parsed.slug;
+    const existing = await tx.query<{ id: string }>(
+      `SELECT id FROM public.courses WHERE circle_id = $1 AND slug = $2 LIMIT 1;`,
+      [parsed.circleId, candidateSlug]
     );
 
-    const course = res.rows[0];
+    if (existing.rows.length > 0) {
+      let counter = 2;
+      let isUnique = false;
+      const baseSlug = parsed.slug.slice(0, 110);
+      while (counter <= 50) {
+        const nextSlug = `${baseSlug}-${counter}`;
+        const check = await tx.query<{ id: string }>(
+          `SELECT id FROM public.courses WHERE circle_id = $1 AND slug = $2 LIMIT 1;`,
+          [parsed.circleId, nextSlug]
+        );
+        if (check.rows.length === 0) {
+          candidateSlug = nextSlug;
+          isUnique = true;
+          break;
+        }
+        counter++;
+      }
+      if (!isUnique) {
+        candidateSlug = `${baseSlug}-${crypto.randomBytes(3).toString('hex')}`;
+      }
+    }
+
+    const courseId = crypto.randomUUID();
+    let course: CourseItem;
+    try {
+      const res = await tx.query<CourseItem>(
+        `INSERT INTO public.courses (
+           id, circle_id, instructor_id, title, slug, description,
+           thumbnail_url, difficulty_level, estimated_duration_hours,
+           pacing_format, schedule_type, cohort_start_date, cohort_end_date,
+           require_sequential_completion, access_rule, min_level_required, status
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+         RETURNING *;`,
+        [
+          courseId,
+          parsed.circleId,
+          actorUserId,
+          parsed.title,
+          candidateSlug,
+          parsed.description,
+          parsed.thumbnailUrl || null,
+          parsed.difficultyLevel || null,
+          parsed.estimatedDurationHours,
+          parsed.pacingFormat,
+          parsed.scheduleType,
+          parsed.cohortStartDate ? new Date(parsed.cohortStartDate).toISOString() : null,
+          parsed.cohortEndDate ? new Date(parsed.cohortEndDate).toISOString() : null,
+          parsed.requireSequentialCompletion,
+          parsed.accessRule,
+          parsed.minLevelRequired,
+          parsed.status,
+        ]
+      );
+      course = res.rows[0];
+    } catch (insertErr) {
+      const errMsg = insertErr instanceof Error ? insertErr.message : String(insertErr);
+      const isUniqueErr =
+        errMsg.includes('courses_circle_id_slug_key') ||
+        (typeof insertErr === 'object' &&
+          insertErr !== null &&
+          'code' in insertErr &&
+          (insertErr as { code: unknown }).code === '23505');
+
+      if (isUniqueErr) {
+        const fallbackSlug = `${parsed.slug.slice(0, 110)}-${crypto.randomBytes(3).toString('hex')}`;
+        const fallbackRes = await tx.query<CourseItem>(
+          `INSERT INTO public.courses (
+             id, circle_id, instructor_id, title, slug, description,
+             thumbnail_url, difficulty_level, estimated_duration_hours,
+             pacing_format, schedule_type, cohort_start_date, cohort_end_date,
+             require_sequential_completion, access_rule, min_level_required, status
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+           RETURNING *;`,
+          [
+            courseId,
+            parsed.circleId,
+            actorUserId,
+            parsed.title,
+            fallbackSlug,
+            parsed.description,
+            parsed.thumbnailUrl || null,
+            parsed.difficultyLevel || null,
+            parsed.estimatedDurationHours,
+            parsed.pacingFormat,
+            parsed.scheduleType,
+            parsed.cohortStartDate ? new Date(parsed.cohortStartDate).toISOString() : null,
+            parsed.cohortEndDate ? new Date(parsed.cohortEndDate).toISOString() : null,
+            parsed.requireSequentialCompletion,
+            parsed.accessRule,
+            parsed.minLevelRequired,
+            parsed.status,
+          ]
+        );
+        course = fallbackRes.rows[0];
+      } else {
+        throw insertErr;
+      }
+    }
+
     if (!course) {
       throw new ValidationError('Failed to create course.');
     }
@@ -771,6 +850,18 @@ export async function updateCourse(
 
     if (!isStaff && course.instructor_id !== actorUserId) {
       throw new ForbiddenError('Only the course instructor or Circle staff can update this course.');
+    }
+
+    if (parsed.slug) {
+      const dupRes = await tx.query<{ id: string }>(
+        `SELECT id FROM public.courses WHERE circle_id = $1 AND slug = $2 AND id != $3 LIMIT 1;`,
+        [circleId, parsed.slug, courseId]
+      );
+      if (dupRes.rows.length > 0) {
+        throw new ConflictError(
+          `A course with slug "${parsed.slug}" already exists in this Circle. Please choose a different slug.`
+        );
+      }
     }
 
     const res = await tx.query<CourseItem>(
@@ -2546,6 +2637,15 @@ export async function createLearningPath(
   }
 ): Promise<LearningPathItem> {
   return withRlsTransaction(actorUserId, async (tx) => {
+    let candidateSlug = input.slug.trim().toLowerCase();
+    const existing = await tx.query<{ id: string }>(
+      `SELECT id FROM public.learning_paths WHERE circle_id = $1 AND slug = $2 LIMIT 1;`,
+      [circleId, candidateSlug]
+    );
+    if (existing.rows.length > 0) {
+      candidateSlug = `${candidateSlug.slice(0, 110)}-${crypto.randomBytes(3).toString('hex')}`;
+    }
+
     const id = crypto.randomUUID();
     const res = await tx.query<LearningPathItem>(
       `INSERT INTO public.learning_paths (
@@ -2557,7 +2657,7 @@ export async function createLearningPath(
         id,
         circleId,
         input.title.trim(),
-        input.slug.trim().toLowerCase(),
+        candidateSlug,
         input.description?.trim() || '',
         input.thumbnailUrl || null,
         input.difficultyLevel || 'all_levels',
@@ -2798,9 +2898,10 @@ export const createCoursePaywallSchema = z.object({
     .toUpperCase()
     .refine(
       (c) => isBachsSupportedCurrency(c),
-      'Currency must be an accepted Bachs currency (e.g. USD, NGN, GHS, KES, ZAR, EUR, GBP, CAD, USDT, USDC).'
+      'Currency must be an accepted currency (e.g. USD, EUR, GBP, NGN, GHS, KES, ZAR, CAD, USDT, USDC).'
     )
     .default('USD'),
+  currencyPrices: z.record(z.number().int().min(0)).optional(),
   billingType: z.enum(['one_time', 'recurring']).default('one_time'),
   intervalUnit: z.enum(['day', 'week', 'month', 'quarter', 'year']).nullable().optional(),
 });
@@ -2828,12 +2929,15 @@ export async function createCoursePaywall(
     const planId = crypto.randomUUID();
     const intervalUnit = parsed.billingType === 'recurring' ? (parsed.intervalUnit || 'month') : null;
     const planSlug = parsed.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') + '-' + Date.now().toString(36);
+    const planMetadata = {
+      currency_prices: parsed.currencyPrices || {},
+    };
 
-    const planRes = await tx.query<CoursePaywallPlan>(
-      `INSERT INTO public.pricing_plans (id, circle_id, slug, name, description, billing_type, amount_cents, currency, interval_unit, is_active, is_public)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, true)
-       RETURNING id, circle_id, slug, name, description, billing_type, amount_cents, currency, interval_unit, is_active;`,
-      [planId, circleId, planSlug, parsed.name, parsed.description, parsed.billingType, parsed.amountCents, parsed.currency, intervalUnit]
+    const planRes = await tx.query<CoursePaywallPlan & { metadata: Record<string, unknown> }>(
+      `INSERT INTO public.pricing_plans (id, circle_id, slug, name, description, billing_type, amount_cents, currency, interval_unit, is_active, is_public, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, true, $10::jsonb)
+       RETURNING id, circle_id, slug, name, description, billing_type, amount_cents, currency, interval_unit, is_active, metadata;`,
+      [planId, circleId, planSlug, parsed.name, parsed.description, parsed.billingType, parsed.amountCents, parsed.currency, intervalUnit, JSON.stringify(planMetadata)]
     );
 
     const entId = crypto.randomUUID();
@@ -2846,6 +2950,7 @@ export async function createCoursePaywall(
     return {
       ...planRes.rows[0],
       entitlement_id: entId,
+      currency_prices: parsed.currencyPrices || {},
     };
   });
 }

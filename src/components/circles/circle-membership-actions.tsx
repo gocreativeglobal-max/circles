@@ -2,7 +2,9 @@
 
 import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { UserPlus } from 'lucide-react';
 import { Circle } from '@/types/domain';
+import { InviteModal } from './invite-modal';
 
 interface CircleMembershipActionsProps {
   circle: Circle;
@@ -22,6 +24,7 @@ export function CircleMembershipActions({
   const [error, setError] = useState<string | null>(null);
   const [requestNote, setRequestNote] = useState('');
   const [showRequestForm, setShowRequestForm] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
 
   const isMember = circle.current_user_membership_status === 'active';
   const isPending = circle.current_user_join_request_status === 'pending';
@@ -71,6 +74,17 @@ export function CircleMembershipActions({
         {inviteToken && !isMember && (
           <button type="button" onClick={() => submit('accept_invite', { token: inviteToken })} disabled={loading} className={primaryBtn}>
             Accept invite
+          </button>
+        )}
+
+        {isMember && (
+          <button
+            type="button"
+            onClick={() => setShowInviteModal(true)}
+            className="flex items-center gap-1.5 rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm font-medium text-stone-700 shadow-2xs hover:bg-stone-50 hover:border-stone-300 transition-colors"
+          >
+            <UserPlus className="h-4 w-4 text-stone-500" />
+            <span>Invite</span>
           </button>
         )}
 
@@ -130,6 +144,17 @@ export function CircleMembershipActions({
           {error}
         </p>
       )}
+
+      <InviteModal
+        circle={circle}
+        isOpen={showInviteModal}
+        onClose={() => setShowInviteModal(false)}
+        isStaff={
+          circle.current_user_role === 'owner' ||
+          circle.current_user_role === 'admin' ||
+          circle.current_user_role === 'moderator'
+        }
+      />
     </div>
   );
 }

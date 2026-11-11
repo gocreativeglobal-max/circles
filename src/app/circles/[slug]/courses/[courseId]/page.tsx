@@ -12,8 +12,10 @@ export const dynamic = 'force-dynamic';
 
 export default async function CircleCourseDetailPage({
   params,
+  searchParams,
 }: {
   params: { slug: string; courseId: string };
+  searchParams?: { learn?: string; lessonId?: string };
 }) {
   const user = await getAuthenticatedUser();
   const circle = await getCircleBySlugOrId(user?.id ?? null, params.slug);
@@ -57,6 +59,8 @@ export default async function CircleCourseDetailPage({
     circle.current_user_role === 'admin' ||
     circle.current_user_role === 'moderator';
 
+  const shouldStartInClassroom = searchParams?.learn === 'true';
+
   return (
     <CoursePlayer
       circleId={circle.id}
@@ -64,6 +68,8 @@ export default async function CircleCourseDetailPage({
       initialCourse={JSON.parse(JSON.stringify(course))}
       isMember={isMember}
       isStaff={isStaff}
+      initialViewMode={shouldStartInClassroom ? 'classroom' : 'overview'}
+      initialLessonId={searchParams?.lessonId}
     />
   );
 }

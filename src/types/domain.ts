@@ -111,6 +111,30 @@ export interface CircleInvitation {
   inviter_name?: string;
 }
 
+export interface CircleInviteLink {
+  id: string;
+  circle_id: string;
+  created_by: string;
+  code: string;
+  role: Exclude<CircleRole, 'owner'>;
+  max_uses: number | null;
+  uses_count: number;
+  expires_at: string | null;
+  is_revoked: boolean;
+  created_at: string;
+  creator_name?: string;
+  circle_name?: string;
+  circle_slug?: string;
+}
+
+export interface CircleInviteLinkUse {
+  id: string;
+  invite_link_id: string;
+  user_id: string;
+  circle_id: string;
+  used_at: string;
+}
+
 export interface CapabilityDefinition {
   key: string;
   name: string;
@@ -1092,6 +1116,8 @@ export interface CoursePaywallPlan {
   interval_unit?: 'day' | 'week' | 'month' | 'quarter' | 'year' | null;
   is_active: boolean;
   entitlement_id?: string;
+  metadata?: Record<string, unknown>;
+  currency_prices?: Record<string, number>;
 }
 
 export interface CourseItem {
@@ -1120,6 +1146,8 @@ export interface CourseItem {
   created_at: string;
   updated_at: string;
   instructor?: Pick<UserProfile, 'id' | 'username' | 'display_name' | 'avatar_url'>;
+  instructor_avatar_url?: string | null;
+  instructor_display_name?: string | null;
   modules?: CourseModuleItem[];
   total_lessons_count?: number;
   completed_lessons_count?: number;

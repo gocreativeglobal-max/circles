@@ -113,7 +113,7 @@ export function CoursesCatalog({
         val
           .toLowerCase()
           .replace(/[^a-z0-9]+/g, '-')
-          .replace(/^-+/g, '')
+          .replace(/^-+|-+$/g, '')
       );
     }
   }
@@ -123,12 +123,17 @@ export function CoursesCatalog({
     setError(null);
     setLoading(true);
     try {
+      const cleanSlug = (slug.trim() || title.trim())
+        .toLowerCase()
+        .replace(/[^a-z0-9-]+/g, '-')
+        .replace(/^-+|-+$/g, '') || `course-${Date.now().toString(36)}`;
+
       const res = await fetch(`/api/circles/${circleId}/courses`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title,
-          slug,
+          title: title.trim(),
+          slug: cleanSlug,
           description,
           thumbnailUrl: thumbnailUrl.trim() || null,
           difficultyLevel: difficulty,

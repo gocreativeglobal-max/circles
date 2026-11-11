@@ -7,7 +7,10 @@ import {
   CircleRole,
   CircleSpace,
   CircleVisibility,
+  CourseItem,
+  FundraisingCampaignItem,
   JoinRequestStatus,
+  LearningResourceItem,
   MarketplaceListingItem,
   MembershipPolicy,
   MembershipStatus,
@@ -57,6 +60,30 @@ export type GlobalFeedItem =
       engagementScore: number;
       circle: FeedCircleContext;
       data: MarketplaceListingItem;
+    }
+  | {
+      id: string;
+      itemType: 'course';
+      timestamp: string;
+      engagementScore: number;
+      circle: FeedCircleContext;
+      data: CourseItem;
+    }
+  | {
+      id: string;
+      itemType: 'resource';
+      timestamp: string;
+      engagementScore: number;
+      circle: FeedCircleContext;
+      data: LearningResourceItem;
+    }
+  | {
+      id: string;
+      itemType: 'cause';
+      timestamp: string;
+      engagementScore: number;
+      circle: FeedCircleContext;
+      data: FundraisingCampaignItem;
     };
 
 export interface ComposerCircleOption {
@@ -395,6 +422,190 @@ export async function getGlobalFeedData(
       listingsRows = [];
     }
 
+    // 4. Fetch Courses across all readable Circles (public Circles + user's joined Circles)
+    type CourseFeedRow = CourseItem & {
+      instructor_username: string;
+      instructor_display_name: string;
+      instructor_avatar_url: string | null;
+      total_lessons_count: string;
+      circle_name: string;
+      circle_slug: string;
+      circle_description: string;
+      circle_category: CircleCategory;
+      circle_location: string | null;
+      circle_avatar_url: string | null;
+      circle_cover_url: string | null;
+      circle_visibility: CircleVisibility;
+      circle_membership_policy: MembershipPolicy;
+      circle_member_count: string;
+      viewer_role: CircleRole | null;
+      viewer_membership_status: MembershipStatus | null;
+      viewer_join_request_status: JoinRequestStatus | null;
+    };
+
+    let coursesRows: CourseFeedRow[] = [];
+    try {
+      const crsRes = await tx.query<CourseFeedRow>(
+        `SELECT c.*,
+           COALESCE(u.username, 'instructor') AS instructor_username,
+           COALESCE(u.display_name, 'Instructor') AS instructor_display_name,
+           u.avatar_url AS instructor_avatar_url,
+           (
+             SELECT COUNT(*)::text 
+             FROM public.course_lessons l 
+             WHERE l.course_id = c.id AND l.circle_id = c.circle_id AND l.status = 'published'
+           ) AS total_lessons_count,
+           circ.name AS circle_name,
+           circ.slug AS circle_slug,
+           circ.description AS circle_description,
+           circ.category AS circle_category,
+           circ.location AS circle_location,
+           circ.avatar_url AS circle_avatar_url,
+           circ.cover_url AS circle_cover_url,
+           circ.visibility AS circle_visibility,
+           circ.membership_policy AS circle_membership_policy,
+           (SELECT COUNT(*)::text FROM public.circle_memberships cm WHERE cm.circle_id = circ.id AND cm.status = 'active') AS circle_member_count,
+           (SELECT vm.role FROM public.circle_memberships vm WHERE vm.circle_id = circ.id AND vm.user_id = $1::uuid LIMIT 1) AS viewer_role,
+           (SELECT vm.status FROM public.circle_memberships vm WHERE vm.circle_id = circ.id AND vm.user_id = $1::uuid LIMIT 1) AS viewer_membership_status,
+           (SELECT jr.status FROM public.circle_join_requests jr WHERE jr.circle_id = circ.id AND jr.user_id = $1::uuid ORDER BY jr.created_at DESC LIMIT 1) AS viewer_join_request_status
+         FROM public.courses c
+         JOIN public.circles circ ON circ.id = c.circle_id
+         LEFT JOIN public.profiles u ON u.id = c.instructor_id
+         WHERE c.status = 'published'
+           AND circ.status = 'active'
+           AND (
+             circ.visibility = 'public'
+             OR ($1::uuid IS NOT NULL AND EXISTS (
+               SELECT 1 FROM public.circle_memberships m
+               WHERE m.circle_id = circ.id AND m.user_id = $1::uuid AND m.status = 'active'
+             ))
+           )
+         ORDER BY COALESCE(c.updated_at, c.created_at) DESC
+         LIMIT 25;`,
+        [actorUserId]
+      );
+      coursesRows = crsRes.rows;
+    } catch {
+      coursesRows = [];
+    }
+
+    // 5. Fetch Learning Resources across readable Circles
+    type ResourceFeedRow = LearningResourceItem & {
+      author_username: string;
+      author_display_name: string;
+      author_avatar_url: string | null;
+      circle_name: string;
+      circle_slug: string;
+      circle_description: string;
+      circle_category: CircleCategory;
+      circle_location: string | null;
+      circle_avatar_url: string | null;
+      circle_cover_url: string | null;
+      circle_visibility: CircleVisibility;
+      circle_membership_policy: MembershipPolicy;
+      circle_member_count: string;
+      viewer_role: CircleRole | null;
+      viewer_membership_status: MembershipStatus | null;
+      viewer_join_request_status: JoinRequestStatus | null;
+    };
+
+    let resourcesRows: ResourceFeedRow[] = [];
+    try {
+      const resRes = await tx.query<ResourceFeedRow>(
+        `SELECT r.*,
+           COALESCE(u.username, 'author') AS author_username,
+           COALESCE(u.display_name, 'Author') AS author_display_name,
+           u.avatar_url AS author_avatar_url,
+           circ.name AS circle_name,
+           circ.slug AS circle_slug,
+           circ.description AS circle_description,
+           circ.category AS circle_category,
+           circ.location AS circle_location,
+           circ.avatar_url AS circle_avatar_url,
+           circ.cover_url AS circle_cover_url,
+           circ.visibility AS circle_visibility,
+           circ.membership_policy AS circle_membership_policy,
+           (SELECT COUNT(*)::text FROM public.circle_memberships cm WHERE cm.circle_id = circ.id AND cm.status = 'active') AS circle_member_count,
+           (SELECT vm.role FROM public.circle_memberships vm WHERE vm.circle_id = circ.id AND vm.user_id = $1::uuid LIMIT 1) AS viewer_role,
+           (SELECT vm.status FROM public.circle_memberships vm WHERE vm.circle_id = circ.id AND vm.user_id = $1::uuid LIMIT 1) AS viewer_membership_status,
+           (SELECT jr.status FROM public.circle_join_requests jr WHERE jr.circle_id = circ.id AND jr.user_id = $1::uuid ORDER BY jr.created_at DESC LIMIT 1) AS viewer_join_request_status
+         FROM public.learning_resources_items r
+         JOIN public.circles circ ON circ.id = r.circle_id
+         LEFT JOIN public.profiles u ON u.id = r.author_id
+         WHERE r.status = 'published'
+           AND circ.status = 'active'
+           AND (
+             circ.visibility = 'public'
+             OR ($1::uuid IS NOT NULL AND EXISTS (
+               SELECT 1 FROM public.circle_memberships m
+               WHERE m.circle_id = circ.id AND m.user_id = $1::uuid AND m.status = 'active'
+             ))
+           )
+         ORDER BY COALESCE(r.updated_at, r.created_at) DESC
+         LIMIT 15;`,
+        [actorUserId]
+      );
+      resourcesRows = resRes.rows;
+    } catch {
+      resourcesRows = [];
+    }
+
+    // 6. Fetch Active Community Causes across readable Circles
+    type CauseFeedRow = FundraisingCampaignItem & {
+      circle_name: string;
+      circle_slug: string;
+      circle_description: string;
+      circle_category: CircleCategory;
+      circle_location: string | null;
+      circle_avatar_url: string | null;
+      circle_cover_url: string | null;
+      circle_visibility: CircleVisibility;
+      circle_membership_policy: MembershipPolicy;
+      circle_member_count: string;
+      viewer_role: CircleRole | null;
+      viewer_membership_status: MembershipStatus | null;
+      viewer_join_request_status: JoinRequestStatus | null;
+    };
+
+    let causesRows: CauseFeedRow[] = [];
+    try {
+      const causeRes = await tx.query<CauseFeedRow>(
+        `SELECT fc.*,
+           (SELECT COALESCE(SUM(p.pledge_amount), 0)::float FROM public.fundraising_pledges p WHERE p.campaign_id = fc.id) AS pledged_total,
+           (SELECT COUNT(*)::int FROM public.fundraising_pledges p WHERE p.campaign_id = fc.id) AS pledge_count,
+           circ.name AS circle_name,
+           circ.slug AS circle_slug,
+           circ.description AS circle_description,
+           circ.category AS circle_category,
+           circ.location AS circle_location,
+           circ.avatar_url AS circle_avatar_url,
+           circ.cover_url AS circle_cover_url,
+           circ.visibility AS circle_visibility,
+           circ.membership_policy AS circle_membership_policy,
+           (SELECT COUNT(*)::text FROM public.circle_memberships cm WHERE cm.circle_id = circ.id AND cm.status = 'active') AS circle_member_count,
+           (SELECT vm.role FROM public.circle_memberships vm WHERE vm.circle_id = circ.id AND vm.user_id = $1::uuid LIMIT 1) AS viewer_role,
+           (SELECT vm.status FROM public.circle_memberships vm WHERE vm.circle_id = circ.id AND vm.user_id = $1::uuid LIMIT 1) AS viewer_membership_status,
+           (SELECT jr.status FROM public.circle_join_requests jr WHERE jr.circle_id = circ.id AND jr.user_id = $1::uuid ORDER BY jr.created_at DESC LIMIT 1) AS viewer_join_request_status
+         FROM public.fundraising_campaigns fc
+         JOIN public.circles circ ON circ.id = fc.circle_id
+         WHERE fc.status = 'active'
+           AND circ.status = 'active'
+           AND (
+             circ.visibility = 'public'
+             OR ($1::uuid IS NOT NULL AND EXISTS (
+               SELECT 1 FROM public.circle_memberships m
+               WHERE m.circle_id = circ.id AND m.user_id = $1::uuid AND m.status = 'active'
+             ))
+           )
+         ORDER BY COALESCE(fc.updated_at, fc.created_at) DESC
+         LIMIT 15;`,
+        [actorUserId]
+      );
+      causesRows = causeRes.rows;
+    } catch {
+      causesRows = [];
+    }
+
     // Build unified GlobalFeedItem[]
     const items: GlobalFeedItem[] = [];
 
@@ -583,6 +794,123 @@ export async function getGlobalFeedData(
         engagementScore: 2,
         circle: circleCtx,
         data: listingItem,
+      });
+    }
+
+    // Add Courses to unified stream
+    for (const c of coursesRows) {
+      const circleCtx: FeedCircleContext = {
+        id: c.circle_id,
+        name: c.circle_name,
+        slug: c.circle_slug,
+        description: c.circle_description,
+        category: c.circle_category,
+        location: c.circle_location,
+        avatar_url: c.circle_avatar_url,
+        cover_url: c.circle_cover_url,
+        visibility: c.circle_visibility,
+        membership_policy: c.circle_membership_policy,
+        member_count: parseInt(c.circle_member_count ?? '1', 10),
+        viewer_role: c.viewer_role,
+        viewer_membership_status: c.viewer_membership_status,
+        viewer_join_request_status: c.viewer_join_request_status,
+      };
+
+      const courseItem: CourseItem = {
+        ...c,
+        estimated_duration_hours: Number(c.estimated_duration_hours ?? 0),
+        sort_order: Number(c.sort_order ?? 0),
+        total_lessons_count: parseInt(c.total_lessons_count || '0', 10),
+        instructor: {
+          id: c.instructor_id,
+          username: c.instructor_username,
+          display_name: c.instructor_display_name,
+          avatar_url: c.instructor_avatar_url,
+        },
+      };
+
+      items.push({
+        id: `course-${c.id}`,
+        itemType: 'course',
+        timestamp: c.updated_at || c.created_at,
+        engagementScore: (courseItem.total_lessons_count || 1) * 2 + 3,
+        circle: circleCtx,
+        data: courseItem,
+      });
+    }
+
+    // Add Learning Resources & Guides to unified stream
+    for (const r of resourcesRows) {
+      const circleCtx: FeedCircleContext = {
+        id: r.circle_id,
+        name: r.circle_name,
+        slug: r.circle_slug,
+        description: r.circle_description,
+        category: r.circle_category,
+        location: r.circle_location,
+        avatar_url: r.circle_avatar_url,
+        cover_url: r.circle_cover_url,
+        visibility: r.circle_visibility,
+        membership_policy: r.circle_membership_policy,
+        member_count: parseInt(r.circle_member_count ?? '1', 10),
+        viewer_role: r.viewer_role,
+        viewer_membership_status: r.viewer_membership_status,
+        viewer_join_request_status: r.viewer_join_request_status,
+      };
+
+      const resItem: LearningResourceItem = {
+        ...r,
+        author: {
+          id: r.author_id,
+          username: r.author_username,
+          display_name: r.author_display_name,
+          avatar_url: r.author_avatar_url,
+        },
+      };
+
+      items.push({
+        id: `resource-${r.id}`,
+        itemType: 'resource',
+        timestamp: r.updated_at || r.created_at,
+        engagementScore: 2,
+        circle: circleCtx,
+        data: resItem,
+      });
+    }
+
+    // Add Community Causes to unified stream
+    for (const fc of causesRows) {
+      const circleCtx: FeedCircleContext = {
+        id: fc.circle_id,
+        name: fc.circle_name,
+        slug: fc.circle_slug,
+        description: fc.circle_description,
+        category: fc.circle_category,
+        location: fc.circle_location,
+        avatar_url: fc.circle_avatar_url,
+        cover_url: fc.circle_cover_url,
+        visibility: fc.circle_visibility,
+        membership_policy: fc.circle_membership_policy,
+        member_count: parseInt(fc.circle_member_count ?? '1', 10),
+        viewer_role: fc.viewer_role,
+        viewer_membership_status: fc.viewer_membership_status,
+        viewer_join_request_status: fc.viewer_join_request_status,
+      };
+
+      const causeItem: FundraisingCampaignItem = {
+        ...fc,
+        goal_amount: Number(fc.goal_amount ?? 0),
+        pledged_total: Number(fc.pledged_total ?? 0),
+        pledge_count: Number(fc.pledge_count ?? 0),
+      };
+
+      items.push({
+        id: `cause-${fc.id}`,
+        itemType: 'cause',
+        timestamp: fc.updated_at || fc.created_at,
+        engagementScore: (causeItem.pledge_count || 1) * 2 + 3,
+        circle: circleCtx,
+        data: causeItem,
       });
     }
 

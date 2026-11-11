@@ -195,6 +195,30 @@ export function handleApiError(error: unknown): NextResponse {
     return NextResponse.json({ error: firstMsg, code: 'VALIDATION_ERROR' }, { status: 400 });
   }
 
+  // Handle PostgreSQL unique constraint violations (code 23505) gracefully
+  const errMsg = error instanceof Error ? error.message : String(error);
+  const errCode =
+    error && typeof error === 'object' && 'code' in error
+      ? String((error as { code: unknown }).code)
+      : '';
+
+  if (errCode === '23505' || errMsg.includes('violates unique constraint')) {
+    let friendlyMessage = 'A resource with this identifier or name already exists.';
+    if (errMsg.includes('courses_circle_id_slug_key')) {
+      friendlyMessage = 'A course with this title or URL slug already exists in this Circle.';
+    } else if (errMsg.includes('circle_spaces_circle_id_slug_key')) {
+      friendlyMessage = 'A space with this name or slug already exists in this Circle.';
+    } else if (errMsg.includes('circles_slug_key')) {
+      friendlyMessage = 'A Circle with this URL slug already exists. Please choose a different slug.';
+    } else if (errMsg.includes('learning_paths_circle_id_slug_key')) {
+      friendlyMessage = 'A learning path with this title or slug already exists in this Circle.';
+    } else if (errMsg.includes('circle_memberships_circle_id_user_id_key')) {
+      friendlyMessage = 'You already have an active membership in this Circle.';
+    }
+
+    return NextResponse.json({ error: friendlyMessage, code: 'CONFLICT' }, { status: 409 });
+  }
+
   logger.error('Unhandled API route error', {
     error: error instanceof Error ? error.message : String(error),
   });

@@ -34,7 +34,6 @@ import { generateAvailableSlots } from '@/features/marketplace/calendar-utils';
 import {
   BACHS_ACCEPTED_CURRENCIES,
   formatBachsAmount,
-  getBachsCurrency,
 } from '@/lib/payments/currencies';
 
 interface MarketplaceBoardProps {
@@ -1118,7 +1117,7 @@ export function MarketplaceBoard({
 
             <div>
               <label className="block text-xs font-medium text-stone-700 mb-1.5">
-                Payment method ({getBachsCurrency(checkoutListing.price_currency || 'USD').paymentMethodsDescription})
+                Payment method
               </label>
               <div className="grid grid-cols-2 gap-2">
                 {[
