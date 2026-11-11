@@ -46,17 +46,33 @@ export interface CourseLandingViewProps {
   onStartLearning: (initialLessonId?: string) => void;
   onOpenCheckout?: (plan?: CoursePaywallPlan) => void;
   onOpenSettings?: () => void;
+  onCourseUpdated?: (course: CourseItem) => void;
+}
+
+function getDifficultyLabel(level?: string | null): string {
+  switch (level) {
+    case 'beginner':
+      return 'Beginner';
+    case 'intermediate':
+      return 'Intermediate';
+    case 'advanced':
+      return 'Advanced';
+    case 'all_levels':
+    default:
+      return 'All Levels';
+  }
 }
 
 export function CourseLandingView({
   circleId: _circleId,
   circleSlug,
   course,
-  isMember: _isMember,
+  isMember,
   isStaff,
   onStartLearning,
   onOpenCheckout,
   onOpenSettings,
+  onCourseUpdated,
 }: CourseLandingViewProps) {
   // Curriculum Accordion State: all section IDs expanded by default
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>(() => {
@@ -72,6 +88,12 @@ export function CourseLandingView({
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [previewVideoUrl, setPreviewVideoUrl] = useState<string | null>(null);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+
+  // Review submission state
+  const [selectedRating, setSelectedRating] = useState<number>(course.user_review?.rating || 5);
+  const [reviewText, setReviewText] = useState<string>(course.user_review?.review_text || '');
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+  const [reviewMsg, setReviewMsg] = useState<string | null>(null);
 
   // Flatten all lessons
   const allLessons = useMemo(() => {
@@ -158,6 +180,42 @@ export function CourseLandingView({
     }
   }
 
+  async function handleSubmitReview() {
+    setIsSubmittingReview(true);
+    setReviewMsg(null);
+    try {
+      const res = await fetch(`/api/circles/${_circleId}/courses`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'submit_review',
+          courseId: course.id,
+          rating: selectedRating,
+          reviewText: reviewText.trim() || undefined,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to submit review.');
+      setReviewMsg('Thank you! Your review has been saved.');
+      if (onCourseUpdated && data.review) {
+        const existing = (course.reviews || []).filter((r) => r.user_id !== data.review.user_id);
+        const updated = [data.review, ...existing];
+        const avg = Math.round((updated.reduce((s, r) => s + r.rating, 0) / updated.length) * 10) / 10;
+        onCourseUpdated({
+          ...course,
+          average_rating: avg,
+          ratings_count: updated.length,
+          reviews: updated,
+          user_review: data.review,
+        });
+      }
+    } catch (err) {
+      setReviewMsg(err instanceof Error ? err.message : 'Error submitting review');
+    } finally {
+      setIsSubmittingReview(false);
+    }
+  }
+
   function handleOpenPreview(videoUrl?: string | null) {
     const url = videoUrl || previewLesson?.video_url;
     if (url) {
@@ -188,7 +246,7 @@ export function CourseLandingView({
                   Courses
                 </Link>
                 <span>/</span>
-                <span className="capitalize">{course.difficulty_level ? course.difficulty_level.replace('_', ' ') : 'All Levels'}</span>
+                <span>{getDifficultyLabel(course.difficulty_level)}</span>
                 <span>/</span>
                 <span className="text-stone-300 font-bold truncate max-w-xs">{course.title}</span>
               </nav>
@@ -209,23 +267,35 @@ export function CourseLandingView({
 
               {/* Badges, Rating & Meta Row */}
               <div className="flex flex-wrap items-center gap-y-2 gap-x-4 text-xs">
-                {/* Community Top Rated Badge */}
-                <div className="flex items-center gap-1.5 rounded-md bg-amber-400/10 border border-amber-400/30 px-2.5 py-1 text-amber-300 font-bold">
-                  <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                  <span>4.9</span>
-                  <span className="text-amber-400/70 font-normal">({totalLessons * 12 + 18} ratings)</span>
-                </div>
+                {/* Real Rating Badge */}
+                {course.ratings_count && course.ratings_count > 0 ? (
+                  <div className="flex items-center gap-1.5 rounded-md bg-amber-400/10 border border-amber-400/30 px-2.5 py-1 text-amber-300 font-bold">
+                    <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                    <span>{course.average_rating?.toFixed(1) || '0.0'}</span>
+                    <span className="text-amber-400/70 font-normal">
+                      ({course.ratings_count} {course.ratings_count === 1 ? 'rating' : 'ratings'})
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 rounded-md bg-stone-900 border border-stone-800 px-2.5 py-1 text-stone-300 font-medium">
+                    <Star className="h-3.5 w-3.5 text-stone-500" />
+                    <span>Not yet rated</span>
+                  </div>
+                )}
 
-                {/* Enrolled Students */}
+                {/* Real Enrolled Students */}
                 <div className="flex items-center gap-1 text-stone-300">
                   <Users className="h-3.5 w-3.5 text-stone-400" />
-                  <span>{course.enrolled_students_count || (totalLessons * 7 + 42)} students enrolled</span>
+                  <span>
+                    {(course.enrolled_students_count || 0).toLocaleString()}{' '}
+                    {(course.enrolled_students_count || 0) === 1 ? 'student' : 'students'} enrolled
+                  </span>
                 </div>
 
                 {/* Difficulty */}
-                <div className="flex items-center gap-1 text-stone-300 capitalize">
+                <div className="flex items-center gap-1 text-stone-300">
                   <GraduationCap className="h-3.5 w-3.5 text-stone-400" />
-                  <span>{course.difficulty_level ? course.difficulty_level.replace('_', ' ') : 'All Levels'}</span>
+                  <span>{getDifficultyLabel(course.difficulty_level)}</span>
                 </div>
               </div>
 
@@ -567,7 +637,11 @@ export function CourseLandingView({
                     <div className="flex flex-wrap items-center gap-4 text-xs text-stone-600 pt-1">
                       <div className="flex items-center gap-1">
                         <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
-                        <span>4.9 Instructor Rating</span>
+                        <span>
+                          {course.instructor_ratings_count && course.instructor_ratings_count > 0
+                            ? `${course.instructor_average_rating?.toFixed(1)} Instructor Rating`
+                            : 'Course Instructor'}
+                        </span>
                       </div>
                       <div className="flex items-center gap-1">
                         <Award className="h-3.5 w-3.5 text-stone-500" />
@@ -581,6 +655,152 @@ export function CourseLandingView({
                   Passionate educator and practitioner creating structured learning experiences. Dedicated to providing clear explanations, production patterns, and continuous curriculum updates.
                 </p>
               </div>
+            </section>
+
+            {/* -------------------------------------------------------------- */}
+            {/* F. STUDENT FEEDBACK & REVIEWS                                  */}
+            {/* -------------------------------------------------------------- */}
+            <section className="space-y-6 border-t border-stone-200/80 pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-stone-900">Student Feedback & Reviews</h2>
+                  <p className="text-xs text-stone-500">
+                    Real reviews and ratings from verified enrolled learners.
+                  </p>
+                </div>
+                {course.ratings_count && course.ratings_count > 0 ? (
+                  <div className="flex items-center gap-2 bg-stone-100 rounded-xl px-3 py-1.5 border border-stone-200">
+                    <Star className="h-4 w-4 fill-amber-400 text-amber-400" />
+                    <span className="text-base font-extrabold text-stone-900">
+                      {course.average_rating?.toFixed(1)}
+                    </span>
+                    <span className="text-xs text-stone-500">
+                      ({course.ratings_count} {course.ratings_count === 1 ? 'review' : 'reviews'})
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Review Submission Form for Enrolled or Active Members */}
+              {(isEnrolled || isMember || isStaff) && (
+                <div className="rounded-2xl border border-stone-200/90 bg-white p-5 shadow-xs space-y-4">
+                  <h3 className="text-sm font-bold text-stone-900">
+                    {course.user_review ? 'Update your rating & review' : 'Leave a review for this course'}
+                  </h3>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-1.5">
+                      {[1, 2, 3, 4, 5].map((star) => (
+                        <button
+                          key={star}
+                          type="button"
+                          onClick={() => setSelectedRating(star)}
+                          className="p-1 text-stone-300 hover:text-amber-400 transition-colors focus:outline-hidden"
+                          title={`${star} star${star > 1 ? 's' : ''}`}
+                        >
+                          <Star
+                            className={`h-6 w-6 transition-transform hover:scale-110 ${
+                              star <= selectedRating ? 'fill-amber-400 text-amber-400' : 'text-stone-300'
+                            }`}
+                          />
+                        </button>
+                      ))}
+                      <span className="text-xs font-semibold text-stone-600 ml-2">
+                        {selectedRating} out of 5 stars
+                      </span>
+                    </div>
+
+                    <textarea
+                      value={reviewText}
+                      onChange={(e) => setReviewText(e.target.value)}
+                      placeholder="Share what you liked about this course or how it helped you..."
+                      rows={3}
+                      className="w-full rounded-xl border border-stone-200 px-3.5 py-2.5 text-xs text-stone-900 placeholder:text-stone-400 focus:border-stone-900 focus:outline-hidden resize-none bg-stone-50/50"
+                    />
+
+                    {reviewMsg && (
+                      <p className="text-xs font-medium text-emerald-600">{reviewMsg}</p>
+                    )}
+
+                    <div className="flex justify-end">
+                      <Button
+                        type="button"
+                        size="sm"
+                        disabled={isSubmittingReview}
+                        onClick={handleSubmitReview}
+                        className="bg-black hover:bg-stone-800 text-white text-xs font-bold px-4 py-2 rounded-xl"
+                      >
+                        {isSubmittingReview ? 'Submitting...' : course.user_review ? 'Update Review' : 'Submit Review'}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Reviews List */}
+              {course.reviews && course.reviews.length > 0 ? (
+                <div className="space-y-3">
+                  {course.reviews.map((rev) => (
+                    <div
+                      key={rev.id}
+                      className="rounded-2xl border border-stone-200/80 bg-white p-4 shadow-2xs space-y-2"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <div className="h-8 w-8 rounded-full bg-stone-900 flex items-center justify-center text-white text-xs font-bold overflow-hidden">
+                            {rev.user?.avatar_url ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={rev.user.avatar_url}
+                                alt={rev.user.display_name}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              rev.user?.display_name?.slice(0, 1).toUpperCase() || 'U'
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-stone-900">
+                              {rev.user?.display_name || 'Anonymous Student'}
+                            </p>
+                            <p className="text-[10px] text-stone-400">
+                              {new Date(rev.created_at).toLocaleDateString(undefined, {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                              })}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-0.5">
+                          {[1, 2, 3, 4, 5].map((s) => (
+                            <Star
+                              key={s}
+                              className={`h-3.5 w-3.5 ${
+                                s <= rev.rating ? 'fill-amber-400 text-amber-400' : 'text-stone-200'
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+
+                      {rev.review_text && (
+                        <p className="text-xs text-stone-700 leading-relaxed pl-10">
+                          {rev.review_text}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-dashed border-stone-200 p-6 text-center space-y-1">
+                  <p className="text-xs font-semibold text-stone-600">No student reviews yet</p>
+                  <p className="text-[11px] text-stone-400">
+                    Be the first learner to leave a rating and review for this course!
+                  </p>
+                </div>
+              )}
             </section>
           </div>
 

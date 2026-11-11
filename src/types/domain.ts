@@ -1157,10 +1157,28 @@ export interface CourseItem {
   in_progress_students_count?: number;
   completed_students_count?: number;
   completion_rate_percentage?: number;
+  average_rating?: number;
+  ratings_count?: number;
+  reviews?: CourseReviewItem[];
+  user_review?: CourseReviewItem | null;
+  instructor_average_rating?: number;
+  instructor_ratings_count?: number;
   learning_objectives?: string[];
   published_version?: number;
   validation_issues?: string[];
   prerequisites?: CoursePrerequisiteItem[];
+}
+
+export interface CourseReviewItem {
+  id: string;
+  circle_id: string;
+  course_id: string;
+  user_id: string;
+  rating: number;
+  review_text?: string | null;
+  created_at: string;
+  updated_at: string;
+  user?: Pick<UserProfile, 'id' | 'username' | 'display_name' | 'avatar_url'>;
 }
 
 export interface CourseLessonCompletionItem {

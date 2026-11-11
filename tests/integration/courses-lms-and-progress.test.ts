@@ -10,6 +10,7 @@ import {
   createLesson,
   createLessonComment,
   createModule,
+  deleteCourseReview,
   enrollInCourse,
   getCircleLeaderboard,
   getCourseWithCurriculum,
@@ -18,6 +19,7 @@ import {
   listLessonComments,
   reviewAssignmentSubmission,
   submitAssignment,
+  submitCourseReview,
   toggleLessonCompletion,
   updateCourse,
 } from '@/features/courses/service';
@@ -603,5 +605,122 @@ describe('Courses, LMS Curriculum & Student Learning Progress Integration Suite'
         slug: 'mastering-nextjs',
       })
     ).rejects.toThrow(ConflictError);
+  });
+
+  it('manages authentic course reviews, calculates real average ratings, and reports real enrollment count', async () => {
+    const suffix = Date.now() + 2;
+    const instructor = (
+      await registerUser({
+        email: `rev-inst-${suffix}@example.com`,
+        username: `rev_inst_${suffix}`,
+        displayName: 'Review Instructor',
+        password: 'Password123!',
+      })
+    ).user;
+
+    const student1 = (
+      await registerUser({
+        email: `rev-stud1-${suffix}@example.com`,
+        username: `rev_stud1_${suffix}`,
+        displayName: 'Student One',
+        password: 'Password123!',
+      })
+    ).user;
+
+    const student2 = (
+      await registerUser({
+        email: `rev-stud2-${suffix}@example.com`,
+        username: `rev_stud2_${suffix}`,
+        displayName: 'Student Two',
+        password: 'Password123!',
+      })
+    ).user;
+
+    const outsider = (
+      await registerUser({
+        email: `rev-out-${suffix}@example.com`,
+        username: `rev_out_${suffix}`,
+        displayName: 'Unenrolled Outsider',
+        password: 'Password123!',
+      })
+    ).user;
+
+    const circle = await createCircle(instructor.id, {
+      name: `Review Academy ${suffix}`,
+      slug: `review-academy-${suffix}`,
+      visibility: 'public',
+    });
+
+    await updateCircleCapability(instructor.id, circle.id, 'spaces', true);
+    await updateCircleCapability(instructor.id, circle.id, 'learning_resources', true);
+
+    await joinPublicCircle(student1.id, circle.id);
+    await joinPublicCircle(student2.id, circle.id);
+
+    const course = await createCourse(instructor.id, {
+      circleId: circle.id,
+      title: 'Fullstack Next.js Production Patterns',
+      slug: 'fullstack-nextjs-production-patterns',
+      description: 'Comprehensive guide to building production SaaS.',
+      difficultyLevel: 'all_levels',
+    });
+
+    // Before any enrollments or reviews: real count is 0, rating is null / 0
+    const initialCourseView = await getCourseWithCurriculum(student1.id, circle.id, course.id);
+    expect(initialCourseView.enrolled_students_count).toBe(0);
+    expect(initialCourseView.ratings_count).toBe(0);
+    expect(initialCourseView.average_rating).toBe(0);
+    expect(initialCourseView.difficulty_level).toBe('all_levels');
+
+    // Both students enroll
+    await enrollInCourse(student1.id, circle.id, course.id);
+    await enrollInCourse(student2.id, circle.id, course.id);
+
+    // Enrolled count is now 2
+    const enrolledView = await getCourseWithCurriculum(student1.id, circle.id, course.id);
+    expect(enrolledView.enrolled_students_count).toBe(2);
+
+    // Outsider (not member of private circle nor enrolled) cannot review if circle is private
+    // But since circle is public, let's test outsider without membership in another private circle or test submit
+    const review1 = await submitCourseReview(student1.id, circle.id, {
+      courseId: course.id,
+      rating: 5,
+      reviewText: 'Outstanding course! Everything was practical and clearly explained.',
+    });
+    expect(review1.rating).toBe(5);
+    expect(review1.user.display_name).toBe('Student One');
+
+    const review2 = await submitCourseReview(student2.id, circle.id, {
+      courseId: course.id,
+      rating: 4,
+      reviewText: 'Very solid curriculum, would recommend.',
+    });
+    expect(review2.rating).toBe(4);
+
+    // View course curriculum as student1 -> calculates real average (5 + 4) / 2 = 4.5
+    const reviewedCourseView = await getCourseWithCurriculum(student1.id, circle.id, course.id);
+    expect(reviewedCourseView.ratings_count).toBe(2);
+    expect(reviewedCourseView.average_rating).toBe(4.5);
+    expect(reviewedCourseView.instructor_ratings_count).toBe(2);
+    expect(reviewedCourseView.instructor_average_rating).toBe(4.5);
+    expect(reviewedCourseView.user_review?.rating).toBe(5);
+    expect(reviewedCourseView.reviews?.length).toBe(2);
+
+    // Student1 updates their review to 4
+    await submitCourseReview(student1.id, circle.id, {
+      courseId: course.id,
+      rating: 4,
+      reviewText: 'Updated review: Still great!',
+    });
+
+    const updatedCourseView = await getCourseWithCurriculum(student1.id, circle.id, course.id);
+    expect(updatedCourseView.ratings_count).toBe(2);
+    expect(updatedCourseView.average_rating).toBe(4.0);
+
+    // Student2 deletes their review
+    await deleteCourseReview(student2.id, circle.id, review2.id);
+    const afterDeleteView = await getCourseWithCurriculum(student1.id, circle.id, course.id);
+    expect(afterDeleteView.ratings_count).toBe(1);
+    expect(afterDeleteView.average_rating).toBe(4.0);
   });
 });

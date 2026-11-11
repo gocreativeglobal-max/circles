@@ -28,6 +28,7 @@ import {
   LearningPathCourseItem,
   CoursePrerequisiteItem,
   CoursePaywallPlan,
+  CourseReviewItem,
   LearningPathEnrollmentItem,
 } from '@/types/domain';
 import {
@@ -614,32 +615,121 @@ export async function getCourseWithCurriculum(
     let completedStudentsCount = 0;
     let completionRatePercentage = 0;
 
-    if (isStaff) {
-      const enrollStatsRes = await tx.query<{ student_id: string }>(
-        `SELECT student_id FROM public.course_enrollments WHERE course_id = $1 AND circle_id = $2;`,
+    try {
+      const countRes = await tx.query<{ count: string | number }>(
+        `SELECT public.get_course_enrolled_count($1, $2) as count;`,
         [course.id, circleId]
       );
-      enrolledStudentsCount = enrollStatsRes.rows.length;
+      enrolledStudentsCount = Number(countRes.rows[0]?.count || 0);
+    } catch {
+      // Fallback if function not yet applied
+    }
 
-      if (enrolledStudentsCount > 0 && totalLessons > 0) {
-        const compGroupRes = await tx.query<{ user_id: string; comp_count: string }>(
-          `SELECT user_id, COUNT(DISTINCT lesson_id)::text AS comp_count
-           FROM public.course_lesson_completions
-           WHERE course_id = $1 AND circle_id = $2
-           GROUP BY user_id;`,
-          [course.id, circleId]
-        );
-        const compByUser = new Map(compGroupRes.rows.map((r) => [r.user_id, parseInt(r.comp_count, 10)]));
-        for (const row of enrollStatsRes.rows) {
-          const count = compByUser.get(row.student_id) || 0;
-          if (count >= totalLessons) {
-            completedStudentsCount++;
-          } else if (count > 0) {
-            inProgressStudentsCount++;
-          }
+    const enrollStatsRes = await tx.query<{ student_id: string }>(
+      `SELECT student_id FROM public.course_enrollments WHERE course_id = $1 AND circle_id = $2;`,
+      [course.id, circleId]
+    );
+    enrolledStudentsCount = Math.max(enrolledStudentsCount, enrollStatsRes.rows.length);
+
+    if (enrolledStudentsCount > 0 && totalLessons > 0) {
+      const compGroupRes = await tx.query<{ user_id: string; comp_count: string }>(
+        `SELECT user_id, COUNT(DISTINCT lesson_id)::text AS comp_count
+         FROM public.course_lesson_completions
+         WHERE course_id = $1 AND circle_id = $2
+         GROUP BY user_id;`,
+        [course.id, circleId]
+      );
+      const compByUser = new Map(compGroupRes.rows.map((r) => [r.user_id, parseInt(r.comp_count, 10)]));
+      for (const row of enrollStatsRes.rows) {
+        const count = compByUser.get(row.student_id) || 0;
+        if (count >= totalLessons) {
+          completedStudentsCount++;
+        } else if (count > 0) {
+          inProgressStudentsCount++;
         }
-        completionRatePercentage = Math.round((completedStudentsCount / enrolledStudentsCount) * 100);
       }
+      completionRatePercentage = Math.round((completedStudentsCount / enrolledStudentsCount) * 100);
+    }
+
+    // Real Course Ratings & Reviews from public.course_reviews
+    let averageRating = 0;
+    let ratingsCount = 0;
+    let reviewsList: CourseReviewItem[] = [];
+    let userReview: CourseReviewItem | null = null;
+
+    try {
+      const ratingStatsRes = await tx.query<{ avg_rating: string; count: string }>(
+        `SELECT COALESCE(ROUND(AVG(rating)::numeric, 1), 0)::text as avg_rating, COUNT(*)::text as count
+         FROM public.course_reviews WHERE course_id = $1 AND circle_id = $2;`,
+        [course.id, circleId]
+      );
+      averageRating = parseFloat(ratingStatsRes.rows[0]?.avg_rating || '0');
+      ratingsCount = parseInt(ratingStatsRes.rows[0]?.count || '0', 10);
+
+      const reviewsRes = await tx.query<{
+        id: string;
+        circle_id: string;
+        course_id: string;
+        user_id: string;
+        rating: number;
+        review_text: string | null;
+        created_at: string;
+        updated_at: string;
+        author_username: string;
+        author_display_name: string;
+        author_avatar_url: string | null;
+      }>(
+        `SELECT r.*,
+                COALESCE(p.username, 'student') as author_username,
+                COALESCE(p.display_name, 'Student') as author_display_name,
+                p.avatar_url as author_avatar_url
+         FROM public.course_reviews r
+         JOIN public.profiles p ON p.id = r.user_id
+         WHERE r.course_id = $1 AND r.circle_id = $2
+         ORDER BY r.created_at DESC
+         LIMIT 20;`,
+        [course.id, circleId]
+      );
+
+      reviewsList = reviewsRes.rows.map((r) => ({
+        id: r.id,
+        circle_id: r.circle_id,
+        course_id: r.course_id,
+        user_id: r.user_id,
+        rating: r.rating,
+        review_text: r.review_text,
+        created_at: r.created_at,
+        updated_at: r.updated_at,
+        user: {
+          id: r.user_id,
+          username: r.author_username,
+          display_name: r.author_display_name,
+          avatar_url: r.author_avatar_url,
+        },
+      }));
+
+      if (actorUserId) {
+        userReview = reviewsList.find((r) => r.user_id === actorUserId) || null;
+      }
+    } catch {
+      // Table may be pending in transient contexts
+    }
+
+    // Instructor Aggregate Ratings across all courses in Circle
+    let instructorAvgRating = 0;
+    let instructorRatingsCount = 0;
+    try {
+      const instRatingRes = await tx.query<{ avg_rating: string; count: string }>(
+        `SELECT COALESCE(ROUND(AVG(r.rating)::numeric, 1), 0)::text as avg_rating, COUNT(r.*)::text as count
+         FROM public.course_reviews r
+         JOIN public.courses c ON c.id = r.course_id
+         WHERE c.instructor_id = $1 AND r.circle_id = $2;`,
+        [course.instructor_id, circleId]
+      );
+      instructorAvgRating = parseFloat(instRatingRes.rows[0]?.avg_rating || '0');
+      instructorRatingsCount = parseInt(instRatingRes.rows[0]?.count || '0', 10);
+    } catch {
+      // Table may be pending
     }
 
     return {
@@ -667,6 +757,12 @@ export async function getCourseWithCurriculum(
       in_progress_students_count: inProgressStudentsCount,
       completed_students_count: completedStudentsCount,
       completion_rate_percentage: completionRatePercentage,
+      average_rating: averageRating,
+      ratings_count: ratingsCount,
+      reviews: reviewsList,
+      user_review: userReview,
+      instructor_average_rating: instructorAvgRating,
+      instructor_ratings_count: instructorRatingsCount,
       paywall_plans: paywallPlansRes.rows.map((plan) => ({
         ...plan,
         currency_prices: (plan.metadata?.currency_prices as Record<string, number>) || {},
@@ -3130,5 +3226,102 @@ export async function purchaseCoursePaywall(
       checkoutUrl: session.checkoutUrl,
       isFree: false,
     };
+  });
+}
+
+export const submitCourseReviewSchema = z.object({
+  courseId: z.string().uuid(),
+  rating: z.number().int().min(1).max(5),
+  reviewText: z.string().max(3000).optional(),
+});
+
+/**
+ * Submits or updates a real 1-5 star review and feedback for a course.
+ */
+export async function submitCourseReview(
+  actorUserId: string,
+  circleId: string,
+  input: z.input<typeof submitCourseReviewSchema>
+): Promise<CourseReviewItem> {
+  const parsed = submitCourseReviewSchema.parse(input);
+  return withRlsTransaction(actorUserId, async (tx) => {
+    const memRes = await tx.query<{ status: string }>(
+      `SELECT status FROM public.circle_memberships WHERE circle_id = $1 AND user_id = $2 LIMIT 1;`,
+      [circleId, actorUserId]
+    );
+    const isMember = memRes.rows[0]?.status === 'active';
+    if (!isMember) {
+      const enrollRes = await tx.query<{ id: string }>(
+        `SELECT id FROM public.course_enrollments WHERE course_id = $1 AND student_id = $2 LIMIT 1;`,
+        [parsed.courseId, actorUserId]
+      );
+      if (enrollRes.rows.length === 0) {
+        throw new ForbiddenError('Only community members or enrolled students can review this course.');
+      }
+    }
+
+    const reviewId = crypto.randomUUID();
+    const res = await tx.query<CourseReviewItem>(
+      `INSERT INTO public.course_reviews (
+         id, circle_id, course_id, user_id, rating, review_text, created_at, updated_at
+       ) VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+       ON CONFLICT (course_id, user_id)
+       DO UPDATE SET
+         rating = EXCLUDED.rating,
+         review_text = EXCLUDED.review_text,
+         updated_at = NOW()
+       RETURNING *;`,
+      [reviewId, circleId, parsed.courseId, actorUserId, parsed.rating, parsed.reviewText?.trim() || null]
+    );
+
+    const profRes = await tx.query<{ username: string; display_name: string; avatar_url: string | null }>(
+      `SELECT username, display_name, avatar_url FROM public.profiles WHERE id = $1 LIMIT 1;`,
+      [actorUserId]
+    );
+    const p = profRes.rows[0];
+
+    return {
+      ...res.rows[0],
+      user: {
+        id: actorUserId,
+        username: p?.username || 'student',
+        display_name: p?.display_name || 'Student',
+        avatar_url: p?.avatar_url || null,
+      },
+    };
+  });
+}
+
+/**
+ * Deletes a course review. Allowed for review author or circle staff.
+ */
+export async function deleteCourseReview(
+  actorUserId: string,
+  circleId: string,
+  reviewId: string
+): Promise<{ success: boolean }> {
+  return withRlsTransaction(actorUserId, async (tx) => {
+    const revRes = await tx.query<{ user_id: string }>(
+      `SELECT user_id FROM public.course_reviews WHERE id = $1 AND circle_id = $2 LIMIT 1;`,
+      [reviewId, circleId]
+    );
+    if (revRes.rows.length === 0) {
+      throw new NotFoundError('Review not found.');
+    }
+
+    const isAuthor = revRes.rows[0].user_id === actorUserId;
+    if (!isAuthor) {
+      const memRes = await tx.query<{ role: string }>(
+        `SELECT role FROM public.circle_memberships WHERE circle_id = $1 AND user_id = $2 AND status = 'active' LIMIT 1;`,
+        [circleId, actorUserId]
+      );
+      const role = memRes.rows[0]?.role;
+      if (role !== 'owner' && role !== 'admin' && role !== 'moderator') {
+        throw new ForbiddenError('Only the author or circle staff can delete this review.');
+      }
+    }
+
+    await tx.query(`DELETE FROM public.course_reviews WHERE id = $1 AND circle_id = $2;`, [reviewId, circleId]);
+    return { success: true };
   });
 }

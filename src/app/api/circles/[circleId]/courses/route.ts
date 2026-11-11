@@ -36,6 +36,8 @@ import {
   addCourseToLearningPath,
   addCoursePrerequisite,
   evaluateCoursePrerequisites,
+  submitCourseReview,
+  deleteCourseReview,
 } from '@/features/courses/service';
 import { handleApiError, resolveApiUser } from '@/lib/auth/api-helpers';
 import { UnauthorizedError, ValidationError } from '@/lib/errors';
@@ -294,6 +296,23 @@ export async function POST(
     if (body.action === 'add_prerequisite') {
       const prereq = await addCoursePrerequisite(user.id, params.circleId, body);
       return NextResponse.json({ prerequisite: prereq }, { status: 201 });
+    }
+
+    if (body.action === 'submit_review') {
+      if (!body.courseId) throw new ValidationError('courseId is required.');
+      if (!body.rating) throw new ValidationError('rating is required.');
+      const review = await submitCourseReview(user.id, params.circleId, {
+        courseId: body.courseId,
+        rating: Number(body.rating),
+        reviewText: body.reviewText,
+      });
+      return NextResponse.json({ review }, { status: 201 });
+    }
+
+    if (body.action === 'delete_review') {
+      if (!body.reviewId) throw new ValidationError('reviewId is required.');
+      const result = await deleteCourseReview(user.id, params.circleId, body.reviewId);
+      return NextResponse.json(result);
     }
 
     const course = await createCourse(user.id, {

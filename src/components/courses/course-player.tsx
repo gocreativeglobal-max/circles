@@ -1045,6 +1045,7 @@ export function CoursePlayer({
             setShowCheckoutModal(true);
           }}
           onOpenSettings={() => setShowCourseSettings(true)}
+          onCourseUpdated={(updated) => setCourse(updated)}
         />
       ) : (
         <div className="space-y-6">
