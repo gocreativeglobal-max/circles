@@ -28,6 +28,9 @@ import {
   X,
   CreditCard,
   Settings,
+  Video,
+  Target,
+  ExternalLink,
 } from 'lucide-react';
 import {
   CourseItem,
@@ -267,6 +270,34 @@ export function CourseLandingView({
 
               {/* Badges, Rating & Meta Row */}
               <div className="flex flex-wrap items-center gap-y-2 gap-x-4 text-xs">
+                {/* Delivery Format Badge */}
+                {course.course_format === 'live_cohort' ? (
+                  <div className="flex items-center gap-1.5 rounded-md bg-blue-500/20 border border-blue-400/40 px-2.5 py-1 text-blue-300 font-bold">
+                    <span className="h-2 w-2 rounded-full bg-blue-400 animate-pulse" />
+                    <span>LIVE COHORT</span>
+                    {course.cohort_start_date && (
+                      <span className="text-blue-300/80 font-normal">
+                        · Starts {new Date(course.cohort_start_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                      </span>
+                    )}
+                  </div>
+                ) : course.course_format === 'text_and_labs' ? (
+                  <div className="flex items-center gap-1.5 rounded-md bg-emerald-500/20 border border-emerald-400/40 px-2.5 py-1 text-emerald-300 font-bold">
+                    <BookOpen className="h-3.5 w-3.5 text-emerald-400" />
+                    <span>TEXT & LABS</span>
+                  </div>
+                ) : course.course_format === 'action_challenge' ? (
+                  <div className="flex items-center gap-1.5 rounded-md bg-purple-500/20 border border-purple-400/40 px-2.5 py-1 text-purple-300 font-bold">
+                    <Target className="h-3.5 w-3.5 text-purple-400" />
+                    <span>{course.challenge_duration_days || 30}-DAY ACTION SPRINT</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 rounded-md bg-amber-500/10 border border-amber-400/30 px-2.5 py-1 text-amber-300 font-bold">
+                    <Play className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                    <span>ON-DEMAND VIDEO</span>
+                  </div>
+                )}
+
                 {/* Real Rating Badge */}
                 {course.ratings_count && course.ratings_count > 0 ? (
                   <div className="flex items-center gap-1.5 rounded-md bg-amber-400/10 border border-amber-400/30 px-2.5 py-1 text-amber-300 font-bold">
@@ -321,6 +352,13 @@ export function CourseLandingView({
                     </span>
                   </span>
                 </div>
+
+                {course.cohort_schedule_description && (
+                  <div className="flex items-center gap-1 text-blue-300 font-medium">
+                    <Clock className="h-3.5 w-3.5 text-blue-400" />
+                    <span>{course.cohort_schedule_description}</span>
+                  </div>
+                )}
 
                 <div className="flex items-center gap-1">
                   <Calendar className="h-3.5 w-3.5 text-stone-500" />
@@ -827,13 +865,27 @@ export function CourseLandingView({
                   </div>
                 )}
 
-                {/* Dark Hover Overlay & Play Button */}
+                {/* Dark Hover Overlay & Play/Interactive Button */}
                 <div className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center gap-2 group-hover:bg-black/50 transition-colors">
                   <div className="h-14 w-14 rounded-full bg-white/95 flex items-center justify-center shadow-lg transition-transform group-hover:scale-110">
-                    <Play className="h-6 w-6 text-black fill-black ml-1" />
+                    {course.course_format === 'live_cohort' ? (
+                      <Video className="h-6 w-6 text-blue-700 ml-0.5" />
+                    ) : course.course_format === 'text_and_labs' ? (
+                      <BookOpen className="h-6 w-6 text-emerald-700 ml-0.5" />
+                    ) : course.course_format === 'action_challenge' ? (
+                      <Target className="h-6 w-6 text-purple-700 ml-0.5" />
+                    ) : (
+                      <Play className="h-6 w-6 text-black fill-black ml-1" />
+                    )}
                   </div>
                   <span className="text-xs font-bold text-white tracking-wide shadow-sm">
-                    Preview this course
+                    {course.course_format === 'live_cohort'
+                      ? 'Live Cohort Classroom'
+                      : course.course_format === 'text_and_labs'
+                      ? 'Interactive Reading & Labs'
+                      : course.course_format === 'action_challenge'
+                      ? 'Action Sprint Prompts'
+                      : 'Preview this course'}
                   </span>
                 </div>
               </div>
@@ -855,7 +907,11 @@ export function CourseLandingView({
                           50% OFF
                         </span>
                       </div>
-                      <p className="text-[11px] text-stone-500">One-time purchase · Lifetime access</p>
+                      <p className="text-[11px] text-stone-500">
+                        {course.course_format === 'live_cohort'
+                          ? 'Includes all live workshops & cohort recordings'
+                          : 'One-time purchase · Lifetime access'}
+                      </p>
                     </div>
                   ) : isEnrolled ? (
                     <div className="space-y-2">
@@ -870,7 +926,7 @@ export function CourseLandingView({
                         />
                       </div>
                       <p className="text-[11px] text-stone-500">
-                        {completedLessons} of {totalLessons} lectures completed
+                        {completedLessons} of {totalLessons} modules completed
                       </p>
                     </div>
                   ) : (
@@ -881,7 +937,11 @@ export function CourseLandingView({
                           Included in Circle
                         </span>
                       </div>
-                      <p className="text-[11px] text-stone-500">Full access to all lectures and exercises</p>
+                      <p className="text-[11px] text-stone-500">
+                        {course.course_format === 'live_cohort'
+                          ? 'Open to all community members'
+                          : 'Full access to all lectures and exercises'}
+                      </p>
                     </div>
                   )}
                 </div>
@@ -894,7 +954,9 @@ export function CourseLandingView({
                       className="w-full rounded-xl bg-black py-3 text-sm font-bold text-white shadow-xs hover:bg-stone-800 transition-all flex items-center justify-center gap-2"
                     >
                       <CreditCard className="h-4 w-4" />
-                      <span>Enroll Now</span>
+                      <span>
+                        {course.course_format === 'live_cohort' ? 'Enroll in Live Cohort' : 'Enroll Now'}
+                      </span>
                     </Button>
                   ) : isLevelGated ? (
                     <div className="rounded-xl border border-amber-300 bg-amber-50 p-3.5 text-center space-y-1.5">
@@ -906,6 +968,48 @@ export function CourseLandingView({
                         Your current level is Level {course.viewer_level ?? 1}. Earn XP by engaging in the community to unlock this course!
                       </p>
                     </div>
+                  ) : course.course_format === 'live_cohort' ? (
+                    <div className="space-y-2">
+                      {isEnrolled && course.cohort_meeting_url && (
+                        <a
+                          href={course.cohort_meeting_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full rounded-xl bg-blue-700 py-3 text-sm font-bold text-white shadow-xs hover:bg-blue-800 transition-all flex items-center justify-center gap-2"
+                        >
+                          <Video className="h-4 w-4" />
+                          <span>Join Live Video Room</span>
+                          <ExternalLink className="h-3.5 w-3.5 opacity-80" />
+                        </a>
+                      )}
+                      <Button
+                        onClick={() => onStartLearning(firstPlayableLesson?.id)}
+                        className={`w-full rounded-xl py-3 text-sm font-bold transition-all flex items-center justify-center gap-2 ${
+                          isEnrolled && course.cohort_meeting_url
+                            ? 'bg-stone-100 text-stone-900 hover:bg-stone-200 border border-stone-200'
+                            : 'bg-black text-white hover:bg-stone-800'
+                        }`}
+                      >
+                        <BookOpen className="h-4 w-4" />
+                        <span>{isEnrolled ? 'View Curriculum & Replays' : 'Join This Live Cohort'}</span>
+                      </Button>
+                    </div>
+                  ) : course.course_format === 'text_and_labs' ? (
+                    <Button
+                      onClick={() => onStartLearning(firstPlayableLesson?.id)}
+                      className="w-full rounded-xl bg-black py-3 text-sm font-bold text-white shadow-xs hover:bg-stone-800 transition-all flex items-center justify-center gap-2"
+                    >
+                      <BookOpen className="h-4 w-4" />
+                      <span>{isEnrolled ? 'Continue Reading & Labs' : 'Start Reading Course'}</span>
+                    </Button>
+                  ) : course.course_format === 'action_challenge' ? (
+                    <Button
+                      onClick={() => onStartLearning(firstPlayableLesson?.id)}
+                      className="w-full rounded-xl bg-purple-700 py-3 text-sm font-bold text-white shadow-xs hover:bg-purple-800 transition-all flex items-center justify-center gap-2"
+                    >
+                      <Target className="h-4 w-4" />
+                      <span>{isEnrolled ? "Continue Today's Sprint" : 'Join the Sprint'}</span>
+                    </Button>
                   ) : (
                     <Button
                       onClick={() => onStartLearning(firstPlayableLesson?.id)}
@@ -917,7 +1021,7 @@ export function CourseLandingView({
                   )}
 
                   <p className="text-center text-[11px] text-stone-400">
-                    30-Day Guarantee · Full Lifetime Access
+                    30-Day Guarantee · Full Community Access
                   </p>
                 </div>
 
@@ -927,30 +1031,103 @@ export function CourseLandingView({
                     This course includes:
                   </h4>
                   <ul className="space-y-2.5 text-xs text-stone-700">
-                    <li className="flex items-center gap-2.5">
-                      <Clock className="h-4 w-4 text-stone-500 shrink-0" />
-                      <span>{totalDurationHours} hours on-demand video</span>
-                    </li>
-                    <li className="flex items-center gap-2.5">
-                      <FileText className="h-4 w-4 text-stone-500 shrink-0" />
-                      <span>{totalLessons} lessons & interactive exercises</span>
-                    </li>
-                    <li className="flex items-center gap-2.5">
-                      <FolderDown className="h-4 w-4 text-stone-500 shrink-0" />
-                      <span>Downloadable resources & code files</span>
-                    </li>
-                    <li className="flex items-center gap-2.5">
-                      <Smartphone className="h-4 w-4 text-stone-500 shrink-0" />
-                      <span>Access on mobile, tablet, and desktop</span>
-                    </li>
-                    <li className="flex items-center gap-2.5">
-                      <Layers className="h-4 w-4 text-stone-500 shrink-0" />
-                      <span>Milestone assignments & student Q&A</span>
-                    </li>
-                    <li className="flex items-center gap-2.5">
-                      <Award className="h-4 w-4 text-stone-500 shrink-0" />
-                      <span>Certificate of Completion</span>
-                    </li>
+                    {course.course_format === 'live_cohort' ? (
+                      <>
+                        <li className="flex items-center gap-2.5 text-blue-900 font-semibold">
+                          <Video className="h-4 w-4 text-blue-700 shrink-0" />
+                          <span>Live interactive video workshops via Zoom/Meet</span>
+                        </li>
+                        <li className="flex items-center gap-2.5">
+                          <Users className="h-4 w-4 text-stone-500 shrink-0" />
+                          <span>Dedicated cohort community & peer group</span>
+                        </li>
+                        <li className="flex items-center gap-2.5">
+                          <Clock className="h-4 w-4 text-stone-500 shrink-0" />
+                          <span>Session recordings archive with lifetime access</span>
+                        </li>
+                        <li className="flex items-center gap-2.5">
+                          <FileText className="h-4 w-4 text-stone-500 shrink-0" />
+                          <span>{totalLessons} modules, syllabus notes & exercises</span>
+                        </li>
+                        <li className="flex items-center gap-2.5">
+                          <Award className="h-4 w-4 text-stone-500 shrink-0" />
+                          <span>Official Cohort Certificate of Completion</span>
+                        </li>
+                      </>
+                    ) : course.course_format === 'text_and_labs' ? (
+                      <>
+                        <li className="flex items-center gap-2.5 text-emerald-900 font-semibold">
+                          <BookOpen className="h-4 w-4 text-emerald-700 shrink-0" />
+                          <span>In-depth reading guides & architecture breakdowns</span>
+                        </li>
+                        <li className="flex items-center gap-2.5">
+                          <CheckCircle2 className="h-4 w-4 text-stone-500 shrink-0" />
+                          <span>Zero video required — read and learn at your pace</span>
+                        </li>
+                        <li className="flex items-center gap-2.5">
+                          <FileText className="h-4 w-4 text-stone-500 shrink-0" />
+                          <span>Interactive code sandboxes & lab exercises</span>
+                        </li>
+                        <li className="flex items-center gap-2.5">
+                          <Layers className="h-4 w-4 text-stone-500 shrink-0" />
+                          <span>Self-assessment milestone quizzes</span>
+                        </li>
+                        <li className="flex items-center gap-2.5">
+                          <FolderDown className="h-4 w-4 text-stone-500 shrink-0" />
+                          <span>Downloadable cheatsheets & starter templates</span>
+                        </li>
+                        <li className="flex items-center gap-2.5">
+                          <Award className="h-4 w-4 text-stone-500 shrink-0" />
+                          <span>Certificate of Completion</span>
+                        </li>
+                      </>
+                    ) : course.course_format === 'action_challenge' ? (
+                      <>
+                        <li className="flex items-center gap-2.5 text-purple-900 font-semibold">
+                          <Target className="h-4 w-4 text-purple-700 shrink-0" />
+                          <span>{course.challenge_duration_days || 30} daily action prompts & challenges</span>
+                        </li>
+                        <li className="flex items-center gap-2.5">
+                          <Users className="h-4 w-4 text-stone-500 shrink-0" />
+                          <span>Community proof-of-work feed for accountability</span>
+                        </li>
+                        <li className="flex items-center gap-2.5">
+                          <Sparkles className="h-4 w-4 text-stone-500 shrink-0" />
+                          <span>Gamification XP points & daily streak tracking</span>
+                        </li>
+                        <li className="flex items-center gap-2.5">
+                          <Award className="h-4 w-4 text-stone-500 shrink-0" />
+                          <span>Sprint Finisher Badge & Certificate</span>
+                        </li>
+                      </>
+                    ) : (
+                      <>
+                        <li className="flex items-center gap-2.5">
+                          <Clock className="h-4 w-4 text-stone-500 shrink-0" />
+                          <span>{totalDurationHours} hours on-demand video</span>
+                        </li>
+                        <li className="flex items-center gap-2.5">
+                          <FileText className="h-4 w-4 text-stone-500 shrink-0" />
+                          <span>{totalLessons} lessons & interactive exercises</span>
+                        </li>
+                        <li className="flex items-center gap-2.5">
+                          <FolderDown className="h-4 w-4 text-stone-500 shrink-0" />
+                          <span>Downloadable resources & code files</span>
+                        </li>
+                        <li className="flex items-center gap-2.5">
+                          <Smartphone className="h-4 w-4 text-stone-500 shrink-0" />
+                          <span>Access on mobile, tablet, and desktop</span>
+                        </li>
+                        <li className="flex items-center gap-2.5">
+                          <Layers className="h-4 w-4 text-stone-500 shrink-0" />
+                          <span>Milestone assignments & student Q&A</span>
+                        </li>
+                        <li className="flex items-center gap-2.5">
+                          <Award className="h-4 w-4 text-stone-500 shrink-0" />
+                          <span>Certificate of Completion</span>
+                        </li>
+                      </>
+                    )}
                   </ul>
                 </div>
 

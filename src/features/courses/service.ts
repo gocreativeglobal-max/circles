@@ -55,6 +55,10 @@ export const createCourseSchema = z.object({
     .nullable()
     .optional(),
   estimatedDurationHours: z.number().min(0).max(1000).default(0),
+  courseFormat: z.enum(['video_on_demand', 'live_cohort', 'text_and_labs', 'action_challenge']).default('video_on_demand'),
+  cohortMeetingUrl: z.string().trim().max(1000).nullable().optional(),
+  cohortScheduleDescription: z.string().trim().max(500).nullable().optional(),
+  challengeDurationDays: z.number().int().min(1).max(365).nullable().optional(),
   pacingFormat: z.enum(['self_paced', 'structured', 'scheduled']).default('self_paced'),
   scheduleType: z.enum(['relative_drip', 'calendar_date']).default('relative_drip'),
   cohortStartDate: z.string().datetime().nullable().optional(),
@@ -81,6 +85,10 @@ export const updateCourseSchema = z.object({
     .nullable()
     .optional(),
   estimatedDurationHours: z.number().min(0).max(1000).optional(),
+  courseFormat: z.enum(['video_on_demand', 'live_cohort', 'text_and_labs', 'action_challenge']).optional(),
+  cohortMeetingUrl: z.string().trim().max(1000).nullable().optional(),
+  cohortScheduleDescription: z.string().trim().max(500).nullable().optional(),
+  challengeDurationDays: z.number().int().min(1).max(365).nullable().optional(),
   pacingFormat: z.enum(['self_paced', 'structured', 'scheduled']).optional(),
   scheduleType: z.enum(['relative_drip', 'calendar_date']).optional(),
   cohortStartDate: z.string().datetime().nullable().optional(),
@@ -288,6 +296,10 @@ export async function listCourses(
         estimated_duration_hours: Number(row.estimated_duration_hours || 0),
         status: row.status,
         sort_order: row.sort_order ?? 0,
+        course_format: row.course_format ?? 'video_on_demand',
+        cohort_meeting_url: row.cohort_meeting_url ?? null,
+        cohort_schedule_description: row.cohort_schedule_description ?? null,
+        challenge_duration_days: row.challenge_duration_days ? Number(row.challenge_duration_days) : null,
         pacing_format: row.pacing_format ?? 'self_paced',
         schedule_type: row.schedule_type ?? 'relative_drip',
         cohort_start_date: row.cohort_start_date ?? null,
@@ -748,6 +760,10 @@ export async function getCourseWithCurriculum(
       total_lessons_count: totalLessons,
       completed_lessons_count: completedLessons,
       progress_percentage: progressPercentage,
+      course_format: course.course_format ?? 'video_on_demand',
+      cohort_meeting_url: course.cohort_meeting_url ?? null,
+      cohort_schedule_description: course.cohort_schedule_description ?? null,
+      challenge_duration_days: course.challenge_duration_days ? Number(course.challenge_duration_days) : null,
       pacing_format: course.pacing_format ?? 'self_paced',
       schedule_type: course.schedule_type ?? 'relative_drip',
       cohort_start_date: course.cohort_start_date ?? null,
@@ -838,9 +854,10 @@ export async function createCourse(
         `INSERT INTO public.courses (
            id, circle_id, instructor_id, title, slug, description,
            thumbnail_url, difficulty_level, estimated_duration_hours,
+           course_format, cohort_meeting_url, cohort_schedule_description, challenge_duration_days,
            pacing_format, schedule_type, cohort_start_date, cohort_end_date,
            require_sequential_completion, access_rule, min_level_required, status
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
          RETURNING *;`,
         [
           courseId,
@@ -852,6 +869,10 @@ export async function createCourse(
           parsed.thumbnailUrl || null,
           parsed.difficultyLevel || null,
           parsed.estimatedDurationHours,
+          parsed.courseFormat,
+          parsed.cohortMeetingUrl || null,
+          parsed.cohortScheduleDescription || null,
+          parsed.challengeDurationDays ?? null,
           parsed.pacingFormat,
           parsed.scheduleType,
           parsed.cohortStartDate ? new Date(parsed.cohortStartDate).toISOString() : null,
@@ -878,9 +899,10 @@ export async function createCourse(
           `INSERT INTO public.courses (
              id, circle_id, instructor_id, title, slug, description,
              thumbnail_url, difficulty_level, estimated_duration_hours,
+             course_format, cohort_meeting_url, cohort_schedule_description, challenge_duration_days,
              pacing_format, schedule_type, cohort_start_date, cohort_end_date,
              require_sequential_completion, access_rule, min_level_required, status
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
            RETURNING *;`,
           [
             courseId,
@@ -892,6 +914,10 @@ export async function createCourse(
             parsed.thumbnailUrl || null,
             parsed.difficultyLevel || null,
             parsed.estimatedDurationHours,
+            parsed.courseFormat,
+            parsed.cohortMeetingUrl || null,
+            parsed.cohortScheduleDescription || null,
+            parsed.challengeDurationDays ?? null,
             parsed.pacingFormat,
             parsed.scheduleType,
             parsed.cohortStartDate ? new Date(parsed.cohortStartDate).toISOString() : null,
@@ -977,6 +1003,10 @@ export async function updateCourse(
          status = COALESCE($18, status),
          access_rule = COALESCE($19, access_rule),
          min_level_required = COALESCE($20, min_level_required),
+         course_format = COALESCE($21, course_format),
+         cohort_meeting_url = CASE WHEN $22::boolean THEN $23 ELSE cohort_meeting_url END,
+         cohort_schedule_description = CASE WHEN $24::boolean THEN $25 ELSE cohort_schedule_description END,
+         challenge_duration_days = CASE WHEN $26::boolean THEN $27::integer ELSE challenge_duration_days END,
          updated_at = NOW()
        WHERE id = $1 AND circle_id = $2
        RETURNING *;`,
@@ -1001,6 +1031,13 @@ export async function updateCourse(
         parsed.status ?? null,
         parsed.accessRule ?? null,
         parsed.minLevelRequired ?? null,
+        parsed.courseFormat ?? null,
+        parsed.cohortMeetingUrl !== undefined,
+        parsed.cohortMeetingUrl ?? null,
+        parsed.cohortScheduleDescription !== undefined,
+        parsed.cohortScheduleDescription ?? null,
+        parsed.challengeDurationDays !== undefined,
+        parsed.challengeDurationDays ?? null,
       ]
     );
 

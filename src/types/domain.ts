@@ -1120,6 +1120,8 @@ export interface CoursePaywallPlan {
   currency_prices?: Record<string, number>;
 }
 
+export type CourseDeliveryFormat = 'video_on_demand' | 'live_cohort' | 'text_and_labs' | 'action_challenge';
+
 export interface CourseItem {
   id: string;
   circle_id: string;
@@ -1132,6 +1134,10 @@ export interface CourseItem {
   estimated_duration_hours: number;
   status: 'draft' | 'published' | 'archived';
   sort_order: number;
+  course_format?: CourseDeliveryFormat;
+  cohort_meeting_url?: string | null;
+  cohort_schedule_description?: string | null;
+  challenge_duration_days?: number | null;
   pacing_format?: 'self_paced' | 'structured' | 'scheduled';
   schedule_type?: 'relative_drip' | 'calendar_date';
   cohort_start_date?: string | null;

@@ -688,7 +688,7 @@ describe('Courses, LMS Curriculum & Student Learning Progress Integration Suite'
       reviewText: 'Outstanding course! Everything was practical and clearly explained.',
     });
     expect(review1.rating).toBe(5);
-    expect(review1.user.display_name).toBe('Student One');
+    expect(review1.user?.display_name).toBe('Student One');
 
     const review2 = await submitCourseReview(student2.id, circle.id, {
       courseId: course.id,
@@ -722,5 +722,90 @@ describe('Courses, LMS Curriculum & Student Learning Progress Integration Suite'
     const afterDeleteView = await getCourseWithCurriculum(student1.id, circle.id, course.id);
     expect(afterDeleteView.ratings_count).toBe(1);
     expect(afterDeleteView.average_rating).toBe(4.0);
+  });
+
+  it('manages distinct course delivery formats: Live Cohorts, Text & Labs, and Action Sprints', async () => {
+    const suffix = Date.now() + 3;
+    const instructor = (
+      await registerUser({
+        email: `fmt-inst-${suffix}@example.com`,
+        username: `fmt_inst_${suffix}`,
+        displayName: 'Formats Instructor',
+        password: 'Password123!',
+      })
+    ).user;
+
+    const circle = await createCircle(instructor.id, {
+      name: `Formats Academy ${suffix}`,
+      slug: `formats-academy-${suffix}`,
+      visibility: 'public',
+    });
+
+    await updateCircleCapability(instructor.id, circle.id, 'spaces', true);
+    await updateCircleCapability(instructor.id, circle.id, 'learning_resources', true);
+
+    // 1. Create a Live Cohort Course
+    const liveCohort = await createCourse(instructor.id, {
+      circleId: circle.id,
+      title: 'Spring 2026 SaaS Founders Cohort',
+      slug: 'spring-2026-saas-founders-cohort',
+      description: '6-week live cohort with workshops on Zoom.',
+      courseFormat: 'live_cohort',
+      cohortMeetingUrl: 'https://zoom.us/j/987654321',
+      cohortScheduleDescription: 'Tuesdays & Thursdays, 6:00 PM UTC',
+      pacingFormat: 'scheduled',
+      scheduleType: 'calendar_date',
+      cohortStartDate: new Date(Date.now() + 86400000).toISOString(),
+      cohortEndDate: new Date(Date.now() + 86400000 * 42).toISOString(),
+    });
+
+    expect(liveCohort.course_format).toBe('live_cohort');
+    expect(liveCohort.cohort_meeting_url).toBe('https://zoom.us/j/987654321');
+    expect(liveCohort.cohort_schedule_description).toBe('Tuesdays & Thursdays, 6:00 PM UTC');
+
+    // 2. Create an Interactive Text & Labs Course
+    const textLabs = await createCourse(instructor.id, {
+      circleId: circle.id,
+      title: 'PostgreSQL Internals & RLS Deep Dive',
+      slug: 'postgresql-internals-rls-deep-dive',
+      description: 'Zero video required. Deep reading, architecture breakdowns, and lab challenges.',
+      courseFormat: 'text_and_labs',
+      pacingFormat: 'structured',
+    });
+
+    expect(textLabs.course_format).toBe('text_and_labs');
+
+    // 3. Create a 30-Day Action Sprint
+    const actionSprint = await createCourse(instructor.id, {
+      circleId: circle.id,
+      title: '30-Day Audience Building Sprint',
+      slug: '30-day-audience-building-sprint',
+      description: 'Daily action prompts with proof-of-work community accountability.',
+      courseFormat: 'action_challenge',
+      challengeDurationDays: 30,
+      pacingFormat: 'scheduled',
+      scheduleType: 'relative_drip',
+    });
+
+    expect(actionSprint.course_format).toBe('action_challenge');
+    expect(actionSprint.challenge_duration_days).toBe(30);
+
+    // 4. Verify in listCourses
+    const list = await listCourses(instructor.id, circle.id);
+    expect(list.length).toBe(3);
+    const foundCohort = list.find((c) => c.id === liveCohort.id);
+    expect(foundCohort?.course_format).toBe('live_cohort');
+    expect(foundCohort?.cohort_meeting_url).toBe('https://zoom.us/j/987654321');
+
+    // 5. Update course format via updateCourse
+    const updated = await updateCourse(instructor.id, circle.id, textLabs.id, {
+      courseFormat: 'live_cohort',
+      cohortMeetingUrl: 'https://meet.google.com/abc-defg-hij',
+      cohortScheduleDescription: 'Weekly Saturdays, 3:00 PM UTC',
+    });
+
+    expect(updated.course_format).toBe('live_cohort');
+    expect(updated.cohort_meeting_url).toBe('https://meet.google.com/abc-defg-hij');
+    expect(updated.cohort_schedule_description).toBe('Weekly Saturdays, 3:00 PM UTC');
   });
 });
