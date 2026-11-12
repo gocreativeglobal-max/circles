@@ -17,7 +17,10 @@ export async function GET(req: NextRequest) {
 
   // Cryptographically secure state for CSRF mitigation
   const state = crypto.randomBytes(24).toString('hex');
-  const returnUrl = req.nextUrl.searchParams.get('returnUrl') || '/circles';
+  const returnUrl =
+    req.nextUrl.searchParams.get('returnUrl') ||
+    req.nextUrl.searchParams.get('next') ||
+    '/circles';
 
   // Build Google OAuth authorization URL
   const params = new URLSearchParams({

@@ -57,6 +57,7 @@ export function CoursePlayer({
   isStaff,
   initialViewMode = 'overview',
   initialLessonId,
+  currentUserId,
 }: {
   circleId: string;
   circleSlug: string;
@@ -65,6 +66,7 @@ export function CoursePlayer({
   isStaff: boolean;
   initialViewMode?: 'overview' | 'classroom';
   initialLessonId?: string;
+  currentUserId?: string | null;
 }) {
   const [course, setCourse] = useState<CourseItem>(initialCourse);
   const [viewMode, setViewMode] = useState<'overview' | 'classroom'>(initialViewMode);
@@ -1046,6 +1048,11 @@ export function CoursePlayer({
           isStaff={effectiveIsStaff}
           onStartLearning={handleStartLearning}
           onOpenCheckout={(plan) => {
+            if (!currentUserId && typeof window !== 'undefined') {
+              const returnUrl = `${window.location.pathname}${window.location.search}`;
+              window.location.href = `/login?next=${encodeURIComponent(returnUrl)}`;
+              return;
+            }
             setSelectedPaywallPlan(plan || course.paywall_plans?.[0] || null);
             setShowCheckoutModal(true);
           }}
@@ -1323,6 +1330,11 @@ export function CoursePlayer({
                         </span>
                         <Button
                           onClick={() => {
+                            if (!currentUserId && typeof window !== 'undefined') {
+                              const returnUrl = `${window.location.pathname}${window.location.search}`;
+                              window.location.href = `/login?next=${encodeURIComponent(returnUrl)}`;
+                              return;
+                            }
                             setSelectedPaywallPlan(plan);
                             setShowCheckoutModal(true);
                           }}
@@ -1354,6 +1366,11 @@ export function CoursePlayer({
                   {course.paywall_plans && course.paywall_plans.length > 0 && (
                     <Button
                       onClick={() => {
+                        if (!currentUserId && typeof window !== 'undefined') {
+                          const returnUrl = `${window.location.pathname}${window.location.search}`;
+                          window.location.href = `/login?next=${encodeURIComponent(returnUrl)}`;
+                          return;
+                        }
                         setSelectedPaywallPlan(course.paywall_plans![0]);
                         setShowCheckoutModal(true);
                       }}

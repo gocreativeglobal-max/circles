@@ -16,7 +16,7 @@ export default async function CircleCourseStudioPage({
 }) {
   const user = await getAuthenticatedUser();
   if (!user) {
-    redirect(`/sign-in?next=/circles/${params.slug}/courses/${params.courseId}/studio`);
+    redirect(`/login?next=/circles/${params.slug}/courses/${params.courseId}/studio`);
   }
 
   const circle = await getCircleBySlugOrId(user.id, params.slug);

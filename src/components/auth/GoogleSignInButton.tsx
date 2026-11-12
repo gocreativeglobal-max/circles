@@ -5,15 +5,21 @@ import React from 'react';
 interface GoogleSignInButtonProps {
   label?: string;
   className?: string;
+  returnUrl?: string;
 }
 
 export function GoogleSignInButton({
   label = 'Continue with Google',
   className = '',
+  returnUrl,
 }: GoogleSignInButtonProps) {
+  const href = returnUrl
+    ? `/api/auth/google?returnUrl=${encodeURIComponent(returnUrl)}`
+    : '/api/auth/google';
+
   return (
     <a
-      href="/api/auth/google"
+      href={href}
       className={`flex w-full items-center justify-center gap-3 rounded-xl border border-stone-200 bg-white py-2.5 px-4 text-sm font-semibold text-stone-700 shadow-sm transition-all hover:bg-stone-50 hover:border-stone-300 hover:text-stone-900 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-stone-400/20 ${className}`}
     >
       <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24" aria-hidden="true">

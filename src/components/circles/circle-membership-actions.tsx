@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { UserPlus } from 'lucide-react';
 import { Circle } from '@/types/domain';
@@ -31,9 +31,24 @@ export function CircleMembershipActions({
   const canJoinDirectly = circle.membership_policy === 'open' && circle.visibility === 'public';
   const canRequest = circle.membership_policy === 'approval';
 
+  function redirectToLogin(action?: MembershipAction) {
+    if (typeof window === 'undefined') return;
+    const currentPath = window.location.pathname;
+    const searchParams = new URLSearchParams(window.location.search);
+    if (action) {
+      searchParams.set('action', action);
+    }
+    if (inviteToken) {
+      searchParams.set('token', inviteToken);
+    }
+    const query = searchParams.toString();
+    const returnUrl = query ? `${currentPath}?${query}` : currentPath;
+    router.push(`/login?next=${encodeURIComponent(returnUrl)}`);
+  }
+
   async function submit(action: MembershipAction, extra: Record<string, unknown> = {}) {
     if (!isAuthenticated) {
-      router.push('/login');
+      redirectToLogin(action);
       return;
     }
     setLoading(true);
@@ -58,6 +73,38 @@ export function CircleMembershipActions({
     }
   }
 
+  // Resume intent after login redirect (e.g. user clicked Join before logging in)
+  useEffect(() => {
+    if (!isAuthenticated || typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const action = params.get('action');
+    const token = params.get('token') || inviteToken;
+
+    if (action === 'join' && !isMember && !isPending) {
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.delete('action');
+      window.history.replaceState({}, '', newUrl.toString());
+
+      if (canJoinDirectly) {
+        void submit('join');
+      } else if (canRequest) {
+        setShowRequestForm(true);
+      }
+    } else if (action === 'request' && !isMember && !isPending && canRequest) {
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.delete('action');
+      window.history.replaceState({}, '', newUrl.toString());
+      setShowRequestForm(true);
+    } else if (action === 'accept_invite' && token && !isMember) {
+      const newUrl = new URL(window.location.href);
+      newUrl.searchParams.delete('action');
+      newUrl.searchParams.delete('token');
+      window.history.replaceState({}, '', newUrl.toString());
+      void submit('accept_invite', { token });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, isMember, isPending, canJoinDirectly, canRequest, inviteToken]);
+
   function handleLeave() {
     if (!confirm(`Leave ${circle.name}?`)) return;
     void submit('leave');
@@ -72,7 +119,12 @@ export function CircleMembershipActions({
     <div className="relative flex shrink-0 flex-col items-end gap-1">
       <div className="flex items-center gap-2">
         {inviteToken && !isMember && (
-          <button type="button" onClick={() => submit('accept_invite', { token: inviteToken })} disabled={loading} className={primaryBtn}>
+          <button
+            type="button"
+            onClick={() => (isAuthenticated ? submit('accept_invite', { token: inviteToken }) : redirectToLogin('accept_invite'))}
+            disabled={loading}
+            className={primaryBtn}
+          >
             Accept invite
           </button>
         )}
@@ -97,13 +149,18 @@ export function CircleMembershipActions({
         ) : isPending ? (
           <span className="rounded-lg bg-stone-100 px-3 py-2 text-sm text-stone-600">Pending</span>
         ) : canJoinDirectly ? (
-          <button type="button" onClick={() => submit('join')} disabled={loading} className={primaryBtn}>
+          <button
+            type="button"
+            onClick={() => (isAuthenticated ? submit('join') : redirectToLogin('join'))}
+            disabled={loading}
+            className={primaryBtn}
+          >
             {loading ? 'Joining…' : 'Join'}
           </button>
         ) : canRequest ? (
           <button
             type="button"
-            onClick={() => (isAuthenticated ? setShowRequestForm((v) => !v) : router.push('/login'))}
+            onClick={() => (isAuthenticated ? setShowRequestForm((v) => !v) : redirectToLogin('request'))}
             disabled={loading}
             className={primaryBtn}
           >

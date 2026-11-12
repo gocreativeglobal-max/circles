@@ -70,6 +70,7 @@ export default async function CircleCourseDetailPage({
       isStaff={isStaff}
       initialViewMode={shouldStartInClassroom ? 'classroom' : 'overview'}
       initialLessonId={searchParams?.lessonId}
+      currentUserId={user?.id ?? null}
     />
   );
 }

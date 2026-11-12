@@ -247,7 +247,8 @@ export function MarketplaceBoard({
       return;
     }
     if (!currentUserId) {
-      window.location.href = '/sign-in';
+      const returnUrl = typeof window !== 'undefined' ? `${window.location.pathname}${window.location.search}` : '/circles';
+      window.location.href = `/login?next=${encodeURIComponent(returnUrl)}`;
       return;
     }
     if (aType === 'checkout') {
