@@ -19,13 +19,13 @@ import {
   CheckCircle2,
   ArrowRight,
   Video,
-  Target,
 } from 'lucide-react';
 import { CourseItem, CourseDeliveryFormat, LeaderboardEntry, MemberXpSummary } from '@/types/domain';
 import { Button } from '@/components/ui/button';
 import { ImageUploader } from '@/components/ui/image-uploader';
 import { LearningPathsView } from './learning-paths-view';
 import { CourseSettingsModal } from './course-settings-modal';
+import { detectMeetingPlatform } from '@/lib/courses/cohort-helpers';
 
 export function CoursesCatalog({
   circleId,
@@ -78,6 +78,8 @@ export function CoursesCatalog({
   const [minLevelRequired, setMinLevelRequired] = useState(2);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const detectedPlatform = detectMeetingPlatform(cohortMeetingUrl);
 
   useEffect(() => {
     if (!isMember) return;
@@ -388,23 +390,13 @@ export function CoursesCatalog({
                             {course.difficulty_level?.replace('_', ' ') || 'All Levels'}
                           </span>
                           {course.course_format === 'live_cohort' ? (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-mono font-bold text-blue-700 border border-blue-200">
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 px-2.5 py-0.5 text-[10px] font-mono font-bold text-blue-700 border border-blue-200 shadow-2xs">
                               <span className="h-1.5 w-1.5 rounded-full bg-blue-600 animate-pulse" />
                               Live Cohort
                             </span>
-                          ) : course.course_format === 'text_and_labs' ? (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-mono font-bold text-emerald-700 border border-emerald-200">
-                              <BookOpen className="h-2.5 w-2.5" />
-                              Text & Labs
-                            </span>
-                          ) : course.course_format === 'action_challenge' ? (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-purple-50 px-2 py-0.5 text-[10px] font-mono font-bold text-purple-700 border border-purple-200">
-                              <Target className="h-2.5 w-2.5" />
-                              {course.challenge_duration_days || 30}-Day Sprint
-                            </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 rounded-md bg-stone-100 px-2 py-0.5 text-[10px] font-mono font-semibold text-stone-800 border border-stone-200">
-                              <Play className="h-2.5 w-2.5" />
+                              <Play className="h-2.5 w-2.5 fill-current" />
                               On-Demand
                             </span>
                           )}
@@ -468,6 +460,13 @@ export function CoursesCatalog({
                       <p className="mt-1.5 text-xs text-stone-500 line-clamp-2 leading-relaxed">
                         {course.description || 'No description provided.'}
                       </p>
+
+                      {course.course_format === 'live_cohort' && course.cohort_schedule_description && (
+                        <div className="mt-2.5 flex items-center gap-1.5 rounded-lg bg-blue-50/80 border border-blue-100 px-2.5 py-1 text-[11px] font-medium text-blue-800">
+                          <Video className="h-3 w-3 text-blue-600 shrink-0" />
+                          <span className="truncate">{course.cohort_schedule_description}</span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="mt-5 border-t border-stone-100 pt-4">
@@ -570,7 +569,7 @@ export function CoursesCatalog({
                   Select how this course will be delivered to your community:
                 </p>
 
-                <div className="mt-3.5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="mt-3.5 grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                   {/* Format 1: Video on Demand */}
                   <button
                     type="button"
@@ -578,7 +577,7 @@ export function CoursesCatalog({
                       setCourseFormat('video_on_demand');
                       setPacingFormat('self_paced');
                     }}
-                    className={`relative flex flex-col items-start rounded-xl border p-3.5 text-left transition-all ${
+                    className={`relative flex flex-col items-start rounded-xl border p-4 text-left transition-all ${
                       courseFormat === 'video_on_demand'
                         ? 'border-black bg-white shadow-xs ring-2 ring-black/10'
                         : 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50/60'
@@ -586,7 +585,7 @@ export function CoursesCatalog({
                   >
                     <div className="flex w-full items-center justify-between">
                       <div
-                        className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+                        className={`flex h-9 w-9 items-center justify-center rounded-lg ${
                           courseFormat === 'video_on_demand'
                             ? 'bg-black text-white'
                             : 'bg-stone-100 text-stone-600'
@@ -595,17 +594,20 @@ export function CoursesCatalog({
                         <Play className="h-4 w-4" />
                       </div>
                       {courseFormat === 'video_on_demand' ? (
-                        <CheckCircle2 className="h-4 w-4 text-stone-700" />
+                        <CheckCircle2 className="h-4 w-4 text-stone-900" />
                       ) : (
                         <span className="h-4 w-4 rounded-full border border-stone-300" />
                       )}
                     </div>
-                    <div className="mt-2.5">
+                    <div className="mt-3">
                       <div className="flex items-center gap-1.5">
-                        <h4 className="text-xs font-bold text-stone-900">Video on Demand</h4>
+                        <h4 className="text-sm font-bold text-stone-900">Video on Demand</h4>
+                        <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-semibold text-stone-700">
+                          Self-Paced
+                        </span>
                       </div>
-                      <p className="mt-1 text-[11px] text-stone-500 leading-relaxed">
-                        Pre-recorded video lectures. Learners watch and progress on their own schedule.
+                      <p className="mt-1 text-xs text-stone-500 leading-relaxed">
+                        Pre-recorded video lectures and modular lessons. Learners watch and progress on their own schedule.
                       </p>
                     </div>
                   </button>
@@ -618,15 +620,15 @@ export function CoursesCatalog({
                       setPacingFormat('scheduled');
                       setScheduleType('calendar_date');
                     }}
-                    className={`relative flex flex-col items-start rounded-xl border p-3.5 text-left transition-all ${
+                    className={`relative flex flex-col items-start rounded-xl border p-4 text-left transition-all ${
                       courseFormat === 'live_cohort'
-                        ? 'border-blue-700 bg-blue-50/30 shadow-xs ring-2 ring-blue-500/20'
+                        ? 'border-blue-700 bg-blue-50/40 shadow-xs ring-2 ring-blue-500/20'
                         : 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50/60'
                     }`}
                   >
                     <div className="flex w-full items-center justify-between">
                       <div
-                        className={`flex h-8 w-8 items-center justify-center rounded-lg ${
+                        className={`flex h-9 w-9 items-center justify-center rounded-lg ${
                           courseFormat === 'live_cohort'
                             ? 'bg-blue-700 text-white'
                             : 'bg-stone-100 text-stone-600'
@@ -640,94 +642,15 @@ export function CoursesCatalog({
                         <span className="h-4 w-4 rounded-full border border-stone-300" />
                       )}
                     </div>
-                    <div className="mt-2.5">
+                    <div className="mt-3">
                       <div className="flex items-center gap-1.5">
-                        <h4 className="text-xs font-bold text-stone-900">Live Cohort</h4>
-                        <span className="rounded bg-blue-100 px-1 py-0.2 text-[9px] font-bold text-blue-800">
-                          Interactive
+                        <h4 className="text-sm font-bold text-stone-900">Live Cohort</h4>
+                        <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-bold text-blue-800">
+                          🔴 Live Workshops
                         </span>
                       </div>
-                      <p className="mt-1 text-[11px] text-stone-500 leading-relaxed">
-                        Live Zoom/Meet workshops, scheduled dates, and real-time community interaction.
-                      </p>
-                    </div>
-                  </button>
-
-                  {/* Format 3: Text & Labs */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCourseFormat('text_and_labs');
-                      setPacingFormat('structured');
-                    }}
-                    className={`relative flex flex-col items-start rounded-xl border p-3.5 text-left transition-all ${
-                      courseFormat === 'text_and_labs'
-                        ? 'border-emerald-700 bg-emerald-50/30 shadow-xs ring-2 ring-emerald-500/20'
-                        : 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50/60'
-                    }`}
-                  >
-                    <div className="flex w-full items-center justify-between">
-                      <div
-                        className={`flex h-8 w-8 items-center justify-center rounded-lg ${
-                          courseFormat === 'text_and_labs'
-                            ? 'bg-emerald-700 text-white'
-                            : 'bg-stone-100 text-stone-600'
-                        }`}
-                      >
-                        <BookOpen className="h-4 w-4" />
-                      </div>
-                      {courseFormat === 'text_and_labs' ? (
-                        <CheckCircle2 className="h-4 w-4 text-emerald-700" />
-                      ) : (
-                        <span className="h-4 w-4 rounded-full border border-stone-300" />
-                      )}
-                    </div>
-                    <div className="mt-2.5">
-                      <div className="flex items-center gap-1.5">
-                        <h4 className="text-xs font-bold text-stone-900">Text & Labs</h4>
-                      </div>
-                      <p className="mt-1 text-[11px] text-stone-500 leading-relaxed">
-                        Zero video required. Deep reading guides, code sandboxes, and milestone quizzes.
-                      </p>
-                    </div>
-                  </button>
-
-                  {/* Format 4: Action Sprint */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCourseFormat('action_challenge');
-                      setPacingFormat('scheduled');
-                      setScheduleType('relative_drip');
-                    }}
-                    className={`relative flex flex-col items-start rounded-xl border p-3.5 text-left transition-all ${
-                      courseFormat === 'action_challenge'
-                        ? 'border-purple-700 bg-purple-50/30 shadow-xs ring-2 ring-purple-500/20'
-                        : 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50/60'
-                    }`}
-                  >
-                    <div className="flex w-full items-center justify-between">
-                      <div
-                        className={`flex h-8 w-8 items-center justify-center rounded-lg ${
-                          courseFormat === 'action_challenge'
-                            ? 'bg-purple-700 text-white'
-                            : 'bg-stone-100 text-stone-600'
-                        }`}
-                      >
-                        <Target className="h-4 w-4" />
-                      </div>
-                      {courseFormat === 'action_challenge' ? (
-                        <CheckCircle2 className="h-4 w-4 text-purple-700" />
-                      ) : (
-                        <span className="h-4 w-4 rounded-full border border-stone-300" />
-                      )}
-                    </div>
-                    <div className="mt-2.5">
-                      <div className="flex items-center gap-1.5">
-                        <h4 className="text-xs font-bold text-stone-900">Action Sprint</h4>
-                      </div>
-                      <p className="mt-1 text-[11px] text-stone-500 leading-relaxed">
-                        Daily drip prompts, habit building, proof of work in feed, and streak leaderboards.
+                      <p className="mt-1 text-xs text-stone-500 leading-relaxed">
+                        Scheduled live video sessions (Zoom, Google Meet, Teams), cohort calendar dates, and live classroom access.
                       </p>
                     </div>
                   </button>
@@ -735,24 +658,91 @@ export function CoursesCatalog({
 
                 {/* Live Cohort Configuration */}
                 {courseFormat === 'live_cohort' && (
-                  <div className="mt-3.5 rounded-xl border border-blue-200 bg-blue-50/40 p-4 space-y-3.5">
-                    <div className="flex items-center gap-2 text-xs font-bold text-blue-900">
-                      <Video className="h-4 w-4 text-blue-700" />
-                      <span>Live Cohort Schedule & Meeting Settings</span>
+                  <div className="mt-4 rounded-xl border border-blue-200 bg-white p-4 sm:p-5 shadow-xs space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-blue-100 pb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
+                          <Video className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-bold text-stone-900">Live Cohort Classroom & Schedule</h4>
+                          <p className="text-[11px] text-stone-500">Configure meeting link, schedule, and cohort calendar.</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        {detectedPlatform.platform !== 'custom' && (
+                          <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold ${detectedPlatform.badgeBg} ${detectedPlatform.badgeText}`}>
+                            {detectedPlatform.name}
+                          </span>
+                        )}
+                        <span className="rounded-md bg-blue-50 border border-blue-200 px-2 py-0.5 text-[10px] font-medium text-blue-700">
+                          Auto-Recorded Replays
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Platform Selector Buttons */}
+                    <div>
+                      <label className="block text-[11px] font-semibold text-stone-700 mb-1.5">
+                        Choose Live Video Platform:
+                      </label>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {[
+                          { id: 'zoom', label: 'Zoom', prefix: 'https://zoom.us/j/' },
+                          { id: 'meet', label: 'Google Meet', prefix: 'https://meet.google.com/' },
+                          { id: 'teams', label: 'MS Teams', prefix: 'https://teams.microsoft.com/l/meetup-join/' },
+                          { id: 'custom', label: 'Custom Video Link', prefix: '' },
+                        ].map((plat) => {
+                          const isSelected =
+                            plat.id === 'custom'
+                              ? !cohortMeetingUrl.includes('zoom.us') && !cohortMeetingUrl.includes('meet.google.com') && !cohortMeetingUrl.includes('teams.microsoft.com')
+                              : cohortMeetingUrl.toLowerCase().includes(plat.id === 'meet' ? 'meet.google' : plat.id);
+                          return (
+                            <button
+                              key={plat.id}
+                              type="button"
+                              onClick={() => {
+                                if (plat.prefix && (!cohortMeetingUrl || !cohortMeetingUrl.startsWith('http'))) {
+                                  setCohortMeetingUrl(plat.prefix);
+                                }
+                              }}
+                              className={`rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors ${
+                                isSelected
+                                  ? 'border-blue-600 bg-blue-50 text-blue-900 font-bold'
+                                  : 'border-stone-200 bg-stone-50 text-stone-600 hover:bg-stone-100 hover:text-stone-900'
+                              }`}
+                            >
+                              {plat.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Meeting Link & Schedule Inputs */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                       <div>
-                        <label className="block text-[11px] font-semibold text-stone-700">
-                          Live Video Classroom URL (Zoom, Meet, Teams)
-                        </label>
+                        <div className="flex items-center justify-between">
+                          <label className="block text-[11px] font-semibold text-stone-700">
+                            Live Video Classroom URL <span className="text-red-500">*</span>
+                          </label>
+                          {cohortMeetingUrl && (
+                            <span className="text-[10px] text-stone-400 font-mono">
+                              {detectedPlatform.name}
+                            </span>
+                          )}
+                        </div>
                         <input
                           type="url"
-                          placeholder="https://zoom.us/j/123456789 or https://meet.google.com/..."
+                          placeholder={detectedPlatform.defaultPlaceholder}
                           value={cohortMeetingUrl}
                           onChange={(e) => setCohortMeetingUrl(e.target.value)}
-                          className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
+                          className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-2.5 py-2 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
                         />
+                        <p className="mt-1 text-[10px] text-stone-500">
+                          Enrolled students will see a direct &ldquo;Join Live Video Room&rdquo; button.
+                        </p>
                       </div>
 
                       <div>
@@ -764,15 +754,33 @@ export function CoursesCatalog({
                           placeholder="e.g. Tuesdays & Thursdays at 6:00 PM UTC"
                           value={cohortScheduleDescription}
                           onChange={(e) => setCohortScheduleDescription(e.target.value)}
-                          className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
+                          className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-2.5 py-2 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
                         />
+                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                          <span className="text-[10px] text-stone-400">Presets:</span>
+                          {[
+                            'Tue & Thu 6:00 PM UTC',
+                            'Every Sat 10:00 AM UTC',
+                            'Mon-Fri Bootcamp',
+                          ].map((preset) => (
+                            <button
+                              key={preset}
+                              type="button"
+                              onClick={() => setCohortScheduleDescription(preset)}
+                              className="text-[10px] text-blue-700 hover:underline"
+                            >
+                              {preset}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 border-t border-blue-100 pt-3">
+                    {/* Cohort Dates & Timezone */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 border-t border-stone-100 pt-3">
                       <div>
                         <label className="block text-[11px] font-semibold text-stone-700">
-                          Cohort Start Date
+                          Cohort Start Date & Time
                         </label>
                         <input
                           type="datetime-local"
@@ -783,7 +791,7 @@ export function CoursesCatalog({
                       </div>
                       <div>
                         <label className="block text-[11px] font-semibold text-stone-700">
-                          Cohort End Date
+                          Cohort End Date & Graduation
                         </label>
                         <input
                           type="datetime-local"
@@ -792,33 +800,6 @@ export function CoursesCatalog({
                           className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
                         />
                       </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Action Challenge Configuration */}
-                {courseFormat === 'action_challenge' && (
-                  <div className="mt-3.5 rounded-xl border border-purple-200 bg-purple-50/40 p-4 space-y-3">
-                    <div className="flex items-center gap-2 text-xs font-bold text-purple-900">
-                      <Target className="h-4 w-4 text-purple-700" />
-                      <span>Action Sprint Duration</span>
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-semibold text-stone-700">
-                        Sprint Duration (Days)
-                      </label>
-                      <input
-                        type="number"
-                        min="5"
-                        max="365"
-                        value={challengeDurationDays}
-                        onChange={(e) => setChallengeDurationDays(e.target.value)}
-                        className="mt-1 w-32 rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
-                      />
-                      <p className="mt-1 text-[11px] text-stone-500">
-                        Lessons will drip 1 per day. Students post proof-of-work in the community feed to earn streak XP.
-                      </p>
                     </div>
                   </div>
                 )}

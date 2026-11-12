@@ -29,6 +29,8 @@ import {
   BookOpen,
   CreditCard,
   Settings,
+  Video,
+  ExternalLink,
 } from 'lucide-react';
 import {
   CourseItem,
@@ -44,6 +46,7 @@ import { LessonBlockBuilder } from './lesson-block-builder';
 import { CourseSettingsModal } from './course-settings-modal';
 import { CourseLandingView } from './course-landing-view';
 import { formatBachsAmount, getBachsCurrency } from '@/lib/payments/currencies';
+import { detectMeetingPlatform } from '@/lib/courses/cohort-helpers';
 
 export function CoursePlayer({
   circleId,
@@ -1192,6 +1195,49 @@ export function CoursePlayer({
               {error}
             </div>
           )}
+
+          {/* Live Cohort Classroom Hub Banner */}
+          {course.course_format === 'live_cohort' && (() => {
+            const platformInfo = detectMeetingPlatform(course.cohort_meeting_url);
+            return (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-900 via-stone-900 to-black p-4 sm:p-5 text-white shadow-sm">
+                <div className="flex items-center gap-3.5">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md ring-2 ring-blue-400/40">
+                    <Video className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-2 w-2 rounded-full bg-blue-400 animate-pulse" />
+                      <span className="text-[11px] font-mono font-bold tracking-wider text-blue-300 uppercase">
+                        Live Cohort Classroom Active
+                      </span>
+                    </div>
+                    <h3 className="text-sm font-bold text-white mt-0.5">
+                      {course.cohort_schedule_description || 'Interactive live workshops with instructor'}
+                    </h3>
+                    <p className="text-[11px] text-stone-300">
+                      Live sessions are interactive. Recorded replays are automatically archived below in the curriculum.
+                    </p>
+                  </div>
+                </div>
+
+                {course.cohort_meeting_url && (
+                  <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
+                    <a
+                      href={course.cohort_meeting_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-colors"
+                    >
+                      <Video className="h-4 w-4" />
+                      <span>Join Live Room ({platformInfo.name})</span>
+                      <ExternalLink className="h-3 w-3 opacity-80" />
+                    </a>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Main LMS Layout: Left Player Stage (8/12 cols), Right Sidebar Curriculum (4 cols) */}
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">

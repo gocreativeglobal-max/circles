@@ -29,7 +29,6 @@ import {
   CreditCard,
   Settings,
   Video,
-  Target,
   ExternalLink,
 } from 'lucide-react';
 import {
@@ -39,6 +38,11 @@ import {
 } from '@/types/domain';
 import { Button } from '@/components/ui/button';
 import { formatBachsAmount } from '@/lib/payments/currencies';
+import {
+  detectMeetingPlatform,
+  formatCohortDateRange,
+  generateGoogleCalendarUrl,
+} from '@/lib/courses/cohort-helpers';
 
 export interface CourseLandingViewProps {
   circleId: string;
@@ -138,6 +142,26 @@ export function CourseLandingView({
   const isLevelGated = course.viewer_can_access === false && course.access_rule !== 'paywall' && !isStaff;
   const hasAccess = isStaff || Boolean(course.has_paywall_access) || isEnrolled;
   const primaryPlan = course.paywall_plans?.[0] || null;
+
+  const detectedPlatform = useMemo(
+    () => detectMeetingPlatform(course.cohort_meeting_url),
+    [course.cohort_meeting_url]
+  );
+  const cohortDateRange = useMemo(
+    () => formatCohortDateRange(course.cohort_start_date, course.cohort_end_date),
+    [course.cohort_start_date, course.cohort_end_date]
+  );
+  const googleCalendarUrl = useMemo(
+    () =>
+      generateGoogleCalendarUrl({
+        title: `${course.title} (Live Cohort Workshop)`,
+        description: course.description,
+        startDate: course.cohort_start_date,
+        endDate: course.cohort_end_date,
+        meetingUrl: course.cohort_meeting_url,
+      }),
+    [course.title, course.description, course.cohort_start_date, course.cohort_end_date, course.cohort_meeting_url]
+  );
 
   // Learning Objectives (synthesize if not explicitly set)
   const learningObjectives = useMemo(() => {
@@ -272,24 +296,14 @@ export function CourseLandingView({
               <div className="flex flex-wrap items-center gap-y-2 gap-x-4 text-xs">
                 {/* Delivery Format Badge */}
                 {course.course_format === 'live_cohort' ? (
-                  <div className="flex items-center gap-1.5 rounded-md bg-blue-500/20 border border-blue-400/40 px-2.5 py-1 text-blue-300 font-bold">
+                  <div className="flex items-center gap-2 rounded-full bg-blue-500/20 border border-blue-400/40 px-3 py-1 text-blue-300 font-bold shadow-2xs">
                     <span className="h-2 w-2 rounded-full bg-blue-400 animate-pulse" />
-                    <span>LIVE COHORT</span>
-                    {course.cohort_start_date && (
-                      <span className="text-blue-300/80 font-normal">
-                        · Starts {new Date(course.cohort_start_date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                    <span>LIVE INTERACTIVE COHORT</span>
+                    {cohortDateRange && (
+                      <span className="text-blue-200/90 font-normal">
+                        · {cohortDateRange}
                       </span>
                     )}
-                  </div>
-                ) : course.course_format === 'text_and_labs' ? (
-                  <div className="flex items-center gap-1.5 rounded-md bg-emerald-500/20 border border-emerald-400/40 px-2.5 py-1 text-emerald-300 font-bold">
-                    <BookOpen className="h-3.5 w-3.5 text-emerald-400" />
-                    <span>TEXT & LABS</span>
-                  </div>
-                ) : course.course_format === 'action_challenge' ? (
-                  <div className="flex items-center gap-1.5 rounded-md bg-purple-500/20 border border-purple-400/40 px-2.5 py-1 text-purple-300 font-bold">
-                    <Target className="h-3.5 w-3.5 text-purple-400" />
-                    <span>{course.challenge_duration_days || 30}-DAY ACTION SPRINT</span>
                   </div>
                 ) : (
                   <div className="flex items-center gap-1.5 rounded-md bg-amber-500/10 border border-amber-400/30 px-2.5 py-1 text-amber-300 font-bold">
@@ -433,6 +447,137 @@ export function CourseLandingView({
                 ))}
               </div>
             </section>
+
+            {/* -------------------------------------------------------------- */}
+            {/* LIVE COHORT WORKSHOP HUB (If format is live_cohort)            */}
+            {/* -------------------------------------------------------------- */}
+            {course.course_format === 'live_cohort' && (
+              <section className="rounded-2xl border-2 border-blue-200 bg-gradient-to-br from-blue-50/70 via-white to-blue-50/40 p-6 shadow-xs space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-blue-100 pb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-blue-600 text-white shadow-sm ring-4 ring-blue-100">
+                      <Video className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-2 w-2 rounded-full bg-blue-600 animate-pulse" />
+                        <span className="text-[11px] font-mono font-bold tracking-wider text-blue-700 uppercase">
+                          Interactive Live Cohort
+                        </span>
+                      </div>
+                      <h2 className="text-lg font-extrabold text-stone-900 mt-0.5">
+                        Live Video Classroom & Workshop Schedule
+                      </h2>
+                    </div>
+                  </div>
+
+                  {cohortDateRange && (
+                    <div className="flex items-center gap-1.5 rounded-xl bg-white border border-blue-200/80 px-3 py-1.5 text-xs font-semibold text-blue-900 shadow-2xs self-start sm:self-auto">
+                      <Calendar className="h-4 w-4 text-blue-600" />
+                      <span>{cohortDateRange}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Cohort Details Grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Schedule Card */}
+                  <div className="rounded-xl border border-blue-100 bg-white p-4 space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-bold text-stone-800">
+                      <Clock className="h-4 w-4 text-blue-600" />
+                      <span>Live Session Schedule</span>
+                    </div>
+                    <p className="text-sm font-semibold text-stone-900">
+                      {course.cohort_schedule_description || 'Weekly scheduled live interactive workshops'}
+                    </p>
+                    <p className="text-[11px] text-stone-500 leading-relaxed">
+                      Interactive lectures, group discussions, and live code reviews directly with the instructor.
+                    </p>
+                  </div>
+
+                  {/* Classroom Access Card */}
+                  <div className="rounded-xl border border-blue-100 bg-white p-4 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2 text-xs font-bold text-stone-800">
+                        <Video className="h-4 w-4 text-blue-600" />
+                        <span>Classroom Platform</span>
+                      </div>
+                      <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold ${detectedPlatform.badgeBg} ${detectedPlatform.badgeText}`}>
+                        {detectedPlatform.name}
+                      </span>
+                    </div>
+
+                    {hasAccess && course.cohort_meeting_url ? (
+                      <div className="space-y-2 pt-1">
+                        <a
+                          href={course.cohort_meeting_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition-colors"
+                        >
+                          <Video className="h-4 w-4" />
+                          <span>Launch Live Classroom</span>
+                          <ExternalLink className="h-3.5 w-3.5 opacity-80" />
+                        </a>
+                        <div className="flex items-center justify-between text-[11px] text-stone-500 pt-1">
+                          <a
+                            href={googleCalendarUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-700 hover:underline flex items-center gap-1 font-medium"
+                          >
+                            <Calendar className="h-3 w-3" />
+                            <span>Add to Google Calendar</span>
+                          </a>
+                          <span className="text-stone-400">Direct Room Link Active</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5 pt-1">
+                        <div className="flex items-center gap-1.5 text-xs text-stone-600">
+                          <Lock className="h-3.5 w-3.5 text-stone-400" />
+                          <span>Video classroom link unlocks upon enrollment</span>
+                        </div>
+                        <p className="text-[11px] text-stone-500">
+                          Enroll to receive the direct meeting link, calendar invitations, and access to recordings.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Cohort Feature Highlights */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-blue-100/80 pt-4 text-xs">
+                  <div className="flex items-start gap-2.5">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 font-bold text-[10px]">
+                      1
+                    </span>
+                    <div>
+                      <span className="font-bold text-stone-900 block">Live Interactive Lectures</span>
+                      <span className="text-stone-500 text-[11px]">Real-time demonstrations and active discussions.</span>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 font-bold text-[10px]">
+                      2
+                    </span>
+                    <div>
+                      <span className="font-bold text-stone-900 block">Full Session Replays</span>
+                      <span className="text-stone-500 text-[11px]">Recordings posted within 24h with lifetime access.</span>
+                    </div>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-100 text-blue-700 font-bold text-[10px]">
+                      3
+                    </span>
+                    <div>
+                      <span className="font-bold text-stone-900 block">Cohort Peer Network</span>
+                      <span className="text-stone-500 text-[11px]">Study with motivated peers in this Circle.</span>
+                    </div>
+                  </div>
+                </div>
+              </section>
+            )}
 
             {/* -------------------------------------------------------------- */}
             {/* B. COURSE CONTENT / SYLLABUS ACCORDION                          */}
@@ -870,10 +1015,6 @@ export function CourseLandingView({
                   <div className="h-14 w-14 rounded-full bg-white/95 flex items-center justify-center shadow-lg transition-transform group-hover:scale-110">
                     {course.course_format === 'live_cohort' ? (
                       <Video className="h-6 w-6 text-blue-700 ml-0.5" />
-                    ) : course.course_format === 'text_and_labs' ? (
-                      <BookOpen className="h-6 w-6 text-emerald-700 ml-0.5" />
-                    ) : course.course_format === 'action_challenge' ? (
-                      <Target className="h-6 w-6 text-purple-700 ml-0.5" />
                     ) : (
                       <Play className="h-6 w-6 text-black fill-black ml-1" />
                     )}
@@ -881,10 +1022,6 @@ export function CourseLandingView({
                   <span className="text-xs font-bold text-white tracking-wide shadow-sm">
                     {course.course_format === 'live_cohort'
                       ? 'Live Cohort Classroom'
-                      : course.course_format === 'text_and_labs'
-                      ? 'Interactive Reading & Labs'
-                      : course.course_format === 'action_challenge'
-                      ? 'Action Sprint Prompts'
                       : 'Preview this course'}
                   </span>
                 </div>
@@ -994,22 +1131,6 @@ export function CourseLandingView({
                         <span>{isEnrolled ? 'View Curriculum & Replays' : 'Join This Live Cohort'}</span>
                       </Button>
                     </div>
-                  ) : course.course_format === 'text_and_labs' ? (
-                    <Button
-                      onClick={() => onStartLearning(firstPlayableLesson?.id)}
-                      className="w-full rounded-xl bg-black py-3 text-sm font-bold text-white shadow-xs hover:bg-stone-800 transition-all flex items-center justify-center gap-2"
-                    >
-                      <BookOpen className="h-4 w-4" />
-                      <span>{isEnrolled ? 'Continue Reading & Labs' : 'Start Reading Course'}</span>
-                    </Button>
-                  ) : course.course_format === 'action_challenge' ? (
-                    <Button
-                      onClick={() => onStartLearning(firstPlayableLesson?.id)}
-                      className="w-full rounded-xl bg-purple-700 py-3 text-sm font-bold text-white shadow-xs hover:bg-purple-800 transition-all flex items-center justify-center gap-2"
-                    >
-                      <Target className="h-4 w-4" />
-                      <span>{isEnrolled ? "Continue Today's Sprint" : 'Join the Sprint'}</span>
-                    </Button>
                   ) : (
                     <Button
                       onClick={() => onStartLearning(firstPlayableLesson?.id)}
@@ -1035,7 +1156,7 @@ export function CourseLandingView({
                       <>
                         <li className="flex items-center gap-2.5 text-blue-900 font-semibold">
                           <Video className="h-4 w-4 text-blue-700 shrink-0" />
-                          <span>Live interactive video workshops via Zoom/Meet</span>
+                          <span>Live interactive video workshops ({detectedPlatform.name})</span>
                         </li>
                         <li className="flex items-center gap-2.5">
                           <Users className="h-4 w-4 text-stone-500 shrink-0" />
@@ -1054,62 +1175,8 @@ export function CourseLandingView({
                           <span>Official Cohort Certificate of Completion</span>
                         </li>
                       </>
-                    ) : course.course_format === 'text_and_labs' ? (
-                      <>
-                        <li className="flex items-center gap-2.5 text-emerald-900 font-semibold">
-                          <BookOpen className="h-4 w-4 text-emerald-700 shrink-0" />
-                          <span>In-depth reading guides & architecture breakdowns</span>
-                        </li>
-                        <li className="flex items-center gap-2.5">
-                          <CheckCircle2 className="h-4 w-4 text-stone-500 shrink-0" />
-                          <span>Zero video required — read and learn at your pace</span>
-                        </li>
-                        <li className="flex items-center gap-2.5">
-                          <FileText className="h-4 w-4 text-stone-500 shrink-0" />
-                          <span>Interactive code sandboxes & lab exercises</span>
-                        </li>
-                        <li className="flex items-center gap-2.5">
-                          <Layers className="h-4 w-4 text-stone-500 shrink-0" />
-                          <span>Self-assessment milestone quizzes</span>
-                        </li>
-                        <li className="flex items-center gap-2.5">
-                          <FolderDown className="h-4 w-4 text-stone-500 shrink-0" />
-                          <span>Downloadable cheatsheets & starter templates</span>
-                        </li>
-                        <li className="flex items-center gap-2.5">
-                          <Award className="h-4 w-4 text-stone-500 shrink-0" />
-                          <span>Certificate of Completion</span>
-                        </li>
-                      </>
-                    ) : course.course_format === 'action_challenge' ? (
-                      <>
-                        <li className="flex items-center gap-2.5 text-purple-900 font-semibold">
-                          <Target className="h-4 w-4 text-purple-700 shrink-0" />
-                          <span>{course.challenge_duration_days || 30} daily action prompts & challenges</span>
-                        </li>
-                        <li className="flex items-center gap-2.5">
-                          <Users className="h-4 w-4 text-stone-500 shrink-0" />
-                          <span>Community proof-of-work feed for accountability</span>
-                        </li>
-                        <li className="flex items-center gap-2.5">
-                          <Sparkles className="h-4 w-4 text-stone-500 shrink-0" />
-                          <span>Gamification XP points & daily streak tracking</span>
-                        </li>
-                        <li className="flex items-center gap-2.5">
-                          <Award className="h-4 w-4 text-stone-500 shrink-0" />
-                          <span>Sprint Finisher Badge & Certificate</span>
-                        </li>
-                      </>
                     ) : (
                       <>
-                        <li className="flex items-center gap-2.5">
-                          <Clock className="h-4 w-4 text-stone-500 shrink-0" />
-                          <span>{totalDurationHours} hours on-demand video</span>
-                        </li>
-                        <li className="flex items-center gap-2.5">
-                          <FileText className="h-4 w-4 text-stone-500 shrink-0" />
-                          <span>{totalLessons} lessons & interactive exercises</span>
-                        </li>
                         <li className="flex items-center gap-2.5">
                           <FolderDown className="h-4 w-4 text-stone-500 shrink-0" />
                           <span>Downloadable resources & code files</span>

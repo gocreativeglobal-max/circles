@@ -11,13 +11,12 @@ import {
   Layers,
   AlertCircle,
   Video,
-  Target,
-  BookOpen,
   Play,
 } from 'lucide-react';
 import { CourseItem, CourseDeliveryFormat } from '@/types/domain';
 import { Button } from '@/components/ui/button';
 import { ImageUploader } from '@/components/ui/image-uploader';
+import { detectMeetingPlatform } from '@/lib/courses/cohort-helpers';
 
 interface CourseSettingsModalProps {
   circleId: string;
@@ -69,6 +68,8 @@ export function CourseSettingsModal({
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const detectedPlatform = detectMeetingPlatform(cohortMeetingUrl);
 
   // Sync state when course prop updates
   useEffect(() => {
@@ -288,108 +289,87 @@ export function CourseSettingsModal({
               </p>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <button
                 type="button"
                 onClick={() => setCourseFormat('video_on_demand')}
-                className={`p-2.5 rounded-xl border text-left transition-all ${
+                className={`p-3.5 rounded-xl border text-left transition-all ${
                   courseFormat === 'video_on_demand'
-                    ? 'border-black bg-white ring-2 ring-black/10 font-bold'
+                    ? 'border-black bg-white ring-2 ring-black/10 font-bold shadow-xs'
                     : 'border-stone-200 bg-white hover:bg-stone-50'
                 }`}
               >
-                <Play className="h-4 w-4 mb-1 text-stone-700" />
-                <div className="text-xs text-stone-900 font-bold">On-Demand</div>
-                <div className="text-[10px] text-stone-500">Video lectures</div>
+                <div className="flex items-center justify-between">
+                  <Play className="h-4 w-4 text-stone-900" />
+                  <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[9px] font-semibold text-stone-700">
+                    Self-Paced
+                  </span>
+                </div>
+                <div className="mt-2 text-xs text-stone-900 font-bold">Video on Demand</div>
+                <div className="text-[11px] text-stone-500 mt-0.5">Pre-recorded lessons at learner pace</div>
               </button>
 
               <button
                 type="button"
                 onClick={() => setCourseFormat('live_cohort')}
-                className={`p-2.5 rounded-xl border text-left transition-all ${
+                className={`p-3.5 rounded-xl border text-left transition-all ${
                   courseFormat === 'live_cohort'
-                    ? 'border-blue-700 bg-blue-50/50 ring-2 ring-blue-500/20 font-bold'
+                    ? 'border-blue-700 bg-blue-50/50 ring-2 ring-blue-500/20 font-bold shadow-xs'
                     : 'border-stone-200 bg-white hover:bg-stone-50'
                 }`}
               >
-                <Video className="h-4 w-4 mb-1 text-blue-700" />
-                <div className="text-xs text-stone-900 font-bold">Live Cohort</div>
-                <div className="text-[10px] text-stone-500">Zoom / workshops</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setCourseFormat('text_and_labs')}
-                className={`p-2.5 rounded-xl border text-left transition-all ${
-                  courseFormat === 'text_and_labs'
-                    ? 'border-emerald-700 bg-emerald-50/50 ring-2 ring-emerald-500/20 font-bold'
-                    : 'border-stone-200 bg-white hover:bg-stone-50'
-                }`}
-              >
-                <BookOpen className="h-4 w-4 mb-1 text-emerald-700" />
-                <div className="text-xs text-stone-900 font-bold">Text & Labs</div>
-                <div className="text-[10px] text-stone-500">Zero video needed</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setCourseFormat('action_challenge')}
-                className={`p-2.5 rounded-xl border text-left transition-all ${
-                  courseFormat === 'action_challenge'
-                    ? 'border-purple-700 bg-purple-50/50 ring-2 ring-purple-500/20 font-bold'
-                    : 'border-stone-200 bg-white hover:bg-stone-50'
-                }`}
-              >
-                <Target className="h-4 w-4 mb-1 text-purple-700" />
-                <div className="text-xs text-stone-900 font-bold">Action Sprint</div>
-                <div className="text-[10px] text-stone-500">Daily prompts & XP</div>
+                <div className="flex items-center justify-between">
+                  <Video className="h-4 w-4 text-blue-700" />
+                  <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[9px] font-bold text-blue-800">
+                    🔴 Live Workshops
+                  </span>
+                </div>
+                <div className="mt-2 text-xs text-stone-900 font-bold">Live Cohort</div>
+                <div className="text-[11px] text-stone-500 mt-0.5">Live video room, schedule & replays</div>
               </button>
             </div>
 
             {/* Live Cohort meeting details */}
             {courseFormat === 'live_cohort' && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-stone-200">
-                <div>
-                  <label className="text-[11px] font-semibold text-stone-700 block">
-                    Live Video Classroom Link (Zoom / Meet)
-                  </label>
-                  <input
-                    type="url"
-                    value={cohortMeetingUrl}
-                    onChange={(e) => setCohortMeetingUrl(e.target.value)}
-                    placeholder="https://zoom.us/j/..."
-                    className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
-                  />
+              <div className="rounded-xl border border-blue-200 bg-white p-3.5 space-y-3">
+                <div className="flex items-center justify-between border-b border-blue-100 pb-2">
+                  <span className="text-xs font-bold text-stone-900 flex items-center gap-1.5">
+                    <Video className="h-3.5 w-3.5 text-blue-700" />
+                    <span>Live Classroom Link & Schedule</span>
+                  </span>
+                  {detectedPlatform.platform !== 'custom' && (
+                    <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-bold ${detectedPlatform.badgeBg} ${detectedPlatform.badgeText}`}>
+                      {detectedPlatform.name}
+                    </span>
+                  )}
                 </div>
-                <div>
-                  <label className="text-[11px] font-semibold text-stone-700 block">
-                    Schedule Description
-                  </label>
-                  <input
-                    type="text"
-                    value={cohortScheduleDescription}
-                    onChange={(e) => setCohortScheduleDescription(e.target.value)}
-                    placeholder="e.g. Thursdays at 7:00 PM UTC"
-                    className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
-                  />
-                </div>
-              </div>
-            )}
 
-            {/* Action Sprint duration */}
-            {courseFormat === 'action_challenge' && (
-              <div className="pt-2 border-t border-stone-200">
-                <label className="text-[11px] font-semibold text-stone-700 block">
-                  Challenge Duration (Days)
-                </label>
-                <input
-                  type="number"
-                  min="5"
-                  max="365"
-                  value={challengeDurationDays}
-                  onChange={(e) => setChallengeDurationDays(e.target.value)}
-                  className="mt-1 w-32 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
-                />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[11px] font-semibold text-stone-700 block">
+                      Live Classroom URL (Zoom / Meet / Teams)
+                    </label>
+                    <input
+                      type="url"
+                      value={cohortMeetingUrl}
+                      onChange={(e) => setCohortMeetingUrl(e.target.value)}
+                      placeholder={detectedPlatform.defaultPlaceholder}
+                      className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[11px] font-semibold text-stone-700 block">
+                      Schedule Description
+                    </label>
+                    <input
+                      type="text"
+                      value={cohortScheduleDescription}
+                      onChange={(e) => setCohortScheduleDescription(e.target.value)}
+                      placeholder="e.g. Thursdays at 7:00 PM UTC"
+                      className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
+                    />
+                  </div>
+                </div>
               </div>
             )}
           </div>

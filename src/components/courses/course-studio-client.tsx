@@ -27,7 +27,6 @@ import {
   Upload,
   X,
   Video,
-  Target,
 } from 'lucide-react';
 import {
   CourseItem,
@@ -40,6 +39,7 @@ import { Button } from '@/components/ui/button';
 import { ImageUploader } from '@/components/ui/image-uploader';
 import { LessonBlockBuilder } from './lesson-block-builder';
 import { compressImage } from '@/lib/media/compressor';
+import { detectMeetingPlatform } from '@/lib/courses/cohort-helpers';
 import {
   BACHS_ACCEPTED_CURRENCIES,
   formatBachsAmount,
@@ -121,10 +121,11 @@ export function CourseStudioClient({
   const [cohortMeetingUrl, setCohortMeetingUrl] = useState(
     initialCourse.cohort_meeting_url || ''
   );
+  const detectedPlatform = detectMeetingPlatform(cohortMeetingUrl);
   const [cohortScheduleDescription, setCohortScheduleDescription] = useState(
     initialCourse.cohort_schedule_description || ''
   );
-  const [challengeDurationDays, setChallengeDurationDays] = useState(
+  const [challengeDurationDays] = useState(
     initialCourse.challenge_duration_days ? String(initialCourse.challenge_duration_days) : '30'
   );
   const [pacingFormat, setPacingFormat] = useState<'self_paced' | 'structured' | 'scheduled'>(
@@ -2014,22 +2015,27 @@ export function CourseStudioClient({
                   Select the delivery archetype for this curriculum to tailor the student experience.
                 </p>
 
-                <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <button
                     type="button"
                     onClick={() => {
                       setCourseFormat('video_on_demand');
                       setPacingFormat('self_paced');
                     }}
-                    className={`p-3 rounded-xl border text-left transition-all ${
+                    className={`p-3.5 rounded-xl border text-left transition-all ${
                       courseFormat === 'video_on_demand'
-                        ? 'border-black bg-white ring-2 ring-black/10 font-bold'
+                        ? 'border-black bg-white ring-2 ring-black/10 font-bold shadow-xs'
                         : 'border-stone-200 bg-white hover:bg-stone-50'
                     }`}
                   >
-                    <Play className="h-4 w-4 mb-1.5 text-stone-800" />
-                    <div className="text-xs text-stone-900 font-bold">On-Demand</div>
-                    <div className="text-[10px] text-stone-500 mt-0.5">Video lectures</div>
+                    <div className="flex items-center justify-between">
+                      <Play className="h-4 w-4 text-stone-900" />
+                      <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[9px] font-semibold text-stone-700">
+                        Self-Paced
+                      </span>
+                    </div>
+                    <div className="mt-2 text-xs text-stone-900 font-bold">Video on Demand</div>
+                    <div className="text-[11px] text-stone-500 mt-0.5">Pre-recorded lessons at learner pace</div>
                   </button>
 
                   <button
@@ -2038,70 +2044,48 @@ export function CourseStudioClient({
                       setCourseFormat('live_cohort');
                       setPacingFormat('scheduled');
                     }}
-                    className={`p-3 rounded-xl border text-left transition-all ${
+                    className={`p-3.5 rounded-xl border text-left transition-all ${
                       courseFormat === 'live_cohort'
-                        ? 'border-blue-700 bg-blue-50/50 ring-2 ring-blue-500/20 font-bold'
+                        ? 'border-blue-700 bg-blue-50/50 ring-2 ring-blue-500/20 font-bold shadow-xs'
                         : 'border-stone-200 bg-white hover:bg-stone-50'
                     }`}
                   >
-                    <Video className="h-4 w-4 mb-1.5 text-blue-700" />
-                    <div className="text-xs text-stone-900 font-bold">Live Cohort</div>
-                    <div className="text-[10px] text-stone-500 mt-0.5">Zoom / workshops</div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCourseFormat('text_and_labs');
-                      setPacingFormat('structured');
-                    }}
-                    className={`p-3 rounded-xl border text-left transition-all ${
-                      courseFormat === 'text_and_labs'
-                        ? 'border-emerald-700 bg-emerald-50/50 ring-2 ring-emerald-500/20 font-bold'
-                        : 'border-stone-200 bg-white hover:bg-stone-50'
-                    }`}
-                  >
-                    <BookOpen className="h-4 w-4 mb-1.5 text-emerald-700" />
-                    <div className="text-xs text-stone-900 font-bold">Text & Labs</div>
-                    <div className="text-[10px] text-stone-500 mt-0.5">Zero video needed</div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCourseFormat('action_challenge');
-                      setPacingFormat('scheduled');
-                    }}
-                    className={`p-3 rounded-xl border text-left transition-all ${
-                      courseFormat === 'action_challenge'
-                        ? 'border-purple-700 bg-purple-50/50 ring-2 ring-purple-500/20 font-bold'
-                        : 'border-stone-200 bg-white hover:bg-stone-50'
-                    }`}
-                  >
-                    <Target className="h-4 w-4 mb-1.5 text-purple-700" />
-                    <div className="text-xs text-stone-900 font-bold">Action Sprint</div>
-                    <div className="text-[10px] text-stone-500 mt-0.5">Daily prompts & XP</div>
+                    <div className="flex items-center justify-between">
+                      <Video className="h-4 w-4 text-blue-700" />
+                      <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[9px] font-bold text-blue-800">
+                        🔴 Live Workshops
+                      </span>
+                    </div>
+                    <div className="mt-2 text-xs text-stone-900 font-bold">Live Cohort</div>
+                    <div className="text-[11px] text-stone-500 mt-0.5">Live video room, schedule & replays</div>
                   </button>
                 </div>
 
                 {courseFormat === 'live_cohort' && (
-                  <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50/40 p-4 space-y-3">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-blue-900">
-                      <Video className="h-3.5 w-3.5 text-blue-700" />
-                      <span>Live Classroom Settings</span>
+                  <div className="mt-4 rounded-xl border border-blue-200 bg-white p-4 space-y-3.5 shadow-2xs">
+                    <div className="flex items-center justify-between border-b border-blue-100 pb-2.5">
+                      <div className="flex items-center gap-1.5 text-xs font-bold text-stone-900">
+                        <Video className="h-4 w-4 text-blue-700" />
+                        <span>Live Cohort Classroom Link & Schedule</span>
+                      </div>
+                      {detectedPlatform.platform !== 'custom' && (
+                        <span className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-[10px] font-bold ${detectedPlatform.badgeBg} ${detectedPlatform.badgeText}`}>
+                          {detectedPlatform.name}
+                        </span>
+                      )}
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                       <div>
                         <label className="text-[11px] font-semibold text-stone-700 block">
-                          Live Video Classroom Link (Zoom / Meet)
+                          Live Video Classroom Link (Zoom / Meet / Teams)
                         </label>
                         <input
                           type="url"
                           value={cohortMeetingUrl}
                           onChange={(e) => setCohortMeetingUrl(e.target.value)}
-                          placeholder="https://zoom.us/j/..."
-                          className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
+                          placeholder={detectedPlatform.defaultPlaceholder}
+                          className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
                         />
                       </div>
                       <div>
@@ -2113,31 +2097,9 @@ export function CourseStudioClient({
                           value={cohortScheduleDescription}
                           onChange={(e) => setCohortScheduleDescription(e.target.value)}
                           placeholder="e.g. Thursdays at 7:00 PM UTC"
-                          className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
+                          className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
                         />
                       </div>
-                    </div>
-                  </div>
-                )}
-
-                {courseFormat === 'action_challenge' && (
-                  <div className="mt-4 rounded-xl border border-purple-200 bg-purple-50/40 p-4 space-y-2">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-purple-900">
-                      <Target className="h-3.5 w-3.5 text-purple-700" />
-                      <span>Challenge Duration</span>
-                    </div>
-                    <div>
-                      <label className="text-[11px] font-semibold text-stone-700 block">
-                        Sprint Duration (Days)
-                      </label>
-                      <input
-                        type="number"
-                        min="5"
-                        max="365"
-                        value={challengeDurationDays}
-                        onChange={(e) => setChallengeDurationDays(e.target.value)}
-                        className="mt-1 w-32 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
-                      />
                     </div>
                   </div>
                 )}
