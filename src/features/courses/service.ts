@@ -3197,7 +3197,8 @@ export async function purchaseCoursePaywall(
       );
     }
 
-    const isFree = plan.amount_cents === 0;
+    const amountCents = Math.round(Number(plan.amount_cents) || 0);
+    const isFree = amountCents === 0;
     const invoiceId = crypto.randomUUID();
     const invoiceNumber = `INV-COURSE-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
@@ -3299,7 +3300,7 @@ export async function purchaseCoursePaywall(
       invoiceId,
       planId: plan.id,
       userId: actorUserId,
-      amountCents: plan.amount_cents,
+      amountCents,
       currency: plan.currency,
       title: `Course Access: ${plan.name}`,
       customerEmail: profile.email || 'member@joincircles.online',

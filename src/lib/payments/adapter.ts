@@ -97,13 +97,14 @@ export class BachsPaymentProcessorAdapter implements PaymentProcessorAdapter {
   async createCheckoutSession(input: CheckoutSessionInput): Promise<CheckoutSessionResult> {
     const safeSuccessUrl = ensureAbsoluteHttpUrl(input.successUrl);
     const safeCancelUrl = ensureAbsoluteHttpUrl(input.cancelUrl);
+    const decimalAmount = (Math.max(0, Number(input.amountCents) || 0) / 100).toFixed(2);
 
     const payload = {
       customer: {
         email: input.customerEmail || 'member@joincircles.online',
       },
       pricing: {
-        amount_cents: input.amountCents,
+        amount: decimalAmount,
         currency: input.currency.toUpperCase(),
       },
       metadata: {
@@ -189,13 +190,29 @@ export class BachsPaymentProcessorAdapter implements PaymentProcessorAdapter {
       const sessionObj = dataObj.object || dataObj;
       const metadata = sessionObj.metadata || parsed.metadata || {};
 
+      let resolvedAmountCents: number | undefined;
+      const rawCents = sessionObj.amount_cents ?? sessionObj.amount_total_cents;
+      if (typeof rawCents === 'number' && !Number.isNaN(rawCents)) {
+        resolvedAmountCents = rawCents;
+      } else {
+        const rawAmount = sessionObj.amount ?? sessionObj.amount_total ?? parsed.amount;
+        if (typeof rawAmount === 'number' && !Number.isNaN(rawAmount)) {
+          resolvedAmountCents = Math.round(rawAmount * 100);
+        } else if (typeof rawAmount === 'string') {
+          const num = parseFloat(rawAmount);
+          if (!Number.isNaN(num)) {
+            resolvedAmountCents = Math.round(num * 100);
+          }
+        }
+      }
+
       return {
         isValid: true,
         eventType: parsed.type || parsed.event || 'collection.succeeded',
         invoiceId: metadata.invoiceId || sessionObj.internal_order_id || parsed.invoiceId,
         circleId: metadata.circleId || parsed.circleId,
         paymentReference: sessionObj.id || sessionObj.reference || `BACHS_${Date.now()}`,
-        amountCents: sessionObj.amount_cents || sessionObj.amount || sessionObj.amount_total || parsed.amountCents,
+        amountCents: resolvedAmountCents ?? sessionObj.amount_cents ?? parsed.amountCents,
         currency: (sessionObj.currency || parsed.currency || 'USD').toUpperCase(),
         metadata,
       };
