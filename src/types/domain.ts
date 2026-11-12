@@ -39,6 +39,10 @@ export interface UserProfile {
   avatar_url: string | null;
   location: string | null;
   profile_visibility: ProfileVisibility;
+  subscription_tier?: 'free' | 'starter' | 'pro' | 'platinum' | 'enterprise';
+  plan_subscription_status?: 'active' | 'past_due' | 'cancelled' | 'trial';
+  plan_current_period_end?: string | null;
+  custom_max_communities?: number | null;
   is_platform_admin?: boolean;
   created_at: string;
   updated_at: string;

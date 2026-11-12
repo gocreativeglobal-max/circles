@@ -18,6 +18,7 @@ import {
   getCirclePlatformLedger,
   getCircleTierInfo,
   getCircleStorageUsage,
+  getUserCommunityQuota,
   createPlatformTierCheckoutSession,
   confirmPlatformTierPayment,
 } from '@/features/finances/platform-fees';
@@ -80,9 +81,11 @@ export async function GET(
       const data = await withRlsTransaction(user.id, async (tx) => {
         const info = await getCircleTierInfo(tx, params.circleId);
         const storageUsage = await getCircleStorageUsage(tx, params.circleId);
+        const accountQuota = await getUserCommunityQuota(tx, user.id);
         return {
           ...info,
           storageUsage,
+          accountQuota,
           tiers: PLATFORM_TIERS,
         };
       });
@@ -169,12 +172,14 @@ export async function POST(
           // ignore
         }
       }
+      const scope = body.scope === 'circle' ? 'circle' : 'account';
       const session = await createPlatformTierCheckoutSession(
         user.id,
         params.circleId,
         body.tier,
         body.currency || 'USD',
-        clientOrigin
+        clientOrigin,
+        scope
       );
       return NextResponse.json(session, { status: 200 });
     }

@@ -15,6 +15,7 @@ import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '@
 import { CIRCLE_TEMPLATES } from '@/features/templates/registry';
 import { CAPABILITY_REGISTRY, getDefaultEnabledCapabilityKeys } from '@/features/capabilities/registry';
 import { assertCirclePermission } from '@/lib/authorization/permissions';
+import { getUserCommunityQuota } from '@/features/finances/platform-fees';
 
 function reconcileVisibilityAndPolicy(
   visibility: CircleVisibility,
@@ -55,6 +56,16 @@ export async function createCircle(actorUserId: string, input: unknown): Promise
   const category = (data.category ?? template?.category ?? 'general') as CircleCategory;
 
   return withRlsTransaction(actorUserId, async (tx) => {
+    // 0. Quota check: Ensure creator has not exceeded their All-in-One community allowance
+    const quota = await getUserCommunityQuota(tx, actorUserId);
+    if (!quota.canCreateMore) {
+      throw new ValidationError(
+        `You have reached the maximum of ${quota.maxCommunitiesAllowed} ${
+          quota.maxCommunitiesAllowed === 1 ? 'community' : 'communities'
+        } allowed on your ${quota.tierName} plan. Upgrade your account plan to create more communities.`
+      );
+    }
+
     let finalSlug = baseSlug;
     const slugCheck = await tx.query<{ id: string }>(
       `SELECT id FROM public.circles WHERE slug = $1 LIMIT 1;`,
@@ -72,8 +83,8 @@ export async function createCircle(actorUserId: string, input: unknown): Promise
     const circleRes = await tx.query<Circle>(
       `INSERT INTO public.circles (
          id, name, slug, description, category, location, visibility, membership_policy,
-         owner_id, template_key, template_version
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+         owner_id, template_key, template_version, plan_tier
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *;`,
       [
         circleId,
@@ -87,6 +98,7 @@ export async function createCircle(actorUserId: string, input: unknown): Promise
         actorUserId,
         template?.key ?? null,
         template?.version ?? null,
+        quota.subscriptionTier || 'free',
       ]
     );
 

@@ -104,6 +104,16 @@ export function StudioFinancesTab({
     isOverQuota: boolean;
   } | null>(null);
   const [tierSaving, setTierSaving] = useState(false);
+  const [accountQuota, setAccountQuota] = useState<{
+    subscriptionTier: string;
+    subscriptionStatus: string;
+    ownedCount: number;
+    maxCommunitiesAllowed: number;
+    canCreateMore: boolean;
+    tierName: string;
+    storageFormatted: string;
+  } | null>(null);
+  const [inheritedFromOwner, setInheritedFromOwner] = useState(false);
 
   // Tier Upgrade / Downgrade checkout state
   const [showUpgradeModal, setShowUpgradeModal] = useState<PlatformPlanTier | null>(null);
@@ -204,6 +214,12 @@ export function StudioFinancesTab({
       if (tierRes?.storageUsage) {
         setStorageUsage(tierRes.storageUsage);
       }
+      if (tierRes?.accountQuota) {
+        setAccountQuota(tierRes.accountQuota);
+      }
+      if (tierRes?.inheritedFromOwner) {
+        setInheritedFromOwner(Boolean(tierRes.inheritedFromOwner));
+      }
       if (platformLedgerRes?.ledger) {
         setPlatformLedger(platformLedgerRes.ledger);
       }
@@ -256,6 +272,7 @@ export function StudioFinancesTab({
           action: 'upgrade_tier_checkout',
           tier: targetTier,
           currency: selectedTierCurrency,
+          scope: 'account',
           origin: typeof window !== 'undefined' ? window.location.origin : undefined,
         }),
       });
@@ -1095,6 +1112,16 @@ export function StudioFinancesTab({
                     ? `${customFeePct}% Custom Fee`
                     : PLATFORM_TIERS[currentTier]?.badge}
                 </span>
+                {inheritedFromOwner && (
+                  <span className="mt-2 inline-flex items-center rounded-md bg-forest-700/80 px-2 py-0.5 text-[10px] font-bold text-forest-100 border border-forest-500/40">
+                    All-in-One Account Plan (Active across all your communities)
+                  </span>
+                )}
+                {accountQuota && (
+                  <span className="mt-1 text-[11px] font-medium text-forest-200">
+                    Account: {accountQuota.ownedCount} of {accountQuota.maxCommunitiesAllowed} communities used
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -1234,6 +1261,10 @@ export function StudioFinancesTab({
                           {tierKey === 'enterprise' && customFeePct != null
                             ? `${customFeePct}% Fee`
                             : tierDef.badge}
+                        </span>
+                        <span className="inline-flex items-center rounded-lg bg-forest-50 px-2 py-0.5 text-[11px] font-semibold text-forest-800">
+                          <Layers className="h-3 w-3 mr-1 text-forest-600" />
+                          Up to {tierDef.maxCommunitiesAllowed} {tierDef.maxCommunitiesAllowed === 1 ? 'Community' : 'Communities'}
                         </span>
                         <span className="inline-flex items-center rounded-lg bg-stone-100 px-2 py-0.5 text-[11px] font-semibold text-stone-700">
                           <HardDrive className="h-3 w-3 mr-1 text-stone-500" />
@@ -2341,6 +2372,10 @@ export function StudioFinancesTab({
                     )}
 
                     <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span className="text-stone-500 block">Communities Included:</span>
+                        <span className="font-bold text-stone-900">Up to {tierDef.maxCommunitiesAllowed} (All-in-One)</span>
+                      </div>
                       <div>
                         <span className="text-stone-500 block">Cloud Storage:</span>
                         <span className="font-bold text-stone-900">{tierDef.storageFormatted}</span>

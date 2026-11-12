@@ -1,10 +1,20 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertCircle, ArrowRight, Check, Globe, Lock, PlusCircle, Shield } from 'lucide-react';
+import { AlertCircle, ArrowRight, Check, Globe, Layers, Lock, PlusCircle, Shield } from 'lucide-react';
 import { CIRCLE_TEMPLATES } from '@/features/templates/registry';
 import { CircleCategory, CircleVisibility, MembershipPolicy } from '@/types/domain';
+
+interface AccountQuota {
+  subscriptionTier: string;
+  subscriptionStatus: string;
+  ownedCount: number;
+  maxCommunitiesAllowed: number;
+  canCreateMore: boolean;
+  tierName: string;
+  storageFormatted: string;
+}
 
 export default function CreateCirclePage() {
   const router = useRouter();
@@ -20,6 +30,24 @@ export default function CreateCirclePage() {
   const [membershipPolicy, setMembershipPolicy] = useState<MembershipPolicy>('open');
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [quota, setQuota] = useState<AccountQuota | null>(null);
+
+  useEffect(() => {
+    async function fetchQuota() {
+      try {
+        const res = await fetch('/api/account/subscription');
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.quota) {
+            setQuota(data.quota);
+          }
+        }
+      } catch {
+        // non-blocking
+      }
+    }
+    fetchQuota();
+  }, []);
 
   function handleSelectTemplate(key: string) {
     setSelectedTemplate(key);
@@ -83,7 +111,55 @@ export default function CreateCirclePage() {
           Choose a blueprint to auto-configure spaces and capabilities. You can fully customize
           and toggle every module later in Circle Studio.
         </p>
+
+        {/* All-in-One Community Quota Badge */}
+        {quota && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-stone-200 bg-stone-50/70 p-3.5 text-xs text-stone-700">
+            <div className="flex items-center gap-2">
+              <Layers className="h-4 w-4 text-stone-900" />
+              <span>
+                <strong>All-in-One Creator Account:</strong> {quota.tierName}
+              </span>
+              <span className="rounded-full bg-stone-200/80 px-2 py-0.5 text-[11px] font-semibold text-stone-800">
+                {quota.ownedCount} of {quota.maxCommunitiesAllowed} communities used
+              </span>
+            </div>
+            {!quota.canCreateMore ? (
+              <span className="font-semibold text-amber-700">
+                Community limit reached for this plan.
+              </span>
+            ) : (
+              <span className="text-stone-500">
+                {quota.maxCommunitiesAllowed - quota.ownedCount} community slot{quota.maxCommunitiesAllowed - quota.ownedCount === 1 ? '' : 's'} available
+              </span>
+            )}
+          </div>
+        )}
       </div>
+
+      {quota && !quota.canCreateMore && (
+        <div
+          role="alert"
+          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50/90 p-4 text-xs text-amber-900"
+        >
+          <div className="flex items-start gap-2.5">
+            <AlertCircle className="h-4 w-4 shrink-0 mt-0.5 text-amber-700" />
+            <div>
+              <p className="font-bold">You have used all {quota.maxCommunitiesAllowed} communities on your {quota.tierName} plan.</p>
+              <p className="mt-0.5 text-amber-800">
+                Upgrade to the Pro Creator or Network plan to unlock up to 25 communities under a single subscription.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => router.push('/settings')}
+            className="inline-flex items-center justify-center rounded-xl bg-amber-900 px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-amber-800 shrink-0"
+          >
+            Upgrade Plan
+          </button>
+        </div>
+      )}
 
       {error && (
         <div
@@ -339,10 +415,16 @@ export default function CreateCirclePage() {
         <div className="flex items-center justify-end gap-3 pt-2">
           <button
             type="submit"
-            disabled={loading}
+            disabled={loading || (quota !== null && !quota.canCreateMore)}
             className="inline-flex items-center gap-2 rounded-xl bg-black px-6 py-2.5 text-sm font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.25),0_1px_3px_rgba(0,0,0,0.15)] hover:bg-zinc-800 disabled:opacity-50 transition-all active:scale-[0.98]"
           >
-            <span>{loading ? 'Bootstrapping Circle...' : 'Create Community'}</span>
+            <span>
+              {loading
+                ? 'Bootstrapping Circle...'
+                : quota && !quota.canCreateMore
+                ? 'Community Limit Reached'
+                : 'Create Community'}
+            </span>
             <ArrowRight className="h-4 w-4" />
           </button>
         </div>
