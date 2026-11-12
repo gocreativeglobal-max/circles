@@ -9,7 +9,7 @@ export interface CircleTemplateSpec {
   defaultVisibility: CircleVisibility;
   defaultMembershipPolicy: MembershipPolicy;
   enabledCapabilities: string[];
-  suggestedSpaces: Array<{
+  suggestedSpaces?: Array<{
     name: string;
     slug: string;
     description: string;
@@ -38,48 +38,7 @@ export const CIRCLE_TEMPLATES: Record<string, CircleTemplateSpec> = {
       'learning_resources',
       'marketplace',
     ],
-    suggestedSpaces: [
-      {
-        name: 'Campus Announcements',
-        slug: 'announcements',
-        description: 'Official updates, academic deadlines, and campus news.',
-        icon: 'megaphone',
-        capabilityKey: 'discussions',
-        postingPolicy: 'moderators',
-      },
-      {
-        name: 'General Commons',
-        slug: 'general',
-        description: 'Open campus conversation and student introductions.',
-        icon: 'message-square',
-        capabilityKey: 'discussions',
-        postingPolicy: 'members',
-      },
-      {
-        name: 'Study Groups & Courses',
-        slug: 'study-groups',
-        description: 'Course cohorts, exam prep, and shared lecture notes.',
-        icon: 'graduation-cap',
-        capabilityKey: 'learning_resources',
-        postingPolicy: 'members',
-      },
-      {
-        name: 'Campus Events',
-        slug: 'events',
-        description: 'Societies, guest lectures, and student meetups.',
-        icon: 'calendar',
-        capabilityKey: 'events',
-        postingPolicy: 'members',
-      },
-      {
-        name: 'Internships & Opportunities',
-        slug: 'marketplace',
-        description: 'Research assistantships, internships, gigs, and student listings.',
-        icon: 'shopping-bag',
-        capabilityKey: 'marketplace',
-        postingPolicy: 'members',
-      },
-    ],
+    suggestedSpaces: [],
   },
   neighbourhood: {
     key: 'neighbourhood',
@@ -96,40 +55,7 @@ export const CIRCLE_TEMPLATES: Record<string, CircleTemplateSpec> = {
       'member_directory',
       'events',
     ],
-    suggestedSpaces: [
-      {
-        name: 'Neighbourhood Notices',
-        slug: 'notices',
-        description: 'Civic updates, street works, and association alerts.',
-        icon: 'megaphone',
-        capabilityKey: 'discussions',
-        postingPolicy: 'moderators',
-      },
-      {
-        name: 'Resident Forum',
-        slug: 'general',
-        description: 'Everyday conversation with neighbours on your block.',
-        icon: 'message-square',
-        capabilityKey: 'discussions',
-        postingPolicy: 'members',
-      },
-      {
-        name: 'Mutual Aid & Requests',
-        slug: 'requests',
-        description: 'Ask for a hand, borrow tools, or coordinate local support.',
-        icon: 'life-buoy',
-        capabilityKey: 'discussions',
-        postingPolicy: 'members',
-      },
-      {
-        name: 'Block Gatherings',
-        slug: 'events',
-        description: 'Clean-up days, town halls, and seasonal socials.',
-        icon: 'calendar',
-        capabilityKey: 'events',
-        postingPolicy: 'members',
-      },
-    ],
+    suggestedSpaces: [],
   },
   professional: {
     key: 'professional',
@@ -147,32 +73,7 @@ export const CIRCLE_TEMPLATES: Record<string, CircleTemplateSpec> = {
       'marketplace',
       'events',
     ],
-    suggestedSpaces: [
-      {
-        name: 'Introductions & Wins',
-        slug: 'introductions',
-        description: 'Meet fellow practitioners and share recent milestones.',
-        icon: 'users',
-        capabilityKey: 'discussions',
-        postingPolicy: 'members',
-      },
-      {
-        name: 'Industry Craft',
-        slug: 'general',
-        description: 'Deep dives into architecture, strategy, and practice.',
-        icon: 'message-square',
-        capabilityKey: 'discussions',
-        postingPolicy: 'members',
-      },
-      {
-        name: 'Career & Opportunities Board',
-        slug: 'marketplace',
-        description: 'Open roles, gigs, advisory requests, and professional services.',
-        icon: 'shopping-bag',
-        capabilityKey: 'marketplace',
-        postingPolicy: 'members',
-      },
-    ],
+    suggestedSpaces: [],
   },
   creator: {
     key: 'creator',
@@ -184,32 +85,7 @@ export const CIRCLE_TEMPLATES: Record<string, CircleTemplateSpec> = {
     defaultVisibility: 'public',
     defaultMembershipPolicy: 'open',
     enabledCapabilities: ['discussions', 'spaces', 'member_directory', 'events'],
-    suggestedSpaces: [
-      {
-        name: 'Studio Releases',
-        slug: 'announcements',
-        description: 'New episodes, essays, and behind-the-scenes drops.',
-        icon: 'megaphone',
-        capabilityKey: 'discussions',
-        postingPolicy: 'moderators',
-      },
-      {
-        name: 'Community Lounge',
-        slug: 'general',
-        description: 'Discuss topics, share feedback, and connect with peers.',
-        icon: 'message-square',
-        capabilityKey: 'discussions',
-        postingPolicy: 'members',
-      },
-      {
-        name: 'Work-in-Progress Feedback',
-        slug: 'feedback',
-        description: 'Share drafts and vote on upcoming topics.',
-        icon: 'bar-chart-2',
-        capabilityKey: 'discussions',
-        postingPolicy: 'members',
-      },
-    ],
+    suggestedSpaces: [],
   },
   learning: {
     key: 'learning',
@@ -226,32 +102,7 @@ export const CIRCLE_TEMPLATES: Record<string, CircleTemplateSpec> = {
       'member_directory',
       'learning_resources',
     ],
-    suggestedSpaces: [
-      {
-        name: 'Syllabus & Announcements',
-        slug: 'announcements',
-        description: 'Weekly modules, reading lists, and session links.',
-        icon: 'megaphone',
-        capabilityKey: 'discussions',
-        postingPolicy: 'moderators',
-      },
-      {
-        name: 'Cohort Discussions',
-        slug: 'general',
-        description: 'Reflections, study notes, and peer synthesis.',
-        icon: 'graduation-cap',
-        capabilityKey: 'learning_resources',
-        postingPolicy: 'members',
-      },
-      {
-        name: 'Office Hours & Q&A',
-        slug: 'help-desk',
-        description: 'Unblock technical or conceptual questions together.',
-        icon: 'life-buoy',
-        capabilityKey: 'discussions',
-        postingPolicy: 'members',
-      },
-    ],
+    suggestedSpaces: [],
   },
   sports: {
     key: 'sports',
@@ -263,32 +114,7 @@ export const CIRCLE_TEMPLATES: Record<string, CircleTemplateSpec> = {
     defaultVisibility: 'public',
     defaultMembershipPolicy: 'open',
     enabledCapabilities: ['discussions', 'spaces', 'member_directory', 'events', 'rsvps'],
-    suggestedSpaces: [
-      {
-        name: 'Club Notices',
-        slug: 'announcements',
-        description: 'Fixture updates, pitch changes, and kit notices.',
-        icon: 'megaphone',
-        capabilityKey: 'discussions',
-        postingPolicy: 'moderators',
-      },
-      {
-        name: 'Clubhouse Chat',
-        slug: 'general',
-        description: 'Post-match recaps and training plans.',
-        icon: 'message-square',
-        capabilityKey: 'discussions',
-        postingPolicy: 'members',
-      },
-      {
-        name: 'Training & Matches',
-        slug: 'events',
-        description: 'Weekly sessions, tournaments, and squad RSVPs.',
-        icon: 'calendar',
-        capabilityKey: 'events',
-        postingPolicy: 'members',
-      },
-    ],
+    suggestedSpaces: [],
   },
   project: {
     key: 'project',
@@ -305,24 +131,7 @@ export const CIRCLE_TEMPLATES: Record<string, CircleTemplateSpec> = {
       'member_directory',
       'projects_collaboration',
     ],
-    suggestedSpaces: [
-      {
-        name: 'Ship Log & Releases',
-        slug: 'announcements',
-        description: 'Milestone updates, changelogs, and architecture decisions.',
-        icon: 'megaphone',
-        capabilityKey: 'discussions',
-        postingPolicy: 'members',
-      },
-      {
-        name: 'Core Engineering & Product',
-        slug: 'general',
-        description: 'Day-to-day coordination, specs, and design reviews.',
-        icon: 'folder-kanban',
-        capabilityKey: 'projects_collaboration',
-        postingPolicy: 'members',
-      },
-    ],
+    suggestedSpaces: [],
   },
   local_business: {
     key: 'local_business',
@@ -339,24 +148,7 @@ export const CIRCLE_TEMPLATES: Record<string, CircleTemplateSpec> = {
       'member_directory',
       'events',
     ],
-    suggestedSpaces: [
-      {
-        name: 'Merchant Bulletins',
-        slug: 'announcements',
-        description: 'District news, seasonal markets, and policy updates.',
-        icon: 'megaphone',
-        capabilityKey: 'discussions',
-        postingPolicy: 'moderators',
-      },
-      {
-        name: 'Business Owners Forum',
-        slug: 'general',
-        description: 'Collaborate with fellow shop owners and local founders.',
-        icon: 'message-square',
-        capabilityKey: 'discussions',
-        postingPolicy: 'members',
-      },
-    ],
+    suggestedSpaces: [],
   },
 };
 

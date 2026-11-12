@@ -111,7 +111,7 @@ describe('Circles End-to-End Vertical Slice & PostgreSQL RLS Integration Suite',
     expect(enabledKeys).toContain('events');
 
     const initialSpaces = await listCircleSpaces(ownerUser.id, circle.id);
-    expect(initialSpaces.length).toBeGreaterThanOrEqual(3);
+    expect(initialSpaces.length).toBe(0);
 
     // 5. Owner updates a Circle setting
     const updatedCircle = await updateCircle(ownerUser.id, circle.id, {
@@ -135,8 +135,12 @@ describe('Circles End-to-End Vertical Slice & PostgreSQL RLS Integration Suite',
     expect(joinedMembership.role).toBe('member');
     expect(joinedMembership.status).toBe('active');
 
-    // 7. Authorized member creates a post in a space
-    const generalSpace = initialSpaces.find((s) => s.slug === 'general') ?? initialSpaces[0];
+    // 7. Owner creates a space, and authorized member creates a post in it
+    const generalSpace = await createCircleSpace(ownerUser.id, circle.id, {
+      name: 'General Discussion',
+      slug: 'general',
+      description: 'Open conversation for all members of the Circle.',
+    });
     const post = await createPost(secondUser.id, {
       circleId: circle.id,
       spaceId: generalSpace.id,
@@ -288,11 +292,14 @@ describe('Circles End-to-End Vertical Slice & PostgreSQL RLS Integration Suite',
     expect(accepted.status).toBe('active');
 
     // Verify Cross-Circle Space attachment is blocked (cannot attach space from approvalCircle to a post in privateCircle)
-    const approvalSpaces = await listCircleSpaces(owner.id, approvalCircle.id);
+    const approvalSpace = await createCircleSpace(owner.id, approvalCircle.id, {
+      name: 'Approval General',
+      slug: 'approval-general',
+    });
     await expect(
       createPost(owner.id, {
         circleId: privateCircle.id,
-        spaceId: approvalSpaces[0].id,
+        spaceId: approvalSpace.id,
         title: 'Cross-Circle Injection Attempt',
         body: 'Should fail validation and composite FK.',
       })

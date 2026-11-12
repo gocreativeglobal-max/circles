@@ -134,7 +134,7 @@ export default function CreateCirclePage() {
                     </p>
                   </div>
                   <div className="mt-4 pt-2.5 border-t border-stone-200/60 text-[10px] font-mono text-stone-400">
-                    {tpl.enabledCapabilities.length} modules · {tpl.suggestedSpaces.length} spaces
+                    {tpl.enabledCapabilities.length} core modules
                   </div>
                 </button>
               );

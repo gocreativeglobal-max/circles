@@ -122,25 +122,8 @@ export async function createCircle(actorUserId: string, input: unknown): Promise
       );
     }
 
-    // 3. Initialize default spaces
-    const initialSpaces = template?.suggestedSpaces ?? [
-      {
-        name: 'Announcements',
-        slug: 'announcements',
-        description: 'Important updates and community notices.',
-        icon: 'megaphone',
-        capabilityKey: 'discussions',
-        postingPolicy: 'moderators' as const,
-      },
-      {
-        name: 'General Discussion',
-        slug: 'general',
-        description: 'Open conversation for all members of the Circle.',
-        icon: 'message-square',
-        capabilityKey: 'discussions',
-        postingPolicy: 'members' as const,
-      },
-    ];
+    // 3. Initialize default spaces (if template explicitly specifies any; clean slate by default)
+    const initialSpaces = template?.suggestedSpaces ?? [];
 
     let sortOrder = 1;
     for (const sp of initialSpaces) {
