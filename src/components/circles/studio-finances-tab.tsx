@@ -1099,9 +1099,9 @@ export function StudioFinancesTab({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
               {(
-                ['free', 'pro', 'platinum', 'enterprise'] as PlatformPlanTier[]
+                ['free', 'starter', 'pro', 'platinum', 'enterprise'] as PlatformPlanTier[]
               ).map((tierKey) => {
                 const tierDef = PLATFORM_TIERS[tierKey];
                 const isCurrent = currentTier === tierKey;
@@ -1126,6 +1126,7 @@ export function StudioFinancesTab({
                         <h5 className="text-base font-bold text-stone-900">{tierDef.name}</h5>
                         {tierKey === 'platinum' && <Crown className="h-4 w-4 text-amber-500" />}
                         {tierKey === 'pro' && <Zap className="h-4 w-4 text-stone-700" />}
+                        {tierKey === 'starter' && <Sparkles className="h-4 w-4 text-emerald-600" />}
                       </div>
 
                       <div className="mt-4 flex items-baseline gap-1">

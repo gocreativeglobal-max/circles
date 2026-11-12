@@ -36,8 +36,10 @@ export function assertCircleTierEntitlement(
 
   const upgradeTarget =
     feature === 'direct_erp_sync'
-      ? 'Platinum ($99/mo)'
-      : 'Pro ($29/mo)';
+      ? 'Platinum ($250/mo)'
+      : feature === 'ad_free_experience'
+      ? 'Starter ($15/mo)'
+      : 'Pro ($50/mo)';
 
   const featureNames: Record<GatedTierFeature, string> = {
     ad_free_experience: 'Ad-Free Community Experience',

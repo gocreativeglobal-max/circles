@@ -1,4 +1,4 @@
-export type PlatformPlanTier = 'free' | 'pro' | 'platinum' | 'enterprise';
+export type PlatformPlanTier = 'free' | 'starter' | 'pro' | 'platinum' | 'enterprise';
 
 export type GatedTierFeature =
   | 'ad_free_experience'
@@ -32,7 +32,7 @@ export interface PlatformTierDefinition {
 export const PLATFORM_TIERS: Record<PlatformPlanTier, PlatformTierDefinition> = {
   free: {
     tier: 'free',
-    name: 'Free / Starter',
+    name: 'Free / Basic',
     badge: '10% Platform Fee',
     platformFeePercentage: 10,
     monthlyPriceUsd: 0,
@@ -60,12 +60,41 @@ export const PLATFORM_TIERS: Record<PlatformPlanTier, PlatformTierDefinition> = 
       'Standard community support',
     ],
   },
+  starter: {
+    tier: 'starter',
+    name: 'Starter Creator',
+    badge: '7% Platform Fee',
+    platformFeePercentage: 7,
+    monthlyPriceUsd: 15,
+    storageBytes: 10 * 1024 * 1024 * 1024, // 10 GB
+    storageFormatted: '10 GB',
+    maxFileUploadBytes: 50 * 1024 * 1024, // 50 MB
+    maxFileUploadFormatted: '50 MB',
+    adPolicy: '100% Ad-Free for members',
+    allFeaturesUnlocked: true,
+    adFreeExperience: true,
+    customDomainAllowed: false,
+    whiteLabelEmailsAllowed: false,
+    directErpSyncAllowed: false,
+    prioritySupportAllowed: false,
+    description: 'Entry creator plan. 100% ad-free community, 20x more storage, and reduced 7% platform fee.',
+    features: [
+      'Everything in Free (All software tools included)',
+      'Reduced platform fee: 7% on paid sales',
+      '10 GB high-capacity media storage',
+      '100% Ad-Free experience for all circle members',
+      '50 MB max single file upload',
+      'Bachs global cards, bank transfers & mobile money',
+      'Full Community Treasury & live analytics',
+      'Community & email support',
+    ],
+  },
   pro: {
     tier: 'pro',
     name: 'Pro Creator',
     badge: '5% Platform Fee',
     platformFeePercentage: 5,
-    monthlyPriceUsd: 30,
+    monthlyPriceUsd: 50,
     storageBytes: 50 * 1024 * 1024 * 1024, // 50 GB
     storageFormatted: '50 GB',
     maxFileUploadBytes: 100 * 1024 * 1024, // 100 MB
@@ -77,14 +106,15 @@ export const PLATFORM_TIERS: Record<PlatformPlanTier, PlatformTierDefinition> = 
     whiteLabelEmailsAllowed: true,
     directErpSyncAllowed: false,
     prioritySupportAllowed: true,
-    description: 'For growing creators. 50% lower fee, 100x more storage, and completely ad-free.',
+    description: 'For growing creators. 5% fee, 50 GB native storage, custom domains, and white-label branding.',
     features: [
       'Everything in Starter (All software tools included)',
-      '50% lower platform fee: Reduced to 5%',
+      '5% platform fee on paid sales',
       '50 GB high-capacity native media storage',
       '100% Ad-Free experience for all circle members',
       'Custom domain mapping (e.g. academy.yourbrand.com)',
       'White-label emails & custom branding (remove Circles badge)',
+      '100 MB max single file upload',
       'Priority email support',
     ],
   },
@@ -93,7 +123,7 @@ export const PLATFORM_TIERS: Record<PlatformPlanTier, PlatformTierDefinition> = 
     name: 'Platinum High-Volume',
     badge: '3% Platform Fee',
     platformFeePercentage: 3,
-    monthlyPriceUsd: 100,
+    monthlyPriceUsd: 250,
     storageBytes: 250 * 1024 * 1024 * 1024, // 250 GB
     storageFormatted: '250 GB',
     maxFileUploadBytes: 500 * 1024 * 1024, // 500 MB

@@ -183,8 +183,8 @@ export async function PATCH(
     }
 
     if (action === 'update_tier') {
-      if (!body.tier || !['free', 'pro', 'platinum', 'enterprise'].includes(body.tier)) {
-        throw new ValidationError('Valid tier (free, pro, platinum, enterprise) is required.');
+      if (!body.tier || !['free', 'starter', 'pro', 'platinum', 'enterprise'].includes(body.tier)) {
+        throw new ValidationError('Valid tier (free, starter, pro, platinum, enterprise) is required.');
       }
       const updated = await updateCircleTier(
         user.id,
