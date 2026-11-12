@@ -278,7 +278,7 @@ export function CoursePlayer({
       const cleanUrl = window.location.pathname;
       window.history.replaceState({}, document.title, cleanUrl);
       // Reload course state to fetch unredacted lessons
-      fetch(`/api/circles/${circleId}/courses?courseId=${course.id}`)
+      fetch(`/api/circles/${circleId}/courses/${course.id}`)
         .then((r) => r.json())
         .then((data) => {
           if (data.course) {
