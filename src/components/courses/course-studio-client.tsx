@@ -1288,6 +1288,7 @@ export function CourseStudioClient({
                               >
                                 <div className="flex items-center gap-3">
                                   {lesson.thumbnail_url ? (
+                                    /* eslint-disable-next-line @next/next/no-img-element */
                                     <img
                                       src={lesson.thumbnail_url}
                                       alt={lesson.title}
@@ -2486,6 +2487,7 @@ export function CourseStudioClient({
 
                 {lessonThumbnailUrl ? (
                   <div className="mt-1.5 relative rounded-xl border border-stone-200 overflow-hidden bg-stone-50 group">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={lessonThumbnailUrl}
                       alt="Lesson preview"

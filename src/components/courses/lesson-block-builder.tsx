@@ -978,6 +978,7 @@ export function LessonBlockBuilder({
 
                                   {block.url && (
                                     <div className="mt-2 rounded-xl border border-stone-200 bg-stone-50 p-2 overflow-hidden max-w-sm">
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
                                       <img
                                         src={block.url}
                                         alt={block.altText || block.title || 'Lesson block image'}

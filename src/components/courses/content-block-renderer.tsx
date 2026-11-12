@@ -247,6 +247,7 @@ export function ContentBlockRenderer({
                 className="my-5 overflow-hidden rounded-2xl border border-stone-200/90 bg-stone-50/50 shadow-xs"
               >
                 <div className="relative flex w-full items-center justify-center bg-stone-900/5 p-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={block.url}
                     alt={block.altText || block.title || 'Lesson illustration'}

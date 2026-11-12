@@ -521,6 +521,7 @@ export function CommunityHubBoard({
               <div>
                 {c.image_url && (
                   <div className="h-40 w-full overflow-hidden bg-stone-100">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={c.image_url}
                       alt={c.title}

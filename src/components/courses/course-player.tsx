@@ -863,6 +863,7 @@ export function CoursePlayer({
                           className="flex items-center gap-2.5 text-left flex-1 truncate mr-2"
                         >
                           {lesson.thumbnail_url ? (
+                            /* eslint-disable-next-line @next/next/no-img-element */
                             <img
                               src={lesson.thumbnail_url}
                               alt=""
@@ -1533,6 +1534,7 @@ export function CoursePlayer({
               {/* Lesson Featured Cover Image */}
               {activeLesson.thumbnail_url && !activeLesson.video_url && (
                 <div className="relative aspect-video max-h-[360px] w-full overflow-hidden rounded-2xl border border-stone-200/90 bg-stone-100 shadow-xs">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={activeLesson.thumbnail_url}
                     alt={activeLesson.title}
@@ -1692,6 +1694,7 @@ export function CoursePlayer({
                     <div className="flex items-center gap-3 border-t border-stone-100 pt-3">
                       <div className="h-9 w-9 rounded-full bg-stone-200 flex items-center justify-center font-bold text-xs text-stone-800 overflow-hidden">
                         {course.instructor.avatar_url ? (
+                          /* eslint-disable-next-line @next/next/no-img-element */
                           <img
                             src={course.instructor.avatar_url}
                             alt={course.instructor.display_name}

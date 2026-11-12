@@ -25,7 +25,6 @@ import {
   Trash2,
   X,
   ShieldAlert,
-  Lock,
 } from 'lucide-react';
 import {
   BillingType,

@@ -25,7 +25,6 @@ import {
   Layers,
   Lock,
   MapPin,
-  Menu,
   MessageSquare,
   PanelLeft,
   PanelLeftClose,
