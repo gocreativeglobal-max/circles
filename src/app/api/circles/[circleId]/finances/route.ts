@@ -161,7 +161,8 @@ export async function POST(
       const session = await createPlatformTierCheckoutSession(
         user.id,
         params.circleId,
-        body.tier
+        body.tier,
+        body.currency || 'USD'
       );
       return NextResponse.json(session, { status: 200 });
     }

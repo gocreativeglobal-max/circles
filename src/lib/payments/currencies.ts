@@ -254,3 +254,57 @@ export function formatMultiCurrencyPrices(
 
   return `${primaryFormatted} (${extraFormatted})`;
 }
+
+/**
+ * Universal exchange rates baseline relative to 1 USD.
+ */
+export const USD_EXCHANGE_RATES: Record<string, number> = {
+  USD: 1.0,
+  EUR: 0.92,
+  GBP: 0.79,
+  CAD: 1.38,
+  AUD: 1.52,
+  JPY: 155.0,
+  CHF: 0.88,
+  INR: 84.0,
+  BRL: 5.8,
+  AED: 3.67,
+  NGN: 1650.0,
+  GHS: 15.5,
+  KES: 130.0,
+  ZAR: 18.0,
+  UGX: 3700.0,
+  TZS: 2600.0,
+  RWF: 1380.0,
+  ZMW: 27.0,
+  USDT: 1.0,
+  USDC: 1.0,
+};
+
+/**
+ * Converts a base USD amount into the target currency using baseline rates,
+ * returning both the integer amount in cents/minor units (for payment processors)
+ * and the human-readable decimal amount.
+ */
+export function convertUsdToCurrency(
+  usdAmount: number,
+  targetCurrency: string = 'USD'
+): { amountCents: number; decimalAmount: number; currency: string } {
+  const code = (targetCurrency || 'USD').trim().toUpperCase();
+  const rate = USD_EXCHANGE_RATES[code] ?? 1.0;
+  const currencyDef = getCurrency(code);
+  const converted = usdAmount * rate;
+
+  if (currencyDef.zeroDecimal) {
+    const whole = Math.round(converted);
+    return { amountCents: whole, decimalAmount: whole, currency: code };
+  } else {
+    const roundedCents = Math.round(converted * 100);
+    return {
+      amountCents: roundedCents,
+      decimalAmount: Number((roundedCents / 100).toFixed(2)),
+      currency: code,
+    };
+  }
+}
+

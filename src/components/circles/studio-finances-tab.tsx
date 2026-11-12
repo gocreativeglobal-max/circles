@@ -25,6 +25,7 @@ import {
   Trash2,
   X,
   ShieldAlert,
+  Globe,
 } from 'lucide-react';
 import {
   BillingType,
@@ -43,6 +44,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   BACHS_ACCEPTED_CURRENCIES,
+  convertUsdToCurrency,
   formatBachsAmount,
   getBachsCurrency,
 } from '@/lib/payments/currencies';
@@ -105,6 +107,7 @@ export function StudioFinancesTab({
 
   // Tier Upgrade / Downgrade checkout state
   const [showUpgradeModal, setShowUpgradeModal] = useState<PlatformPlanTier | null>(null);
+  const [selectedTierCurrency, setSelectedTierCurrency] = useState<string>('USD');
   const [showDowngradeModal, setShowDowngradeModal] = useState(false);
   const [upgradeLoading, setUpgradeLoading] = useState(false);
   const [upgradeSessionData, setUpgradeSessionData] = useState<{
@@ -113,6 +116,7 @@ export function StudioFinancesTab({
     invoiceId: string;
     targetTier: PlatformPlanTier;
     amountCents: number;
+    currency?: string;
     isSimulated: boolean;
   } | null>(null);
   const [upgradeModalError, setUpgradeModalError] = useState<string | null>(null);
@@ -251,6 +255,7 @@ export function StudioFinancesTab({
         body: JSON.stringify({
           action: 'upgrade_tier_checkout',
           tier: targetTier,
+          currency: selectedTierCurrency,
         }),
       });
       const data = await res.json();
@@ -2247,6 +2252,9 @@ export function StudioFinancesTab({
             {(() => {
               const tierDef = PLATFORM_TIERS[showUpgradeModal];
               if (!tierDef) return null;
+              const converted = convertUsdToCurrency(tierDef.monthlyPriceUsd, selectedTierCurrency);
+              const curMeta = getBachsCurrency(selectedTierCurrency);
+
               return (
                 <div className="space-y-5">
                   <div className="flex items-start justify-between">
@@ -2283,19 +2291,53 @@ export function StudioFinancesTab({
                     </div>
                   )}
 
+                  {/* Multi-Currency Selection Bar */}
+                  <div className="flex items-center justify-between rounded-xl border border-stone-200 bg-stone-50/80 px-3.5 py-2.5 text-xs">
+                    <div className="flex items-center gap-2">
+                      <Globe className="h-4 w-4 text-stone-500" />
+                      <span className="font-semibold text-stone-700">Billing Currency:</span>
+                    </div>
+                    <select
+                      value={selectedTierCurrency}
+                      onChange={(e) => setSelectedTierCurrency(e.target.value)}
+                      disabled={Boolean(upgradeSessionData) || upgradeLoading}
+                      className="rounded-lg border border-stone-300 bg-white px-2.5 py-1 text-xs font-bold text-stone-900 shadow-2xs focus:border-black focus:outline-none focus:ring-1 focus:ring-black cursor-pointer"
+                    >
+                      {BACHS_ACCEPTED_CURRENCIES.map((cur) => (
+                        <option key={cur.code} value={cur.code}>
+                          {cur.code} ({cur.symbol}) — {cur.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
                   {/* Pricing & Key Benefits Card */}
                   <div className="rounded-xl border border-stone-200 bg-stone-50/70 p-4 space-y-3">
                     <div className="flex items-baseline justify-between border-b border-stone-200/60 pb-3">
                       <div>
-                        <span className="text-2xl font-black text-stone-900">
-                          ${tierDef.monthlyPriceUsd}
-                        </span>
-                        <span className="text-xs text-stone-500 font-semibold"> / month</span>
+                        <div className="flex items-baseline gap-1.5">
+                          <span className="text-2xl font-black text-stone-900">
+                            {formatBachsAmount(converted.amountCents, selectedTierCurrency)}
+                          </span>
+                          <span className="text-xs text-stone-500 font-semibold"> / month</span>
+                        </div>
+                        {selectedTierCurrency !== 'USD' && (
+                          <span className="text-[11px] text-stone-500 block mt-0.5">
+                            Approx. ${tierDef.monthlyPriceUsd}.00 USD baseline equivalent
+                          </span>
+                        )}
                       </div>
                       <span className="rounded-md bg-stone-900 text-white px-2 py-0.5 text-xs font-bold">
                         {tierDef.badge}
                       </span>
                     </div>
+
+                    {curMeta.paymentMethodsDescription && (
+                      <div className="rounded-lg bg-emerald-50/80 border border-emerald-200/60 px-3 py-1.5 text-[11px] text-emerald-800 flex items-center gap-1.5">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                        <span>Accepted for {curMeta.code}: <strong>{curMeta.paymentMethodsDescription}</strong></span>
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-2 gap-2 text-xs">
                       <div>
@@ -2329,8 +2371,14 @@ export function StudioFinancesTab({
                         <span>Bachs Payment Simulator (Sandbox Active)</span>
                       </div>
                       <p className="text-[11px] text-blue-700 leading-relaxed">
-                        Invoice #{upgradeSessionData.invoiceId.slice(0, 8)} created for ${tierDef.monthlyPriceUsd}.00 USD.
-                        Click below to verify the test transaction and immediately activate your {tierDef.name} tier.
+                        Invoice #{upgradeSessionData.invoiceId.slice(0, 8)} created for{' '}
+                        <strong>
+                          {formatBachsAmount(
+                            upgradeSessionData.amountCents,
+                            upgradeSessionData.currency || selectedTierCurrency
+                          )}
+                        </strong>
+                        . Click below to simulate checkout verification and immediately activate your {tierDef.name} tier.
                       </p>
                       <Button
                         type="button"
@@ -2338,13 +2386,18 @@ export function StudioFinancesTab({
                         disabled={upgradeLoading}
                         className="w-full mt-2 bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs"
                       >
-                        {upgradeLoading ? 'Activating Plan...' : `Simulate Payment of $${tierDef.monthlyPriceUsd} & Activate`}
+                        {upgradeLoading
+                          ? 'Activating Plan...'
+                          : `Simulate Payment of ${formatBachsAmount(
+                              upgradeSessionData.amountCents,
+                              upgradeSessionData.currency || selectedTierCurrency
+                            )} & Activate`}
                       </Button>
                     </div>
                   ) : (
                     <div className="space-y-3 pt-1">
                       <p className="text-[11px] text-stone-500">
-                        Payments are securely processed via Bachs with support for international cards, bank transfers, mobile money, and crypto stablecoins. You can cancel or downgrade at any time.
+                        Payments are securely processed via Bachs in <strong>{selectedTierCurrency}</strong> with support for international cards, bank transfers, mobile money, and crypto stablecoins. You can cancel or downgrade at any time.
                       </p>
 
                       <div className="flex items-center justify-end gap-2 pt-2 border-t border-stone-100">
@@ -2363,7 +2416,9 @@ export function StudioFinancesTab({
                           onClick={() => handleInitiateTierCheckout(showUpgradeModal)}
                           className="bg-black hover:bg-stone-800 text-white text-xs font-bold px-4"
                         >
-                          {upgradeLoading ? 'Opening Checkout...' : `Pay $${tierDef.monthlyPriceUsd} & Upgrade`}
+                          {upgradeLoading
+                            ? 'Opening Checkout...'
+                            : `Pay ${formatBachsAmount(converted.amountCents, selectedTierCurrency)} & Upgrade`}
                         </Button>
                       </div>
                     </div>

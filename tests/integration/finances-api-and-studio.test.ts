@@ -385,5 +385,42 @@ describe('Phase 2: Financial API Route Handlers & Studio Operations Suite', () =
     expect(downgradeRes.status).toBe(200);
     const downgradeData = await downgradeRes.json();
     expect(downgradeData.updated.planTier).toBe('free');
+
+    // 6. Upgrading to Starter Creator with universal multi-currency (e.g. EUR)
+    const starterCheckoutRes = await financesPostRoute(
+      makeRequest(
+        `http://localhost:3000/api/circles/${circle.id}/finances`,
+        'POST',
+        {
+          action: 'upgrade_tier_checkout',
+          tier: 'starter',
+          currency: 'EUR',
+        },
+        ownerToken
+      ),
+      { params: { circleId: circle.id } }
+    );
+    expect(starterCheckoutRes.status).toBe(200);
+    const starterData = await starterCheckoutRes.json();
+    expect(starterData.targetTier).toBe('starter');
+    expect(starterData.currency).toBe('EUR');
+    expect(starterData.amountCents).toBe(1380); // $15 * 0.92 = €13.80 = 1380 cents
+
+    const confirmStarterRes = await financesPostRoute(
+      makeRequest(
+        `http://localhost:3000/api/circles/${circle.id}/finances`,
+        'POST',
+        {
+          action: 'confirm_tier_payment',
+          invoiceId: starterData.invoiceId,
+          paymentReference: `BACHS_STARTER_EUR_${suffix}`,
+        },
+        ownerToken
+      ),
+      { params: { circleId: circle.id } }
+    );
+    expect(confirmStarterRes.status).toBe(200);
+    const confirmStarterData = await confirmStarterRes.json();
+    expect(confirmStarterData.tier).toBe('starter');
   });
 });

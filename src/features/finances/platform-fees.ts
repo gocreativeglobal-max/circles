@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { DbTransaction, withRlsTransaction, withServiceRoleTransaction } from '@/lib/db/postgres';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
 import { getPaymentProcessor } from '@/lib/payments/adapter';
+import { convertUsdToCurrency, formatCurrencyAmount } from '@/lib/payments/currencies';
 import {
   PlatformPlanTier,
   PlatformTierDefinition,
@@ -247,24 +248,37 @@ export async function updateCircleTier(
 
 /**
  * Creates a Bachs checkout session for upgrading the Circle's platform plan tier.
+ * Supports universal multi-currency payment across all Bachs supported currencies.
  */
 export async function createPlatformTierCheckoutSession(
   actorUserId: string,
   circleId: string,
-  targetTier: PlatformPlanTier
+  targetTier: PlatformPlanTier,
+  selectedCurrency: string = 'USD'
 ): Promise<{
   sessionId: string;
   checkoutUrl: string;
   invoiceId: string;
   targetTier: PlatformPlanTier;
   amountCents: number;
+  currency: string;
   isSimulated: boolean;
 }> {
   return withServiceRoleTransaction(async (tx) => {
-    // 1. Verify user is circle admin or owner
+    // 1. Resolve circle ID (handles both UUID and slug)
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(circleId);
+    const circleRes = await tx.query<{ id: string; name: string; slug: string }>(
+      `SELECT id, name, slug FROM public.circles WHERE ${isUuid ? 'id = $1::uuid' : 'slug = $1'} LIMIT 1;`,
+      [circleId]
+    );
+    const circle = circleRes.rows[0];
+    if (!circle) throw new NotFoundError('Circle not found.');
+    const resolvedCircleId = circle.id;
+
+    // 2. Verify user is circle admin or owner
     const isStaff = await tx.query<{ allowed: boolean }>(
-      `SELECT public.has_circle_staff_role($1, $2, 'admin') AS allowed;`,
-      [circleId, actorUserId]
+      `SELECT public.has_circle_staff_role($1::uuid, $2::uuid, 'admin') AS allowed;`,
+      [resolvedCircleId, actorUserId]
     );
     if (!isStaff.rows[0]?.allowed) {
       throw new ForbiddenError('Only circle administrators can upgrade the platform plan.');
@@ -275,57 +289,70 @@ export async function createPlatformTierCheckoutSession(
       throw new ValidationError(`Cannot checkout for tier "${targetTier}". Paid tiers only.`);
     }
 
-    // 2. Fetch circle details and profile
-    const circleRes = await tx.query<{ id: string; name: string; slug: string }>(
-      `SELECT id, name, slug FROM public.circles WHERE id = $1 LIMIT 1;`,
-      [circleId]
-    );
-    const circle = circleRes.rows[0];
-    if (!circle) throw new NotFoundError('Circle not found.');
-
+    // 3. Fetch profile with fallback to auth.users if needed
     const profileRes = await tx.query<{ id: string; email: string; display_name: string }>(
-      `SELECT id, email, display_name FROM public.profiles WHERE id = $1 LIMIT 1;`,
+      `SELECT id, email, display_name FROM public.profiles WHERE id = $1::uuid LIMIT 1;`,
       [actorUserId]
     );
-    const profile = profileRes.rows[0];
-    if (!profile) throw new NotFoundError('Profile not found.');
+    let profile = profileRes.rows[0];
+    if (!profile) {
+      const authUserRes = await tx.query<{ id: string; email: string }>(
+        `SELECT id, email FROM auth.users WHERE id = $1::uuid LIMIT 1;`,
+        [actorUserId]
+      );
+      if (authUserRes.rows[0]) {
+        profile = {
+          id: authUserRes.rows[0].id,
+          email: authUserRes.rows[0].email,
+          display_name: authUserRes.rows[0].email.split('@')[0],
+        };
+      } else {
+        throw new NotFoundError('User profile not found.');
+      }
+    }
 
-    const amountCents = tierDef.monthlyPriceUsd * 100;
+    // 4. Calculate universal currency amount
+    const currency = (selectedCurrency || 'USD').trim().toUpperCase();
+    const converted = convertUsdToCurrency(tierDef.monthlyPriceUsd, currency);
+    const amountCents = converted.amountCents;
     const invoiceId = crypto.randomUUID();
     const invoiceNumber = `INV-TIER-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-    // 3. Create invoice for platform subscription
+    // 5. Create invoice for platform subscription
     await tx.query(
       `INSERT INTO public.invoices (
          id, circle_id, user_id, invoice_number, title, description,
          status, total_cents, currency, payment_method, metadata, created_at, updated_at
-       ) VALUES ($1, $2, $3, $4, $5, $6, 'open', $7, 'USD', 'bachs', $8::jsonb, NOW(), NOW());`,
+       ) VALUES ($1, $2, $3, $4, $5, $6, 'open', $7, $8, 'bachs', $9::jsonb, NOW(), NOW());`,
       [
         invoiceId,
-        circleId,
+        resolvedCircleId,
         actorUserId,
         invoiceNumber,
         `Circles Platform — ${tierDef.name} Subscription`,
         `Monthly platform subscription for ${circle.name} (${tierDef.badge}, ${tierDef.storageFormatted} storage)`,
         amountCents,
+        currency,
         JSON.stringify({
           type: 'platform_tier_subscription',
           target_tier: targetTier,
           monthly_price_usd: tierDef.monthlyPriceUsd,
+          selected_currency: currency,
+          converted_amount: converted.decimalAmount,
         }),
       ]
     );
 
-    // 4. Create Bachs Checkout Session
+    // 6. Create Bachs Checkout Session
     const processor = getPaymentProcessor();
     const appUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'http://localhost:3000').replace(/\/+$/, '');
     const session = await processor.createCheckoutSession({
-      circleId,
+      circleId: resolvedCircleId,
       invoiceId,
       userId: actorUserId,
       amountCents,
-      currency: 'USD',
-      title: `Circles — ${tierDef.name} ($${tierDef.monthlyPriceUsd}/mo)`,
+      currency,
+      title: `Circles — ${tierDef.name} (${formatCurrencyAmount(amountCents, currency)}/mo)`,
       customerEmail: profile.email,
       successUrl: `${appUrl}/circles/${circle.slug}/studio?tab=finances&tier_payment=success&invoiceId=${invoiceId}`,
       cancelUrl: `${appUrl}/circles/${circle.slug}/studio?tab=finances&tier_payment=cancelled`,
@@ -337,6 +364,7 @@ export async function createPlatformTierCheckoutSession(
       invoiceId,
       targetTier,
       amountCents,
+      currency,
       isSimulated: session.provider === 'mock',
     };
   });
@@ -356,16 +384,26 @@ export async function confirmPlatformTierPayment(
   invoiceId: string;
 }> {
   return withServiceRoleTransaction(async (tx) => {
-    // 1. Verify user is admin
+    // 1. Resolve circle ID (handles both UUID and slug)
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(circleId);
+    const circleRes = await tx.query<{ id: string }>(
+      `SELECT id FROM public.circles WHERE ${isUuid ? 'id = $1::uuid' : 'slug = $1'} LIMIT 1;`,
+      [circleId]
+    );
+    const circle = circleRes.rows[0];
+    if (!circle) throw new NotFoundError('Circle not found.');
+    const resolvedCircleId = circle.id;
+
+    // 2. Verify user is admin
     const isStaff = await tx.query<{ allowed: boolean }>(
-      `SELECT public.has_circle_staff_role($1, $2, 'admin') AS allowed;`,
-      [circleId, actorUserId]
+      `SELECT public.has_circle_staff_role($1::uuid, $2::uuid, 'admin') AS allowed;`,
+      [resolvedCircleId, actorUserId]
     );
     if (!isStaff.rows[0]?.allowed) {
       throw new ForbiddenError('Only circle administrators can confirm tier upgrades.');
     }
 
-    // 2. Fetch invoice and verify it is a platform tier subscription invoice
+    // 3. Fetch invoice and verify it is a platform tier subscription invoice
     const invRes = await tx.query<{
       id: string;
       circle_id: string;
@@ -378,7 +416,7 @@ export async function confirmPlatformTierPayment(
        FROM public.invoices
        WHERE id = $1 AND circle_id = $2
        LIMIT 1;`,
-      [invoiceId, circleId]
+      [invoiceId, resolvedCircleId]
     );
 
     const inv = invRes.rows[0];
@@ -396,7 +434,7 @@ export async function confirmPlatformTierPayment(
 
     const ref = paymentReference || `BACHS_TX_${Date.now()}`;
 
-    // 3. Mark invoice paid
+    // 4. Mark invoice paid
     await tx.query(
       `UPDATE public.invoices
        SET status = 'paid',
@@ -407,7 +445,7 @@ export async function confirmPlatformTierPayment(
       [ref, invoiceId]
     );
 
-    // 4. Update circle tier with 30-day period
+    // 5. Update circle tier with 30-day period
     await tx.query(
       `UPDATE public.circles
        SET plan_tier = $1,
@@ -415,17 +453,17 @@ export async function confirmPlatformTierPayment(
            plan_current_period_end = NOW() + INTERVAL '30 days',
            updated_at = NOW()
        WHERE id = $2;`,
-      [targetTier, circleId]
+      [targetTier, resolvedCircleId]
     );
 
-    // 5. Record platform revenue
+    // 6. Record platform revenue
     await tx.query(
       `INSERT INTO public.platform_revenue_ledger (
          circle_id, invoice_id, plan_tier, gross_amount_cents,
          platform_fee_percentage, platform_fee_cents, creator_net_cents,
          currency, payment_reference, created_at
        ) VALUES ($1, $2, $3, $4, 0, $4, 0, $5, $6, NOW());`,
-      [circleId, invoiceId, targetTier, inv.total_cents, inv.currency, ref]
+      [resolvedCircleId, invoiceId, targetTier, inv.total_cents, inv.currency, ref]
     );
 
     return {
