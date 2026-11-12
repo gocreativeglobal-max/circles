@@ -43,35 +43,81 @@ export interface PaymentProcessorAdapter {
   ): Promise<WebhookVerificationResult>;
 }
 
-export function ensureAbsoluteHttpUrl(urlStr: string | undefined | null, fallbackPath = ''): string {
-  let val = (urlStr || '').trim();
-  const defaultBase = (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://joincircles.online').trim().replace(/\/+$/, '');
+function cleanBaseOrigin(originStr?: string | null): string {
+  let s = (originStr || '').trim();
+  if (!s || s === '/' || s === '.') return '';
+  if (!s.startsWith('http://') && !s.startsWith('https://')) {
+    const isLocal = s.includes('localhost') || s.includes('127.0.0.1');
+    s = isLocal ? `http://${s}` : `https://${s}`;
+  }
+  s = s.replace(/\/+$/, '');
+  try {
+    const u = new URL(s);
+    if (
+      (u.protocol === 'http:' || u.protocol === 'https:') &&
+      u.hostname &&
+      u.hostname !== 'circles'
+    ) {
+      return u.origin;
+    }
+  } catch {
+    // ignore
+  }
+  return '';
+}
 
-  if (!val) {
-    return `${defaultBase}${fallbackPath.startsWith('/') ? fallbackPath : `/${fallbackPath}`}`;
+export function ensureAbsoluteHttpUrl(
+  urlStr: string | undefined | null,
+  fallbackPath = '',
+  clientOrigin?: string | null
+): string {
+  const base =
+    cleanBaseOrigin(clientOrigin) ||
+    cleanBaseOrigin(process.env.NEXT_PUBLIC_APP_URL) ||
+    cleanBaseOrigin(process.env.APP_URL) ||
+    cleanBaseOrigin(process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '') ||
+    'https://joincircles.online';
+
+  let raw = (urlStr || '').trim();
+
+  // If completely empty, return base with fallback path
+  if (!raw) {
+    const p = fallbackPath.startsWith('/') ? fallbackPath : `/${fallbackPath}`;
+    return fallbackPath ? `${base}${p}` : base;
   }
 
-  // If relative path like "/circles/..."
-  if (val.startsWith('/')) {
-    val = `${defaultBase}${val}`;
+  // If relative path (/circles/...)
+  if (raw.startsWith('/')) {
+    const cleanPath = `/${raw.replace(/^\/+/, '')}`;
+    return `${base}${cleanPath}`;
   }
 
-  // If scheme is missing (e.g. "localhost:3000/..." or "joincircles.online/...")
-  if (!val.startsWith('http://') && !val.startsWith('https://')) {
-    const isLocal = val.includes('localhost') || val.includes('127.0.0.1');
-    val = isLocal ? `http://${val}` : `https://${val}`;
+  // If missing scheme
+  if (!raw.startsWith('http://') && !raw.startsWith('https://')) {
+    const isLocal = raw.includes('localhost') || raw.includes('127.0.0.1');
+    raw = isLocal ? `http://${raw}` : `https://${raw}`;
   }
 
   try {
-    const parsed = new URL(val);
+    const parsed = new URL(raw);
     if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
-      return parsed.toString();
+      if (
+        parsed.hostname &&
+        parsed.hostname !== 'circles' &&
+        (parsed.hostname.includes('.') || parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1')
+      ) {
+        return parsed.toString();
+      }
+      // Malformed hostname (e.g. parsed from https:///circles/...)
+      const pathOnBase = `${parsed.pathname || ''}${parsed.search || ''}${parsed.hash || ''}`;
+      return `${base}/${pathOnBase.replace(/^\/+/, '')}`;
     }
   } catch {
     // fallback
   }
 
-  return `${defaultBase}${fallbackPath.startsWith('/') ? fallbackPath : `/${fallbackPath}`}`;
+  const p = fallbackPath.startsWith('/') ? fallbackPath : `/${fallbackPath}`;
+  return fallbackPath ? `${base}${p}` : base;
 }
 
 /**

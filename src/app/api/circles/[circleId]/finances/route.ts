@@ -158,11 +158,23 @@ export async function POST(
       if (!body.tier || !['starter', 'pro', 'platinum'].includes(body.tier)) {
         throw new ValidationError('Valid paid tier (starter, pro, platinum) is required for checkout.');
       }
+      const originHeader = req.headers.get('origin') || req.headers.get('referer');
+      let clientOrigin: string | undefined;
+      if (typeof body.origin === 'string' && body.origin.trim().length > 0) {
+        clientOrigin = body.origin.trim();
+      } else if (originHeader) {
+        try {
+          clientOrigin = new URL(originHeader).origin;
+        } catch {
+          // ignore
+        }
+      }
       const session = await createPlatformTierCheckoutSession(
         user.id,
         params.circleId,
         body.tier,
-        body.currency || 'USD'
+        body.currency || 'USD',
+        clientOrigin
       );
       return NextResponse.json(session, { status: 200 });
     }

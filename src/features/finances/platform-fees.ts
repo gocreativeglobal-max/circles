@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { DbTransaction, withRlsTransaction, withServiceRoleTransaction } from '@/lib/db/postgres';
 import { ForbiddenError, NotFoundError, ValidationError } from '@/lib/errors';
-import { getPaymentProcessor } from '@/lib/payments/adapter';
+import { getPaymentProcessor, ensureAbsoluteHttpUrl } from '@/lib/payments/adapter';
 import { convertUsdToCurrency, formatCurrencyAmount } from '@/lib/payments/currencies';
 import {
   PlatformPlanTier,
@@ -254,7 +254,8 @@ export async function createPlatformTierCheckoutSession(
   actorUserId: string,
   circleId: string,
   targetTier: PlatformPlanTier,
-  selectedCurrency: string = 'USD'
+  selectedCurrency: string = 'USD',
+  clientOrigin?: string
 ): Promise<{
   sessionId: string;
   checkoutUrl: string;
@@ -343,9 +344,9 @@ export async function createPlatformTierCheckoutSession(
       ]
     );
 
-    // 6. Create Bachs Checkout Session
+    // 6. Create Bachs Checkout Session with guaranteed absolute HTTP/HTTPS URLs
     const processor = getPaymentProcessor();
-    const appUrl = (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'http://localhost:3000').replace(/\/+$/, '');
+    const appUrl = ensureAbsoluteHttpUrl('', '', clientOrigin);
     const session = await processor.createCheckoutSession({
       circleId: resolvedCircleId,
       invoiceId,

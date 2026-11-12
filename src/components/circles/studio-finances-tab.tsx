@@ -256,6 +256,7 @@ export function StudioFinancesTab({
           action: 'upgrade_tier_checkout',
           tier: targetTier,
           currency: selectedTierCurrency,
+          origin: typeof window !== 'undefined' ? window.location.origin : undefined,
         }),
       });
       const data = await res.json();
