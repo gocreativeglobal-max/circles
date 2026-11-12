@@ -1118,6 +1118,67 @@ export async function updateCourse(
 }
 
 /**
+ * Permanently deletes a course and its curriculum, assignments, quizzes, reviews, and enrollments.
+ * Allowed for the course instructor or Circle staff (owner, admin, moderator).
+ */
+export async function deleteCourse(
+  actorUserId: string,
+  circleId: string,
+  courseId: string
+): Promise<{ success: boolean; deletedCourseTitle: string }> {
+  return withRlsTransaction(actorUserId, async (tx) => {
+    // 1. Verify capability 'learning_resources'
+    const capRes = await tx.query<{ enabled: boolean }>(
+      `SELECT enabled FROM public.circle_capabilities WHERE circle_id = $1 AND capability_key = 'learning_resources';`,
+      [circleId]
+    );
+    if (!capRes.rows[0]?.enabled) {
+      throw new CapabilityDisabledError('learning_resources');
+    }
+
+    // 2. Fetch course and instructor
+    const courseRes = await tx.query<{ id: string; title: string; instructor_id: string }>(
+      `SELECT id, title, instructor_id FROM public.courses WHERE id = $1 AND circle_id = $2 LIMIT 1;`,
+      [courseId, circleId]
+    );
+    if (courseRes.rows.length === 0) {
+      throw new NotFoundError('Course not found.');
+    }
+    const course = courseRes.rows[0];
+
+    // 3. Verify permissions: instructor or circle staff
+    const memRes = await tx.query<{ role: CircleRole }>(
+      `SELECT role FROM public.circle_memberships WHERE circle_id = $1 AND user_id = $2 AND status = 'active' LIMIT 1;`,
+      [circleId, actorUserId]
+    );
+    const role = memRes.rows[0]?.role;
+    const isStaff = role === 'owner' || role === 'admin' || role === 'moderator';
+
+    if (!isStaff && course.instructor_id !== actorUserId) {
+      throw new ForbiddenError('Only the course instructor or circle staff can delete this course.');
+    }
+
+    // 4. Clean up linked pricing plan entitlements for course_access
+    await tx.query(
+      `DELETE FROM public.pricing_plan_entitlements
+       WHERE circle_id = $1 AND target_type = 'course_access' AND target_id = $2;`,
+      [circleId, courseId]
+    );
+
+    // 5. Delete the course (cascades via foreign keys)
+    await tx.query(
+      `DELETE FROM public.courses WHERE id = $1 AND circle_id = $2;`,
+      [courseId, circleId]
+    );
+
+    return {
+      success: true,
+      deletedCourseTitle: course.title,
+    };
+  });
+}
+
+/**
  * Adds a module (section) to a course.
  */
 export async function createModule(

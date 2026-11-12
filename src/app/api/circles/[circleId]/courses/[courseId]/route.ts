@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
   createCoursePaywall,
+  deleteCourse,
   getCoursePaywalls,
   getCourseWithCurriculum,
   linkCoursePaywall,
@@ -114,6 +115,21 @@ export async function POST(
     }
 
     throw new ValidationError(`Unknown action: "${action}"`);
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { circleId: string; courseId: string } }
+) {
+  try {
+    const user = await resolveApiUser(req);
+    if (!user) throw new UnauthorizedError();
+
+    const result = await deleteCourse(user.id, params.circleId, params.courseId);
+    return NextResponse.json(result);
   } catch (error) {
     return handleApiError(error);
   }

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
   BookOpen,
@@ -71,6 +72,7 @@ export function CourseStudioClient({
   isStaff: _isStaff,
   isFinancesEnabled = true,
 }: CourseStudioClientProps) {
+  const router = useRouter();
   const [course, setCourse] = useState<CourseItem>(initialCourse);
   const [activeTab, setActiveTab] = useState<StudioTab>('overview');
 
@@ -165,6 +167,31 @@ export function CourseStudioClient({
   // Status message & loading
   const [isSaving, setIsSaving] = useState(false);
   const [feedbackMsg, setFeedbackMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Danger Zone / Delete Course state
+  const [showDeleteStudioConfirm, setShowDeleteStudioConfirm] = useState(false);
+  const [isDeletingCourse, setIsDeletingCourse] = useState(false);
+  const [deleteCourseError, setDeleteCourseError] = useState<string | null>(null);
+
+  async function handleDeleteCourseFromStudio() {
+    setIsDeletingCourse(true);
+    setDeleteCourseError(null);
+    try {
+      const res = await fetch(`/api/circles/${circleId}/courses/${course.id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to delete course');
+      }
+      router.push(`/circles/${circleSlug}/courses`);
+      router.refresh();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Failed to delete course';
+      setDeleteCourseError(msg);
+      setIsDeletingCourse(false);
+    }
+  }
 
   // Calculate totals
   const modules = course.modules || [];
@@ -2225,6 +2252,68 @@ export function CourseStudioClient({
                 </div>
               </form>
             </div>
+          </div>
+
+            {/* Danger Zone: Permanent Course Deletion */}
+            <div className="rounded-2xl border border-red-200 bg-red-50/40 p-6 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold text-red-900 flex items-center gap-1.5">
+                    <Trash2 className="h-4 w-4 text-red-600" />
+                    <span>Danger Zone: Delete Course</span>
+                  </h3>
+                  <p className="text-xs text-red-700/80 mt-0.5">
+                    Permanently delete this course, modules, lessons, completions, assignments, and student enrollments.
+                  </p>
+                </div>
+
+                {!showDeleteStudioConfirm && (
+                  <Button
+                    type="button"
+                    onClick={() => setShowDeleteStudioConfirm(true)}
+                    disabled={isDeletingCourse || isSaving}
+                    className="shrink-0 bg-red-600 text-white hover:bg-red-700 text-xs px-3.5 py-1.5 rounded-xl font-bold shadow-xs transition-colors"
+                  >
+                    Delete Course
+                  </Button>
+                )}
+              </div>
+
+              {deleteCourseError && (
+                <div className="rounded-xl border border-red-300 bg-red-100/90 p-2.5 text-xs text-red-800">
+                  {deleteCourseError}
+                </div>
+              )}
+
+              {showDeleteStudioConfirm && (
+                <div className="rounded-xl border border-red-200 bg-white p-4 space-y-3 shadow-2xs">
+                  <p className="text-xs font-bold text-stone-900">
+                    Are you sure you want to permanently delete <span className="underline decoration-red-400 font-extrabold">{course.title}</span>?
+                  </p>
+                  <p className="text-[11px] text-stone-500">
+                    This action is irreversible. All student progress, assignments, and curriculum materials will be permanently erased.
+                  </p>
+                  <div className="flex items-center justify-end gap-2 pt-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={isDeletingCourse}
+                      onClick={() => setShowDeleteStudioConfirm(false)}
+                      className="text-xs rounded-xl h-8"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="button"
+                      disabled={isDeletingCourse}
+                      onClick={handleDeleteCourseFromStudio}
+                      className="bg-red-600 text-white hover:bg-red-700 text-xs rounded-xl font-bold px-3.5 h-8 transition-colors"
+                    >
+                      {isDeletingCourse ? 'Deleting Course...' : 'Yes, Permanently Delete'}
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         )}

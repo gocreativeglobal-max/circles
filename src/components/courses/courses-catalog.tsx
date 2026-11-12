@@ -1073,6 +1073,12 @@ export function CoursesCatalog({
               prev.map((c) => (c.id === updated.id ? { ...c, ...updated } : c))
             );
           }}
+          onDeleted={() => {
+            if (editingCourse) {
+              setCourses((prev) => prev.filter((c) => c.id !== editingCourse.id));
+            }
+            setEditingCourse(null);
+          }}
         />
       )}
     </div>

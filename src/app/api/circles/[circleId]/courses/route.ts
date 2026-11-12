@@ -38,6 +38,7 @@ import {
   evaluateCoursePrerequisites,
   submitCourseReview,
   deleteCourseReview,
+  deleteCourse,
 } from '@/features/courses/service';
 import { handleApiError, resolveApiUser } from '@/lib/auth/api-helpers';
 import { UnauthorizedError, ValidationError } from '@/lib/errors';
@@ -312,6 +313,12 @@ export async function POST(
     if (body.action === 'delete_review') {
       if (!body.reviewId) throw new ValidationError('reviewId is required.');
       const result = await deleteCourseReview(user.id, params.circleId, body.reviewId);
+      return NextResponse.json(result);
+    }
+
+    if (body.action === 'delete_course') {
+      if (!body.courseId) throw new ValidationError('courseId is required.');
+      const result = await deleteCourse(user.id, params.circleId, body.courseId);
       return NextResponse.json(result);
     }
 

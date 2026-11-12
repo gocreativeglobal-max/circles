@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   CheckCircle2,
   Circle,
@@ -68,6 +69,7 @@ export function CoursePlayer({
   initialLessonId?: string;
   currentUserId?: string | null;
 }) {
+  const router = useRouter();
   const [course, setCourse] = useState<CourseItem>(initialCourse);
   const [viewMode, setViewMode] = useState<'overview' | 'classroom'>(initialViewMode);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -2103,6 +2105,11 @@ export function CoursePlayer({
               type: 'success',
               message: 'Course settings updated successfully.',
             });
+            setShowCourseSettings(false);
+          }}
+          onDeleted={() => {
+            router.push(`/circles/${circleSlug}/courses`);
+            router.refresh();
           }}
         />
       )}

@@ -10,6 +10,7 @@ import {
   createLesson,
   createLessonComment,
   createModule,
+  deleteCourse,
   deleteCourseReview,
   enrollInCourse,
   getCircleLeaderboard,
@@ -909,5 +910,81 @@ describe('Courses, LMS Curriculum & Student Learning Progress Integration Suite'
     // Instructor can always access to prepare the room even if paywalled
     const hostJoin = await recordLiveAttendance(instructor.id, circle.id, paywalledCohort.id);
     expect(hostJoin.meetingUrl).toBe('https://zoom.us/j/123456789');
+  });
+
+  it('allows course instructor and circle staff to permanently delete a course and cascades all child resources', async () => {
+    const suffix = Date.now();
+    const owner = (
+      await registerUser({
+        email: `delete-owner-${suffix}@example.com`,
+        username: `delete_owner_${suffix}`,
+        displayName: 'Circle Owner',
+        password: 'Password123!',
+      })
+    ).user;
+
+    const student = (
+      await registerUser({
+        email: `delete-student-${suffix}@example.com`,
+        username: `delete_student_${suffix}`,
+        displayName: 'Regular Student',
+        password: 'Password123!',
+      })
+    ).user;
+
+    const circle = await createCircle(owner.id, {
+      name: `Course Delete Circle ${suffix}`,
+      slug: `course-delete-circle-${suffix}`,
+      description: 'Testing course deletion',
+      visibility: 'public',
+      membershipType: 'open',
+    });
+
+    await updateCircleCapability(owner.id, circle.id, 'learning_resources', true);
+    await joinPublicCircle(student.id, circle.id);
+
+    // 1. Owner creates a course with module and lesson
+    const course = await createCourse(owner.id, {
+      circleId: circle.id,
+      title: 'Course to Delete',
+      slug: 'course-to-delete',
+      description: 'Testing course deletion and cascades',
+      accessRule: 'open',
+    });
+
+    const module = await createModule(owner.id, {
+      circleId: circle.id,
+      courseId: course.id,
+      title: 'Module 1',
+    });
+
+    await createLesson(owner.id, {
+      circleId: circle.id,
+      courseId: course.id,
+      moduleId: module.id,
+      title: 'Lesson 1',
+      slug: 'lesson-1',
+    });
+
+    // Student enrolls
+    await enrollInCourse(student.id, circle.id, course.id);
+
+    // 2. Non-staff student cannot delete course -> ForbiddenError
+    await expect(deleteCourse(student.id, circle.id, course.id)).rejects.toThrow(ForbiddenError);
+
+    // 3. Instructor/staff deletes course successfully
+    const delResult = await deleteCourse(owner.id, circle.id, course.id);
+    expect(delResult.success).toBe(true);
+    expect(delResult.deletedCourseTitle).toBe('Course to Delete');
+
+    // 4. Verifying course is gone -> NotFoundError
+    await expect(getCourseWithCurriculum(owner.id, circle.id, course.id)).rejects.toThrow(NotFoundError);
+
+    // Course is no longer in list
+    const courses = await listCourses(owner.id, circle.id);
+    expect(courses.find((c) => c.id === course.id)).toBeUndefined();
+
+    // 5. Deleting non-existent course -> NotFoundError
+    await expect(deleteCourse(owner.id, circle.id, course.id)).rejects.toThrow(NotFoundError);
   });
 });

@@ -12,6 +12,7 @@ import {
   AlertCircle,
   Video,
   Play,
+  Trash2,
 } from 'lucide-react';
 import { CourseItem, CourseDeliveryFormat } from '@/types/domain';
 import { Button } from '@/components/ui/button';
@@ -26,6 +27,7 @@ interface CourseSettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSaved: (updatedCourse: CourseItem) => void;
+  onDeleted?: () => void;
 }
 
 export function CourseSettingsModal({
@@ -34,6 +36,7 @@ export function CourseSettingsModal({
   isOpen,
   onClose,
   onSaved,
+  onDeleted,
 }: CourseSettingsModalProps) {
   const [title, setTitle] = useState(course.title);
   const [slug, setSlug] = useState(course.slug);
@@ -73,6 +76,27 @@ export function CourseSettingsModal({
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function handleDeleteCourse() {
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch(`/api/circles/${circleId}/courses/${course.id}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to delete course.');
+      onDeleted?.();
+      onClose();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : 'Unable to delete course.');
+      setIsDeleting(false);
+    }
+  }
 
   const detectedPlatform = detectMeetingPlatform(cohortMeetingUrl);
 
@@ -479,8 +503,70 @@ export function CourseSettingsModal({
             value={learningObjectives}
             onChange={setLearningObjectives}
             courseTitle={title}
-            disabled={saving}
+            disabled={saving || isDeleting}
           />
+
+          {/* Danger Zone: Delete Course */}
+          <div className="rounded-2xl border border-red-200 bg-red-50/50 p-4 space-y-3">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-red-900 flex items-center gap-1.5">
+                  <Trash2 className="h-3.5 w-3.5 text-red-600" />
+                  <span>Danger Zone</span>
+                </h4>
+                <p className="text-[11px] text-red-700 mt-0.5">
+                  Permanently delete this course, including all modules, lessons, student enrollments, quizzes, and reviews.
+                </p>
+              </div>
+
+              {!showDeleteConfirm && (
+                <Button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  disabled={saving || isDeleting}
+                  className="shrink-0 bg-red-600 text-white hover:bg-red-700 text-xs px-3.5 py-1.5 rounded-xl font-bold shadow-xs transition-colors"
+                >
+                  Delete Course
+                </Button>
+              )}
+            </div>
+
+            {deleteError && (
+              <div className="rounded-xl border border-red-300 bg-red-100/90 p-2.5 text-xs text-red-800">
+                {deleteError}
+              </div>
+            )}
+
+            {showDeleteConfirm && (
+              <div className="rounded-xl border border-red-200 bg-white p-3.5 space-y-2.5 shadow-2xs">
+                <p className="text-xs font-bold text-stone-900">
+                  Are you sure you want to permanently delete <span className="underline decoration-red-400 font-extrabold">{course.title}</span>?
+                </p>
+                <p className="text-[11px] text-stone-500">
+                  This action is irreversible. All student progress and learning materials will be immediately removed.
+                </p>
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={isDeleting}
+                    onClick={() => setShowDeleteConfirm(false)}
+                    className="text-xs rounded-xl h-8"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={isDeleting}
+                    onClick={handleDeleteCourse}
+                    className="bg-red-600 text-white hover:bg-red-700 text-xs rounded-xl font-bold px-3.5 h-8 transition-colors"
+                  >
+                    {isDeleting ? 'Deleting Course...' : 'Yes, Permanently Delete'}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Footer Actions */}
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-stone-100">
