@@ -27,6 +27,7 @@ import { LearningPathsView } from './learning-paths-view';
 import { CourseSettingsModal } from './course-settings-modal';
 import { detectMeetingPlatform } from '@/lib/courses/cohort-helpers';
 import { ClassSchedulePicker, ClassScheduleDaysStrip } from './class-schedule-picker';
+import { LearningObjectivesEditor } from './learning-objectives-editor';
 
 export function CoursesCatalog({
   circleId,
@@ -77,6 +78,7 @@ export function CoursesCatalog({
     'open' | 'members_only' | 'min_level' | 'staff_only'
   >('open');
   const [minLevelRequired, setMinLevelRequired] = useState(2);
+  const [learningObjectives, setLearningObjectives] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -162,6 +164,7 @@ export function CoursesCatalog({
           requireSequentialCompletion: pacingFormat === 'structured',
           accessRule,
           minLevelRequired: accessRule === 'min_level' ? Number(minLevelRequired) : 1,
+          learningObjectives: learningObjectives.map((s) => s.trim()).filter(Boolean),
         }),
       });
       const data = await res.json();
@@ -173,6 +176,7 @@ export function CoursesCatalog({
       setIsSlugManual(false);
       setDescription('');
       setThumbnailUrl('');
+      setLearningObjectives([]);
       setCourseFormat('video_on_demand');
       setCohortMeetingUrl('');
       setCohortScheduleDescription('');
@@ -933,6 +937,14 @@ export function CoursesCatalog({
                     className="mt-1 w-full rounded-xl border border-stone-200 bg-white px-3 py-2 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
                   />
                 </div>
+
+                {/* What You'll Learn (Learning Objectives) */}
+                <LearningObjectivesEditor
+                  value={learningObjectives}
+                  onChange={setLearningObjectives}
+                  courseTitle={title}
+                  disabled={loading}
+                />
               </div>
 
               <div className="mt-6 flex items-center justify-end gap-2 border-t border-stone-100 pt-4">

@@ -91,12 +91,24 @@ export async function POST(
 
     if (action === 'purchase_paywall') {
       if (!body.planId) throw new ValidationError('planId is required');
+      const originHeader = req.headers.get('origin') || req.headers.get('referer');
+      let clientOrigin: string | undefined;
+      if (typeof body.origin === 'string' && body.origin.trim().length > 0) {
+        clientOrigin = body.origin.trim();
+      } else if (originHeader) {
+        try {
+          clientOrigin = new URL(originHeader).origin;
+        } catch {
+          // ignore invalid header
+        }
+      }
       const result = await purchaseCoursePaywall(
         user.id,
         params.circleId,
         params.courseId,
         body.planId,
-        body.paymentMethod || 'bachs'
+        body.paymentMethod || 'bachs',
+        clientOrigin
       );
       return NextResponse.json(result, { status: 200 });
     }

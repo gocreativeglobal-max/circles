@@ -41,6 +41,7 @@ import { LessonBlockBuilder } from './lesson-block-builder';
 import { compressImage } from '@/lib/media/compressor';
 import { detectMeetingPlatform } from '@/lib/courses/cohort-helpers';
 import { ClassSchedulePicker } from './class-schedule-picker';
+import { LearningObjectivesEditor } from './learning-objectives-editor';
 import {
   BACHS_ACCEPTED_CURRENCIES,
   formatBachsAmount,
@@ -114,6 +115,9 @@ export function CourseStudioClient({
     'all_levels' | 'beginner' | 'intermediate' | 'advanced'
   >(initialCourse.difficulty_level || 'all_levels');
   const [custDuration, setCustDuration] = useState(String(initialCourse.estimated_duration_hours || 2));
+  const [custObjectives, setCustObjectives] = useState<string[]>(
+    initialCourse.learning_objectives || []
+  );
 
   // Options & Pacing Tab state
   const [courseFormat, setCourseFormat] = useState<CourseDeliveryFormat>(
@@ -563,6 +567,7 @@ export function CourseStudioClient({
           thumbnailUrl: custThumbnail.trim() || null,
           difficultyLevel: custDifficulty,
           estimatedDurationHours: parseFloat(custDuration) || 0,
+          learningObjectives: custObjectives.map((s) => s.trim()).filter(Boolean),
         }),
       });
       const data = await res.json();
@@ -575,6 +580,7 @@ export function CourseStudioClient({
         thumbnail_url: custThumbnail.trim() || null,
         difficulty_level: custDifficulty,
         estimated_duration_hours: parseFloat(custDuration) || 0,
+        learning_objectives: custObjectives,
       }));
       showFeedback('success', 'Course details updated.');
     } catch (err) {
@@ -1481,6 +1487,14 @@ export function CourseStudioClient({
                   />
                 </div>
               </div>
+
+              {/* What You'll Learn (Learning Objectives) */}
+              <LearningObjectivesEditor
+                value={custObjectives}
+                onChange={setCustObjectives}
+                courseTitle={custTitle}
+                disabled={isSaving}
+              />
 
               <div className="pt-4 border-t border-stone-100 flex justify-end">
                 <Button

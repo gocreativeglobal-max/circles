@@ -42,6 +42,37 @@ export interface PaymentProcessorAdapter {
   ): Promise<WebhookVerificationResult>;
 }
 
+export function ensureAbsoluteHttpUrl(urlStr: string | undefined | null, fallbackPath = ''): string {
+  let val = (urlStr || '').trim();
+  const defaultBase = (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://joincircles.online').trim().replace(/\/+$/, '');
+
+  if (!val) {
+    return `${defaultBase}${fallbackPath.startsWith('/') ? fallbackPath : `/${fallbackPath}`}`;
+  }
+
+  // If relative path like "/circles/..."
+  if (val.startsWith('/')) {
+    val = `${defaultBase}${val}`;
+  }
+
+  // If scheme is missing (e.g. "localhost:3000/..." or "joincircles.online/...")
+  if (!val.startsWith('http://') && !val.startsWith('https://')) {
+    const isLocal = val.includes('localhost') || val.includes('127.0.0.1');
+    val = isLocal ? `http://${val}` : `https://${val}`;
+  }
+
+  try {
+    const parsed = new URL(val);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return parsed.toString();
+    }
+  } catch {
+    // fallback
+  }
+
+  return `${defaultBase}${fallbackPath.startsWith('/') ? fallbackPath : `/${fallbackPath}`}`;
+}
+
 /**
  * Bachs Payment Processor Adapter (https://bachs.io)
  * Dedicated sole payment processor for Circles with support for international cards,
@@ -64,6 +95,9 @@ export class BachsPaymentProcessorAdapter implements PaymentProcessorAdapter {
   }
 
   async createCheckoutSession(input: CheckoutSessionInput): Promise<CheckoutSessionResult> {
+    const safeSuccessUrl = ensureAbsoluteHttpUrl(input.successUrl);
+    const safeCancelUrl = ensureAbsoluteHttpUrl(input.cancelUrl);
+
     const payload = {
       customer: {
         email: input.customerEmail || 'member@joincircles.online',
@@ -78,8 +112,8 @@ export class BachsPaymentProcessorAdapter implements PaymentProcessorAdapter {
         planId: input.planId || '',
         userId: input.userId,
       },
-      success_url: input.successUrl,
-      cancel_url: input.cancelUrl,
+      success_url: safeSuccessUrl,
+      cancel_url: safeCancelUrl,
     };
 
     const res = await fetch(`${this.baseUrl}/v1/checkout-sessions`, {

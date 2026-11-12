@@ -44,6 +44,7 @@ import {
   generateGoogleCalendarUrl,
 } from '@/lib/courses/cohort-helpers';
 import { ClassScheduleDaysStrip } from './class-schedule-picker';
+import { generateDefaultObjectives } from './learning-objectives-editor';
 
 export interface CourseLandingViewProps {
   circleId: string;
@@ -169,16 +170,7 @@ export function CourseLandingView({
     if (course.learning_objectives && course.learning_objectives.length > 0) {
       return course.learning_objectives;
     }
-    // Synthesize structured objectives from course title & module topics
-    const defaultList = [
-      `Master end-to-end concepts and best practices in ${course.title}.`,
-      'Build hands-on practical milestones through real-world projects and exercises.',
-      'Understand core architectures, design patterns, and deployment strategies.',
-      'Validate your understanding with comprehensive milestone assessments and quizzes.',
-      'Gain production-ready confidence to apply these skills in professional workflows.',
-      'Earn an official Certificate of Completion upon finishing all modules.',
-    ];
-    return defaultList;
+    return generateDefaultObjectives(course.title);
   }, [course.learning_objectives, course.title]);
 
   const allSectionsExpanded = useMemo(() => {

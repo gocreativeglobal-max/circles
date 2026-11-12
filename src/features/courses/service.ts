@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { z } from 'zod';
 import { withRlsTransaction, withServiceRoleTransaction, DbTransaction } from '@/lib/db/postgres';
-import { getPaymentProcessor } from '@/lib/payments/adapter';
+import { getPaymentProcessor, ensureAbsoluteHttpUrl } from '@/lib/payments/adapter';
 import { isBachsSupportedCurrency } from '@/lib/payments/currencies';
 import { calculatePlatformFee, getCircleTierInfo } from '@/features/finances/platform-fees';
 import {
@@ -67,6 +67,7 @@ export const createCourseSchema = z.object({
   accessRule: z.enum(['open', 'members_only', 'paywall', 'min_level', 'staff_only']).default('open'),
   minLevelRequired: z.number().int().min(1).default(1),
   status: z.enum(['draft', 'published', 'archived']).default('published'),
+  learningObjectives: z.array(z.string().trim()).nullable().optional(),
 });
 
 export const updateCourseSchema = z.object({
@@ -97,6 +98,7 @@ export const updateCourseSchema = z.object({
   accessRule: z.enum(['open', 'members_only', 'paywall', 'min_level', 'staff_only']).optional(),
   minLevelRequired: z.number().int().min(1).optional(),
   status: z.enum(['draft', 'published', 'archived']).optional(),
+  learningObjectives: z.array(z.string().trim()).nullable().optional(),
 });
 
 export const createModuleSchema = z.object({
@@ -308,6 +310,18 @@ export async function listCourses(
         access_rule: row.access_rule ?? 'open',
         min_level_required: Number(row.min_level_required ?? 1),
         published_version: Number(row.published_version ?? 1),
+        learning_objectives: Array.isArray(row.learning_objectives)
+          ? row.learning_objectives
+          : typeof row.learning_objectives === 'string'
+          ? (() => {
+              try {
+                const parsed = JSON.parse(row.learning_objectives);
+                return Array.isArray(parsed) ? parsed : [];
+              } catch {
+                return [];
+              }
+            })()
+          : [],
         created_at: row.created_at,
         updated_at: row.updated_at,
         instructor: {
@@ -746,6 +760,18 @@ export async function getCourseWithCurriculum(
 
     return {
       ...course,
+      learning_objectives: Array.isArray(course.learning_objectives)
+        ? course.learning_objectives
+        : typeof course.learning_objectives === 'string'
+        ? (() => {
+            try {
+              const parsed = JSON.parse(course.learning_objectives);
+              return Array.isArray(parsed) ? parsed : [];
+            } catch {
+              return [];
+            }
+          })()
+        : [],
       estimated_duration_hours: Number(course.estimated_duration_hours),
       viewer_can_access: viewerCanAccess,
       viewer_level: viewerLevel,
@@ -856,8 +882,9 @@ export async function createCourse(
            thumbnail_url, difficulty_level, estimated_duration_hours,
            course_format, cohort_meeting_url, cohort_schedule_description, challenge_duration_days,
            pacing_format, schedule_type, cohort_start_date, cohort_end_date,
-           require_sequential_completion, access_rule, min_level_required, status
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+           require_sequential_completion, access_rule, min_level_required, status,
+           learning_objectives
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
          RETURNING *;`,
         [
           courseId,
@@ -881,6 +908,7 @@ export async function createCourse(
           parsed.accessRule,
           parsed.minLevelRequired,
           parsed.status,
+          JSON.stringify((parsed.learningObjectives || []).map((s) => s.trim()).filter(Boolean)),
         ]
       );
       course = res.rows[0];
@@ -901,8 +929,9 @@ export async function createCourse(
              thumbnail_url, difficulty_level, estimated_duration_hours,
              course_format, cohort_meeting_url, cohort_schedule_description, challenge_duration_days,
              pacing_format, schedule_type, cohort_start_date, cohort_end_date,
-             require_sequential_completion, access_rule, min_level_required, status
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)
+             require_sequential_completion, access_rule, min_level_required, status,
+             learning_objectives
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
            RETURNING *;`,
           [
             courseId,
@@ -926,6 +955,7 @@ export async function createCourse(
             parsed.accessRule,
             parsed.minLevelRequired,
             parsed.status,
+            JSON.stringify((parsed.learningObjectives || []).map((s) => s.trim()).filter(Boolean)),
           ]
         );
         course = fallbackRes.rows[0];
@@ -1007,6 +1037,7 @@ export async function updateCourse(
          cohort_meeting_url = CASE WHEN $22::boolean THEN $23 ELSE cohort_meeting_url END,
          cohort_schedule_description = CASE WHEN $24::boolean THEN $25 ELSE cohort_schedule_description END,
          challenge_duration_days = CASE WHEN $26::boolean THEN $27::integer ELSE challenge_duration_days END,
+         learning_objectives = CASE WHEN $28::boolean THEN $29::jsonb ELSE learning_objectives END,
          updated_at = NOW()
        WHERE id = $1 AND circle_id = $2
        RETURNING *;`,
@@ -1038,10 +1069,29 @@ export async function updateCourse(
         parsed.cohortScheduleDescription ?? null,
         parsed.challengeDurationDays !== undefined,
         parsed.challengeDurationDays ?? null,
+        parsed.learningObjectives !== undefined,
+        parsed.learningObjectives
+          ? JSON.stringify(parsed.learningObjectives.map((s) => s.trim()).filter(Boolean))
+          : '[]',
       ]
     );
 
-    return res.rows[0];
+    const updated = res.rows[0];
+    if (updated) {
+      updated.learning_objectives = Array.isArray(updated.learning_objectives)
+        ? updated.learning_objectives
+        : typeof updated.learning_objectives === 'string'
+        ? (() => {
+            try {
+              const p = JSON.parse(updated.learning_objectives);
+              return Array.isArray(p) ? p : [];
+            } catch {
+              return [];
+            }
+          })()
+        : [];
+    }
+    return updated;
   });
 }
 
@@ -3097,7 +3147,8 @@ export async function purchaseCoursePaywall(
   circleId: string,
   courseId: string,
   planId: string,
-  _paymentMethod: string = 'bachs'
+  _paymentMethod: string = 'bachs',
+  clientOrigin?: string
 ): Promise<{
   success: boolean;
   invoiceId: string;
@@ -3236,10 +3287,9 @@ export async function purchaseCoursePaywall(
     const circleSlug = slugRes.rows[0]?.circle_slug || circleId;
     const courseSlug = slugRes.rows[0]?.course_slug || courseId;
 
-    const appBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://joincircles.online').replace(
-      /\/+$/,
-      ''
-    );
+    const appBaseUrl = ensureAbsoluteHttpUrl(
+      clientOrigin || process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://joincircles.online'
+    ).replace(/\/+$/, '');
     const successUrl = `${appBaseUrl}/circles/${circleSlug}/courses/${courseSlug}?checkout=success&invoiceId=${invoiceId}`;
     const cancelUrl = `${appBaseUrl}/circles/${circleSlug}/courses/${courseSlug}?checkout=cancelled`;
 

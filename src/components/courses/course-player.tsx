@@ -45,7 +45,7 @@ import { QuizRunner } from './quiz-runner';
 import { LessonBlockBuilder } from './lesson-block-builder';
 import { CourseSettingsModal } from './course-settings-modal';
 import { CourseLandingView } from './course-landing-view';
-import { formatBachsAmount, getBachsCurrency } from '@/lib/payments/currencies';
+import { formatBachsAmount } from '@/lib/payments/currencies';
 import { detectMeetingPlatform } from '@/lib/courses/cohort-helpers';
 import { ClassScheduleDaysStrip } from './class-schedule-picker';
 
@@ -326,6 +326,7 @@ export function CoursePlayer({
           action: 'purchase_paywall',
           planId: selectedPaywallPlan.id,
           paymentMethod: 'bachs',
+          origin: typeof window !== 'undefined' ? window.location.origin : undefined,
         }),
       });
       const data = await res.json();
@@ -2295,12 +2296,14 @@ export function CoursePlayer({
                 <div className="rounded-lg border border-stone-200 bg-stone-50/50 p-3 flex items-center gap-3">
                   <CreditCard className="h-4 w-4 text-stone-700" />
                   <div className="flex-1">
-                    <p className="text-xs font-bold text-stone-900">Bachs Secure Checkout</p>
+                    <p className="text-xs font-bold text-stone-900">Instant Access Pass</p>
                     <p className="text-[11px] text-stone-500">
-                      {getBachsCurrency(selectedPaywallPlan.currency).paymentMethodsDescription} via Bachs.io
+                      Encrypted and processed securely
                     </p>
                   </div>
-                  <span className="text-[10px] font-semibold bg-stone-100 text-stone-900 px-2 py-0.5 rounded-full">Bachs Pay</span>
+                  <span className="text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-full">
+                    Instant Access
+                  </span>
                 </div>
               </div>
 

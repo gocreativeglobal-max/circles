@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button';
 import { ImageUploader } from '@/components/ui/image-uploader';
 import { detectMeetingPlatform } from '@/lib/courses/cohort-helpers';
 import { ClassSchedulePicker } from './class-schedule-picker';
+import { LearningObjectivesEditor } from './learning-objectives-editor';
 
 interface CourseSettingsModalProps {
   circleId: string;
@@ -66,6 +67,9 @@ export function CourseSettingsModal({
   const [status, setStatus] = useState<'draft' | 'published' | 'archived'>(
     course.status || 'published'
   );
+  const [learningObjectives, setLearningObjectives] = useState<string[]>(
+    course.learning_objectives || []
+  );
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -92,6 +96,7 @@ export function CourseSettingsModal({
     setAccessRule(course.access_rule || 'open');
     setMinLevelRequired(course.min_level_required ?? 2);
     setStatus(course.status || 'published');
+    setLearningObjectives(course.learning_objectives || []);
     setError(null);
   }, [course]);
 
@@ -157,6 +162,7 @@ export function CourseSettingsModal({
         accessRule,
         minLevelRequired: accessRule === 'min_level' ? Number(minLevelRequired) : 1,
         status,
+        learningObjectives: learningObjectives.map((s) => s.trim()).filter(Boolean),
       };
 
       const res = await fetch(`/api/circles/${circleId}/courses/${course.id}`, {
@@ -467,6 +473,14 @@ export function CourseSettingsModal({
               )}
             </div>
           </div>
+
+          {/* What You'll Learn (Learning Objectives) */}
+          <LearningObjectivesEditor
+            value={learningObjectives}
+            onChange={setLearningObjectives}
+            courseTitle={title}
+            disabled={saving}
+          />
 
           {/* Footer Actions */}
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-stone-100">
