@@ -1173,6 +1173,32 @@ export interface CourseItem {
   published_version?: number;
   validation_issues?: string[];
   prerequisites?: CoursePrerequisiteItem[];
+  live_attendance_count_today?: number;
+  has_attended_live_today?: boolean;
+}
+
+export interface CourseLiveAttendanceItem {
+  id: string;
+  circle_id: string;
+  course_id: string;
+  user_id: string;
+  session_date: string;
+  joined_at: string;
+  metadata?: Record<string, unknown>;
+  user?: Pick<UserProfile, 'id' | 'username' | 'display_name' | 'avatar_url'>;
+}
+
+export interface CourseLiveAttendanceSummary {
+  totalUniqueAttendees: number;
+  todayAttendeesCount: number;
+  hasUserAttendedToday: boolean;
+  attendeesToday: Array<{
+    userId: string;
+    displayName: string;
+    username: string;
+    avatarUrl: string | null;
+    joinedAt: string;
+  }>;
 }
 
 export interface CourseReviewItem {

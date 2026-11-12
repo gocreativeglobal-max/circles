@@ -42,6 +42,7 @@ import {
   detectMeetingPlatform,
   formatCohortDateRange,
   generateGoogleCalendarUrl,
+  calculateLiveSessionStatus,
 } from '@/lib/courses/cohort-helpers';
 import { ClassScheduleDaysStrip } from './class-schedule-picker';
 import { generateDefaultObjectives } from './learning-objectives-editor';
@@ -73,7 +74,7 @@ function getDifficultyLabel(level?: string | null): string {
 }
 
 export function CourseLandingView({
-  circleId: _circleId,
+  circleId,
   circleSlug,
   course,
   isMember,
@@ -153,6 +154,17 @@ export function CourseLandingView({
     () => formatCohortDateRange(course.cohort_start_date, course.cohort_end_date),
     [course.cohort_start_date, course.cohort_end_date]
   );
+  const liveStatus = useMemo(
+    () =>
+      calculateLiveSessionStatus({
+        startDate: course.cohort_start_date,
+        endDate: course.cohort_end_date,
+        scheduleDescription: course.cohort_schedule_description,
+      }),
+    [course.cohort_start_date, course.cohort_end_date, course.cohort_schedule_description]
+  );
+  const liveRelayUrl = `/api/circles/${circleId}/courses/${course.id}/live-join`;
+  const icsDownloadUrl = `/api/circles/${circleId}/courses/${course.id}/live-join?format=ics`;
   const googleCalendarUrl = useMemo(
     () =>
       generateGoogleCalendarUrl({
@@ -204,7 +216,7 @@ export function CourseLandingView({
     setIsSubmittingReview(true);
     setReviewMsg(null);
     try {
-      const res = await fetch(`/api/circles/${_circleId}/courses`, {
+      const res = await fetch(`/api/circles/${circleId}/courses`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -491,51 +503,108 @@ export function CourseLandingView({
                     </p>
                   </div>
 
-                  {/* Classroom Access Card */}
-                  <div className="rounded-xl border border-blue-100 bg-white p-4 space-y-2.5">
+                  {/* Luma-style Classroom Access & Live Room Card */}
+                  <div className="rounded-xl border border-blue-100 bg-white p-4 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2 text-xs font-bold text-stone-800">
                         <Video className="h-4 w-4 text-blue-600" />
                         <span>Classroom Platform</span>
                       </div>
-                      <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold ${detectedPlatform.badgeBg} ${detectedPlatform.badgeText}`}>
-                        {detectedPlatform.name}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        {liveStatus.isLiveNow ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 border border-emerald-300 px-2.5 py-0.5 text-[10px] font-bold text-emerald-800">
+                            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                            LIVE NOW
+                          </span>
+                        ) : liveStatus.isDoorsOpen ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 border border-amber-300 px-2.5 py-0.5 text-[10px] font-bold text-amber-800">
+                            <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                            DOORS OPEN
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-mono text-stone-500">
+                            {liveStatus.countdownText}
+                          </span>
+                        )}
+                        <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-bold ${detectedPlatform.badgeBg} ${detectedPlatform.badgeText}`}>
+                          {detectedPlatform.name}
+                        </span>
+                      </div>
                     </div>
 
                     {hasAccess && course.cohort_meeting_url ? (
-                      <div className="space-y-2 pt-1">
+                      <div className="space-y-2.5 pt-1">
                         <a
-                          href={course.cohort_meeting_url}
+                          href={liveRelayUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 transition-colors"
+                          className={`inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold text-white shadow-xs transition-all ${
+                            liveStatus.isLiveNow
+                              ? 'bg-emerald-600 hover:bg-emerald-700 ring-2 ring-emerald-400/50'
+                              : liveStatus.isDoorsOpen
+                              ? 'bg-amber-600 hover:bg-amber-700 ring-2 ring-amber-400/50'
+                              : 'bg-blue-600 hover:bg-blue-700'
+                          }`}
                         >
                           <Video className="h-4 w-4" />
-                          <span>Launch Live Classroom</span>
+                          <span>
+                            {liveStatus.isLiveNow
+                              ? `Join Live Meeting (${detectedPlatform.name}) · +50 XP`
+                              : liveStatus.isDoorsOpen
+                              ? `Enter Live Room (${detectedPlatform.name}) · +50 XP`
+                              : isStaff
+                              ? `Launch Live Room as Host (${detectedPlatform.name})`
+                              : `Enter Live Room (${detectedPlatform.name})`}
+                          </span>
                           <ExternalLink className="h-3.5 w-3.5 opacity-80" />
                         </a>
-                        <div className="flex items-center justify-between text-[11px] text-stone-500 pt-1">
-                          <a
-                            href={googleCalendarUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-700 hover:underline flex items-center gap-1 font-medium"
-                          >
-                            <Calendar className="h-3 w-3" />
-                            <span>Add to Google Calendar</span>
-                          </a>
-                          <span className="text-stone-400">Direct Room Link Active</span>
+
+                        {/* Attendance & Calendar Row */}
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-stone-100 pt-2 text-[11px]">
+                          <div className="flex items-center gap-3">
+                            <a
+                              href={googleCalendarUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-700 hover:underline flex items-center gap-1 font-medium"
+                            >
+                              <Calendar className="h-3 w-3" />
+                              <span>Google Calendar</span>
+                            </a>
+                            <span className="text-stone-300">·</span>
+                            <a
+                              href={icsDownloadUrl}
+                              download
+                              className="text-stone-600 hover:underline flex items-center gap-1 font-medium"
+                            >
+                              <FolderDown className="h-3 w-3" />
+                              <span>Apple / Outlook (.ics)</span>
+                            </a>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 text-stone-500">
+                            {course.has_attended_live_today ? (
+                              <span className="inline-flex items-center gap-1 font-semibold text-emerald-700">
+                                <Check className="h-3 w-3" /> Attended Today (+50 XP)
+                              </span>
+                            ) : course.live_attendance_count_today && course.live_attendance_count_today > 0 ? (
+                              <span className="text-stone-500">
+                                👥 {course.live_attendance_count_today} joined today
+                              </span>
+                            ) : (
+                              <span className="text-stone-400">Gated Relay Active</span>
+                            )}
+                          </div>
                         </div>
                       </div>
                     ) : (
                       <div className="space-y-1.5 pt-1">
-                        <div className="flex items-center gap-1.5 text-xs text-stone-600">
+                        <div className="flex items-center gap-1.5 text-xs text-stone-700 font-medium">
                           <Lock className="h-3.5 w-3.5 text-stone-400" />
-                          <span>Video classroom link unlocks upon enrollment</span>
+                          <span>Live video meeting link unlocks upon enrollment</span>
                         </div>
                         <p className="text-[11px] text-stone-500">
-                          Enroll to receive the direct meeting link, calendar invitations, and access to recordings.
+                          Enrolled students receive 1-click calendar invites, automated attendance XP tracking, and recorded replays.
                         </p>
                       </div>
                     )}
@@ -1105,13 +1174,23 @@ export function CourseLandingView({
                     <div className="space-y-2">
                       {isEnrolled && course.cohort_meeting_url && (
                         <a
-                          href={course.cohort_meeting_url}
+                          href={liveRelayUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="w-full rounded-xl bg-blue-700 py-3 text-sm font-bold text-white shadow-xs hover:bg-blue-800 transition-all flex items-center justify-center gap-2"
+                          className={`w-full rounded-xl py-3 text-sm font-bold text-white shadow-xs transition-all flex items-center justify-center gap-2 ${
+                            liveStatus.isLiveNow
+                              ? 'bg-emerald-600 hover:bg-emerald-700 ring-2 ring-emerald-400/50'
+                              : liveStatus.isDoorsOpen
+                              ? 'bg-amber-600 hover:bg-amber-700 ring-2 ring-amber-400/50'
+                              : 'bg-blue-700 hover:bg-blue-800'
+                          }`}
                         >
                           <Video className="h-4 w-4" />
-                          <span>Join Live Video Room</span>
+                          <span>
+                            {liveStatus.isLiveNow
+                              ? `Join Live Now (${detectedPlatform.name}) · +50 XP`
+                              : `Join Live Room (${detectedPlatform.name})`}
+                          </span>
                           <ExternalLink className="h-3.5 w-3.5 opacity-80" />
                         </a>
                       )}

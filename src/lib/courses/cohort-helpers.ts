@@ -137,6 +137,186 @@ export function generateGoogleCalendarUrl({
   return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${textParam}&dates=${datesParam}&details=${detailsParam}&location=${locationParam}`;
 }
 
+/**
+ * Generates standard RFC 5545 iCalendar (.ics) content for Apple Calendar, Outlook, and mobile devices
+ */
+export function generateIcsFileContent({
+  title,
+  description,
+  startDate,
+  endDate,
+  meetingUrl,
+  uid,
+}: {
+  title: string;
+  description?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  meetingUrl?: string | null;
+  uid?: string;
+}): string {
+  const start = startDate ? new Date(startDate) : new Date();
+  const end = endDate ? new Date(endDate) : new Date(start.getTime() + 60 * 60 * 1000);
+
+  const formatUtc = (d: Date) =>
+    d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+
+  const eventUid = uid || `cohort-${start.getTime()}@circles.online`;
+  const cleanSummary = title.replace(/\n/g, ' ');
+  const cleanDesc = (description || 'Live cohort session on Circles.')
+    .replace(/\n/g, '\\n')
+    .replace(/;/g, '\\;')
+    .replace(/,/g, '\\,');
+  const cleanLoc = (meetingUrl || 'Live Online Classroom').replace(/,/g, '\\,');
+
+  return [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Circles Platform//Live Classes & Cohorts//EN',
+    'CALSCALE:GREGORIAN',
+    'METHOD:PUBLISH',
+    'BEGIN:VEVENT',
+    `UID:${eventUid}`,
+    `DTSTAMP:${formatUtc(new Date())}`,
+    `DTSTART:${formatUtc(start)}`,
+    `DTEND:${formatUtc(end)}`,
+    `SUMMARY:${cleanSummary}`,
+    `DESCRIPTION:${cleanDesc}\\n\\nJoin Room: ${meetingUrl || ''}`,
+    `LOCATION:${cleanLoc}`,
+    'STATUS:CONFIRMED',
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].join('\r\n');
+}
+
+export interface LiveSessionStatus {
+  badgeState: 'live' | 'doors_open' | 'upcoming' | 'ended' | 'unscheduled';
+  isLiveNow: boolean;
+  isDoorsOpen: boolean;
+  nextSessionDate: Date | null;
+  countdownText: string;
+  formattedSchedule: string;
+}
+
+/**
+ * Calculates real-time live session status (Luma-style doors opening, active stream, or countdown)
+ */
+export function calculateLiveSessionStatus({
+  startDate,
+  endDate,
+  scheduleDescription,
+  now = new Date(),
+}: {
+  startDate?: string | null;
+  endDate?: string | null;
+  scheduleDescription?: string | null;
+  now?: Date;
+}): LiveSessionStatus {
+  if (!startDate) {
+    return {
+      badgeState: scheduleDescription ? 'upcoming' : 'unscheduled',
+      isLiveNow: false,
+      isDoorsOpen: false,
+      nextSessionDate: null,
+      countdownText: scheduleDescription || 'Schedule to be announced',
+      formattedSchedule: scheduleDescription || 'TBD',
+    };
+  }
+
+  const start = new Date(startDate);
+  if (isNaN(start.getTime())) {
+    return {
+      badgeState: 'unscheduled',
+      isLiveNow: false,
+      isDoorsOpen: false,
+      nextSessionDate: null,
+      countdownText: 'Invalid schedule date',
+      formattedSchedule: 'TBD',
+    };
+  }
+
+  // End date default: 90 minutes after start if unspecified
+  const end = endDate && !isNaN(new Date(endDate).getTime())
+    ? new Date(endDate)
+    : new Date(start.getTime() + 90 * 60 * 1000);
+
+  const nowMs = now.getTime();
+  const startMs = start.getTime();
+  const endMs = end.getTime();
+  const doorsOpenMs = startMs - 30 * 60 * 1000; // Doors open 30 minutes before class
+
+  if (nowMs > endMs) {
+    return {
+      badgeState: 'ended',
+      isLiveNow: false,
+      isDoorsOpen: false,
+      nextSessionDate: null,
+      countdownText: 'Session concluded',
+      formattedSchedule: `Ended ${end.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`,
+    };
+  }
+
+  if (nowMs >= startMs && nowMs <= endMs) {
+    const remainingMins = Math.max(1, Math.round((endMs - nowMs) / 60000));
+    return {
+      badgeState: 'live',
+      isLiveNow: true,
+      isDoorsOpen: true,
+      nextSessionDate: start,
+      countdownText: `Live now (${remainingMins}m remaining)`,
+      formattedSchedule: 'In progress',
+    };
+  }
+
+  if (nowMs >= doorsOpenMs && nowMs < startMs) {
+    const minsUntilStart = Math.max(1, Math.round((startMs - nowMs) / 60000));
+    return {
+      badgeState: 'doors_open',
+      isLiveNow: false,
+      isDoorsOpen: true,
+      nextSessionDate: start,
+      countdownText: `Doors open · Starts in ${minsUntilStart}m`,
+      formattedSchedule: 'Starting shortly',
+    };
+  }
+
+  // Future upcoming session
+  const diffMs = startMs - nowMs;
+  const days = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+  const hours = Math.floor((diffMs % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+  const mins = Math.floor((diffMs % (60 * 60 * 1000)) / (60 * 1000));
+
+  let countdownText = '';
+  if (days > 1) {
+    countdownText = `Starts in ${days} days`;
+  } else if (days === 1) {
+    countdownText = `Starts in 1 day ${hours}h`;
+  } else if (hours > 0) {
+    countdownText = `Starts in ${hours}h ${mins}m`;
+  } else {
+    countdownText = `Starts in ${mins}m`;
+  }
+
+  const formattedDate = start.toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+  const formattedTime = start.toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+
+  return {
+    badgeState: 'upcoming',
+    isLiveNow: false,
+    isDoorsOpen: false,
+    nextSessionDate: start,
+    countdownText,
+    formattedSchedule: `${formattedDate} at ${formattedTime}`,
+  };
+}
+
 export interface DayOfWeekOption {
   key: string;
   short: string;

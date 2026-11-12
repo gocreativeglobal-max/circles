@@ -46,7 +46,7 @@ import { LessonBlockBuilder } from './lesson-block-builder';
 import { CourseSettingsModal } from './course-settings-modal';
 import { CourseLandingView } from './course-landing-view';
 import { formatBachsAmount } from '@/lib/payments/currencies';
-import { detectMeetingPlatform } from '@/lib/courses/cohort-helpers';
+import { detectMeetingPlatform, calculateLiveSessionStatus } from '@/lib/courses/cohort-helpers';
 import { ClassScheduleDaysStrip } from './class-schedule-picker';
 
 export function CoursePlayer({
@@ -1205,21 +1205,50 @@ export function CoursePlayer({
             </div>
           )}
 
-          {/* Live Cohort Classroom Hub Banner */}
+          {/* Live Cohort Classroom Hub Banner (Luma-Style Live Room Relay) */}
           {course.course_format === 'live_cohort' && (() => {
             const platformInfo = detectMeetingPlatform(course.cohort_meeting_url);
+            const liveStatus = calculateLiveSessionStatus({
+              startDate: course.cohort_start_date,
+              endDate: course.cohort_end_date,
+              scheduleDescription: course.cohort_schedule_description,
+            });
+            const relayUrl = `/api/circles/${circleId}/courses/${course.id}/live-join`;
             return (
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-900 via-stone-900 to-black p-4 sm:p-5 text-white shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-950 via-stone-900 to-black p-4 sm:p-5 text-white shadow-sm">
                 <div className="flex items-center gap-3.5">
-                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600 text-white shadow-md ring-2 ring-blue-400/40">
+                  <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white shadow-md ring-2 ${
+                    liveStatus.isLiveNow
+                      ? 'bg-emerald-600 ring-emerald-400/50'
+                      : liveStatus.isDoorsOpen
+                      ? 'bg-amber-600 ring-amber-400/50'
+                      : 'bg-blue-600 ring-blue-400/40'
+                  }`}>
                     <Video className="h-5 w-5" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="flex h-2 w-2 rounded-full bg-blue-400 animate-pulse" />
-                      <span className="text-[11px] font-mono font-bold tracking-wider text-blue-300 uppercase">
-                        Live Cohort Classroom Active
+                      <span className={`flex h-2 w-2 rounded-full ${
+                        liveStatus.isLiveNow
+                          ? 'bg-emerald-400 animate-pulse'
+                          : liveStatus.isDoorsOpen
+                          ? 'bg-amber-400 animate-pulse'
+                          : 'bg-blue-400'
+                      }`} />
+                      <span className={`text-[11px] font-mono font-bold tracking-wider uppercase ${
+                        liveStatus.isLiveNow
+                          ? 'text-emerald-300'
+                          : liveStatus.isDoorsOpen
+                          ? 'text-amber-300'
+                          : 'text-blue-300'
+                      }`}>
+                        {liveStatus.isLiveNow ? 'Live Stream Active' : liveStatus.isDoorsOpen ? 'Doors Open' : 'Live Cohort Scheduled'}
                       </span>
+                      {liveStatus.countdownText && (
+                        <span className="text-[10px] text-stone-400 font-mono">
+                          · {liveStatus.countdownText}
+                        </span>
+                      )}
                     </div>
                     <div className="flex flex-wrap items-center gap-2 mt-0.5">
                       <h3 className="text-sm font-bold text-white">
@@ -1231,7 +1260,7 @@ export function CoursePlayer({
                       />
                     </div>
                     <p className="text-[11px] text-stone-300">
-                      Live sessions are interactive. Recorded replays are automatically archived below in the curriculum.
+                      Live sessions are interactive. Attendance is automatically tracked for XP and course completion.
                     </p>
                   </div>
                 </div>
@@ -1239,13 +1268,25 @@ export function CoursePlayer({
                 {course.cohort_meeting_url && (
                   <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
                     <a
-                      href={course.cohort_meeting_url}
+                      href={relayUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-colors"
+                      className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-all ${
+                        liveStatus.isLiveNow
+                          ? 'bg-emerald-600 hover:bg-emerald-500 ring-2 ring-emerald-400/40'
+                          : liveStatus.isDoorsOpen
+                          ? 'bg-amber-600 hover:bg-amber-500 ring-2 ring-amber-400/40'
+                          : 'bg-blue-600 hover:bg-blue-500'
+                      }`}
                     >
                       <Video className="h-4 w-4" />
-                      <span>Join Live Room ({platformInfo.name})</span>
+                      <span>
+                        {liveStatus.isLiveNow
+                          ? `Join Meeting (${platformInfo.name}) · +50 XP`
+                          : liveStatus.isDoorsOpen
+                          ? `Enter Room (${platformInfo.name}) · +50 XP`
+                          : `Join Live Room (${platformInfo.name})`}
+                      </span>
                       <ExternalLink className="h-3 w-3 opacity-80" />
                     </a>
                   </div>

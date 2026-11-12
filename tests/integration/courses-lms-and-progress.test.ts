@@ -22,6 +22,8 @@ import {
   submitCourseReview,
   toggleLessonCompletion,
   updateCourse,
+  recordLiveAttendance,
+  getCourseLiveAttendanceSummary,
 } from '@/features/courses/service';
 import { withRlsTransaction } from '@/lib/db/postgres';
 import { CapabilityDisabledError, ConflictError, ForbiddenError, NotFoundError } from '@/lib/errors';
@@ -807,5 +809,105 @@ describe('Courses, LMS Curriculum & Student Learning Progress Integration Suite'
     expect(updated.course_format).toBe('live_cohort');
     expect(updated.cohort_meeting_url).toBe('https://meet.google.com/abc-defg-hij');
     expect(updated.cohort_schedule_description).toBe('Weekly Saturdays, 3:00 PM UTC');
+  });
+
+  it('manages Luma-style live cohort attendance, relay access gates, and attendance XP tracking', async () => {
+    const suffix = Date.now();
+    const instructor = (
+      await registerUser({
+        email: `cohort-host-${suffix}@example.com`,
+        username: `cohort_host_${suffix}`,
+        displayName: 'Live Instructor',
+        password: 'Password123!',
+      })
+    ).user;
+
+    const student1 = (
+      await registerUser({
+        email: `attendee-1-${suffix}@example.com`,
+        username: `attendee_1_${suffix}`,
+        displayName: 'Attendee One',
+        password: 'Password123!',
+      })
+    ).user;
+
+    const student2 = (
+      await registerUser({
+        email: `attendee-2-${suffix}@example.com`,
+        username: `attendee_2_${suffix}`,
+        displayName: 'Attendee Two',
+        password: 'Password123!',
+      })
+    ).user;
+
+    const circle = await createCircle(instructor.id, {
+      name: `Cohort Circle ${suffix}`,
+      visibility: 'public',
+      membershipPolicy: 'open',
+    });
+
+    await updateCircleCapability(instructor.id, circle.id, 'learning_resources', true);
+    await joinPublicCircle(student1.id, circle.id);
+    await joinPublicCircle(student2.id, circle.id);
+
+    // Create a live cohort course with Google Meet link
+    const liveCourse = await createCourse(instructor.id, {
+      circleId: circle.id,
+      title: 'Fullstack Next.js Live Cohort',
+      slug: 'fullstack-nextjs-live-cohort',
+      description: 'Hands-on live lectures with Google Meet workshops',
+      courseFormat: 'live_cohort',
+      cohortMeetingUrl: 'https://meet.google.com/abc-defg-hij',
+      cohortScheduleDescription: 'Every Tuesday & Thursday, 6:00 PM EST',
+      accessRule: 'members_only',
+    });
+
+    // Student1 enrolls
+    await enrollInCourse(student1.id, circle.id, liveCourse.id);
+
+    // 1. Student1 joins via the live relay: records attendance and gains +50 XP
+    const joinResult = await recordLiveAttendance(student1.id, circle.id, liveCourse.id);
+    expect(joinResult.meetingUrl).toBe('https://meet.google.com/abc-defg-hij');
+    expect(joinResult.isFirstJoinToday).toBe(true);
+    expect(joinResult.xpAwarded).toBe(50);
+
+    const studentXp = await getMemberXpSummary(student1.id, circle.id);
+    expect(studentXp.total_xp).toBe(50);
+
+    // 2. Student1 joins again today: idempotent, does not award double XP
+    const secondJoin = await recordLiveAttendance(student1.id, circle.id, liveCourse.id);
+    expect(secondJoin.meetingUrl).toBe('https://meet.google.com/abc-defg-hij');
+    expect(secondJoin.isFirstJoinToday).toBe(false);
+    expect(secondJoin.xpAwarded).toBe(0);
+
+    // 3. Instructor checks live attendance summary
+    const summary = await getCourseLiveAttendanceSummary(instructor.id, circle.id, liveCourse.id);
+    expect(summary.totalUniqueAttendees).toBe(1);
+    expect(summary.todayAttendeesCount).toBe(1);
+    expect(summary.attendeesToday[0]?.userId).toBe(student1.id);
+    expect(summary.attendeesToday[0]?.displayName).toBe('Attendee One');
+
+    // 4. Verify in getCourseWithCurriculum: reports live_attendance_count_today
+    const enriched = await getCourseWithCurriculum(student1.id, circle.id, liveCourse.id);
+    expect(enriched.live_attendance_count_today).toBe(1);
+    expect(enriched.has_attended_live_today).toBe(true);
+
+    // 5. Non-enrolled student2 in a paywalled cohort is blocked with ForbiddenError
+    const paywalledCohort = await createCourse(instructor.id, {
+      circleId: circle.id,
+      title: 'VIP Masterclass Live',
+      slug: 'vip-masterclass-live',
+      courseFormat: 'live_cohort',
+      cohortMeetingUrl: 'https://zoom.us/j/123456789',
+      accessRule: 'paywall',
+    });
+
+    await expect(recordLiveAttendance(student2.id, circle.id, paywalledCohort.id)).rejects.toThrow(
+      /must enroll in this live cohort/i
+    );
+
+    // Instructor can always access to prepare the room even if paywalled
+    const hostJoin = await recordLiveAttendance(instructor.id, circle.id, paywalledCohort.id);
+    expect(hostJoin.meetingUrl).toBe('https://zoom.us/j/123456789');
   });
 });

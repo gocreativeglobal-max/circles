@@ -30,6 +30,7 @@ import {
   CoursePaywallPlan,
   CourseReviewItem,
   LearningPathEnrollmentItem,
+  CourseLiveAttendanceSummary,
 } from '@/types/domain';
 import {
   CapabilityDisabledError,
@@ -758,6 +759,25 @@ export async function getCourseWithCurriculum(
       // Table may be pending
     }
 
+    let liveAttendanceCountToday = 0;
+    let hasAttendedLiveToday = false;
+    if (course.course_format === 'live_cohort') {
+      try {
+        const attRes = await tx.query<{ count: string; user_attended: boolean }>(
+          `SELECT 
+             COUNT(*)::text AS count,
+             BOOL_OR(user_id = $3) AS user_attended
+           FROM public.course_live_attendance
+           WHERE circle_id = $1 AND course_id = $2 AND session_date = CURRENT_DATE;`,
+          [circleId, course.id, actorUserId || '00000000-0000-0000-0000-000000000000']
+        );
+        liveAttendanceCountToday = parseInt(attRes.rows[0]?.count || '0', 10);
+        hasAttendedLiveToday = Boolean(attRes.rows[0]?.user_attended);
+      } catch {
+        // Table may be pending in initial migrations
+      }
+    }
+
     return {
       ...course,
       learning_objectives: Array.isArray(course.learning_objectives)
@@ -810,6 +830,8 @@ export async function getCourseWithCurriculum(
         currency_prices: (plan.metadata?.currency_prices as Record<string, number>) || {},
       })),
       has_paywall_access: hasPaywallAccess,
+      live_attendance_count_today: liveAttendanceCountToday,
+      has_attended_live_today: hasAttendedLiveToday,
     };
   });
 }
@@ -1890,7 +1912,8 @@ export async function awardMemberXp(
     | 'assignment_submitted'
     | 'assignment_approved'
     | 'lesson_comment'
-    | 'discussion_post',
+    | 'discussion_post'
+    | 'live_cohort_attendance',
   entityId?: string | null
 ): Promise<void> {
   await withServiceRoleTransaction(async (tx) => {
@@ -3411,5 +3434,170 @@ export async function deleteCourseReview(
 
     await tx.query(`DELETE FROM public.course_reviews WHERE id = $1 AND circle_id = $2;`, [reviewId, circleId]);
     return { success: true };
+  });
+}
+
+export interface RecordLiveAttendanceResult {
+  meetingUrl: string;
+  isFirstJoinToday: boolean;
+  xpAwarded: number;
+  courseTitle: string;
+}
+
+/**
+ * Records a student or instructor joining a live cohort session (Luma-style gated relay).
+ * Validates enrollment / access entitlement, records attendance, awards XP, and returns meeting URL.
+ */
+export async function recordLiveAttendance(
+  actorUserId: string,
+  circleId: string,
+  courseId: string
+): Promise<RecordLiveAttendanceResult> {
+  const result = await withRlsTransaction(actorUserId, async (tx) => {
+    // 1. Verify circle capability 'learning_resources'
+    const capRes = await tx.query<{ enabled: boolean }>(
+      `SELECT enabled FROM public.circle_capabilities WHERE circle_id = $1 AND capability_key = 'learning_resources';`,
+      [circleId]
+    );
+    if (!capRes.rows[0]?.enabled) {
+      throw new CapabilityDisabledError('learning_resources');
+    }
+
+    // 2. Fetch course details
+    const courseRes = await tx.query<{
+      id: string;
+      title: string;
+      course_format: string;
+      cohort_meeting_url: string | null;
+      access_rule: string;
+      min_level_required: number;
+    }>(
+      `SELECT id, title, course_format, cohort_meeting_url, access_rule, min_level_required
+       FROM public.courses
+       WHERE id = $1 AND circle_id = $2 LIMIT 1;`,
+      [courseId, circleId]
+    );
+
+    if (courseRes.rows.length === 0) {
+      throw new NotFoundError('Course not found.');
+    }
+
+    const course = courseRes.rows[0];
+
+    if (!course.cohort_meeting_url || !course.cohort_meeting_url.trim()) {
+      throw new NotFoundError('No live meeting link has been configured for this course yet.');
+    }
+
+    // 3. Check staff role
+    const memRes = await tx.query<{ role: string }>(
+      `SELECT role FROM public.circle_memberships WHERE circle_id = $1 AND user_id = $2 AND status = 'active' LIMIT 1;`,
+      [circleId, actorUserId]
+    );
+    const role = memRes.rows[0]?.role;
+    const isStaff = role === 'owner' || role === 'admin' || role === 'moderator';
+
+    // 4. If not staff, verify enrollment or paywall access
+    if (!isStaff) {
+      const enrollRes = await tx.query<{ id: string }>(
+        `SELECT id FROM public.course_enrollments WHERE course_id = $1 AND student_id = $2 LIMIT 1;`,
+        [courseId, actorUserId]
+      );
+      const isEnrolled = enrollRes.rows.length > 0;
+
+      if (!isEnrolled) {
+        if (course.access_rule === 'paywall') {
+          const entRes = await tx.query<{ id: string }>(
+            `SELECT id FROM public.member_entitlements
+             WHERE circle_id = $1 AND user_id = $2 AND target_type = 'course_access' AND target_id = $3
+               AND status = 'active' AND (expires_at IS NULL OR expires_at > NOW()) LIMIT 1;`,
+            [circleId, actorUserId, courseId]
+          );
+          if (entRes.rows.length === 0) {
+            throw new ForbiddenError('You must enroll in this live cohort to enter the meeting room.');
+          }
+        } else if (course.access_rule === 'staff_only') {
+          throw new ForbiddenError('This live cohort session is restricted to instructors and staff.');
+        } else if (memRes.rows.length === 0) {
+          throw new ForbiddenError('You must be a member of this Circle to join this live session.');
+        }
+      }
+    }
+
+    // 5. Insert attendance record (idempotent per session date)
+    const insRes = await tx.query<{ id: string }>(
+      `INSERT INTO public.course_live_attendance (circle_id, course_id, user_id, session_date, joined_at)
+       VALUES ($1, $2, $3, CURRENT_DATE, NOW())
+       ON CONFLICT (course_id, user_id, session_date) DO NOTHING
+       RETURNING id;`,
+      [circleId, courseId, actorUserId]
+    );
+
+    const isFirstJoinToday = insRes.rows.length > 0;
+    const xpAwarded = isFirstJoinToday ? 50 : 0;
+
+    return {
+      meetingUrl: course.cohort_meeting_url,
+      isFirstJoinToday,
+      xpAwarded,
+      courseTitle: course.title,
+    };
+  });
+
+  if (result.isFirstJoinToday) {
+    try {
+      await awardMemberXp(actorUserId, circleId, 50, 'live_cohort_attendance', courseId);
+    } catch {
+      // Best-effort XP reward
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Retrieves attendance analytics for a live cohort (total unique attendees and today's roster).
+ */
+export async function getCourseLiveAttendanceSummary(
+  actorUserId: string,
+  circleId: string,
+  courseId: string
+): Promise<CourseLiveAttendanceSummary> {
+  return withRlsTransaction(actorUserId, async (tx) => {
+    const totalRes = await tx.query<{ count: string }>(
+      `SELECT COUNT(DISTINCT user_id)::text AS count
+       FROM public.course_live_attendance
+       WHERE circle_id = $1 AND course_id = $2;`,
+      [circleId, courseId]
+    );
+
+    const todayRes = await tx.query<{
+      user_id: string;
+      display_name: string;
+      username: string;
+      avatar_url: string | null;
+      joined_at: string;
+    }>(
+      `SELECT cla.user_id, p.display_name, p.username, p.avatar_url, cla.joined_at::text
+       FROM public.course_live_attendance cla
+       JOIN public.profiles p ON p.id = cla.user_id
+       WHERE cla.circle_id = $1 AND cla.course_id = $2 AND cla.session_date = CURRENT_DATE
+       ORDER BY cla.joined_at ASC;`,
+      [circleId, courseId]
+    );
+
+    const userAttendedToday = todayRes.rows.some((r) => r.user_id === actorUserId);
+
+    return {
+      totalUniqueAttendees: parseInt(totalRes.rows[0]?.count || '0', 10),
+      todayAttendeesCount: todayRes.rows.length,
+      hasUserAttendedToday: userAttendedToday,
+      attendeesToday: todayRes.rows.map((r) => ({
+        userId: r.user_id,
+        displayName: r.display_name,
+        username: r.username,
+        avatarUrl: r.avatar_url,
+        joinedAt: r.joined_at,
+      })),
+    };
   });
 }
