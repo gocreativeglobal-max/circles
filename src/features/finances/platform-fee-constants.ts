@@ -65,7 +65,7 @@ export const PLATFORM_TIERS: Record<PlatformPlanTier, PlatformTierDefinition> = 
     name: 'Pro Creator',
     badge: '5% Platform Fee',
     platformFeePercentage: 5,
-    monthlyPriceUsd: 29,
+    monthlyPriceUsd: 30,
     storageBytes: 50 * 1024 * 1024 * 1024, // 50 GB
     storageFormatted: '50 GB',
     maxFileUploadBytes: 100 * 1024 * 1024, // 100 MB
@@ -91,9 +91,9 @@ export const PLATFORM_TIERS: Record<PlatformPlanTier, PlatformTierDefinition> = 
   platinum: {
     tier: 'platinum',
     name: 'Platinum High-Volume',
-    badge: '2% Platform Fee',
-    platformFeePercentage: 2,
-    monthlyPriceUsd: 99,
+    badge: '3% Platform Fee',
+    platformFeePercentage: 3,
+    monthlyPriceUsd: 100,
     storageBytes: 250 * 1024 * 1024 * 1024, // 250 GB
     storageFormatted: '250 GB',
     maxFileUploadBytes: 500 * 1024 * 1024, // 500 MB
@@ -105,10 +105,10 @@ export const PLATFORM_TIERS: Record<PlatformPlanTier, PlatformTierDefinition> = 
     whiteLabelEmailsAllowed: true,
     directErpSyncAllowed: true,
     prioritySupportAllowed: true,
-    description: 'For established academies and high-volume communities. Lowest 2% fee and 250 GB storage.',
+    description: 'For established academies and high-volume communities. Lowest 3% fee and 250 GB storage.',
     features: [
       'Everything in Pro',
-      'Lowest platform fee: Reduced to 2%',
+      'Lowest platform fee: Reduced to 3%',
       '250 GB enterprise media storage',
       '100% Ad-Free experience for all circle members',
       'Direct ERP & automated accounting sync (QuickBooks, Xero, Yardi)',

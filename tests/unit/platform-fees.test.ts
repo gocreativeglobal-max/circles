@@ -21,10 +21,10 @@ describe('Circles Tiered Platform Fees, Storage & Feature Gating', () => {
       expect(free.adPolicy).toBe('Circles Ad-Supported (Platform Ads)');
     });
 
-    it('defines Pro Creator tier at 5% fee, $29/month, and 50 GB storage', () => {
+    it('defines Pro Creator tier at 5% fee, $30/month, and 50 GB storage', () => {
       const pro = PLATFORM_TIERS.pro;
       expect(pro.platformFeePercentage).toBe(5);
-      expect(pro.monthlyPriceUsd).toBe(29);
+      expect(pro.monthlyPriceUsd).toBe(30);
       expect(pro.badge).toContain('5%');
       expect(pro.storageFormatted).toBe('50 GB');
       expect(pro.storageBytes).toBe(50 * 1024 * 1024 * 1024);
@@ -33,11 +33,11 @@ describe('Circles Tiered Platform Fees, Storage & Feature Gating', () => {
       expect(pro.adPolicy).toBe('100% Ad-Free for members');
     });
 
-    it('defines Platinum High-Volume tier at 2% fee, $99/month, and 250 GB storage', () => {
+    it('defines Platinum High-Volume tier at 3% fee, $100/month, and 250 GB storage', () => {
       const platinum = PLATFORM_TIERS.platinum;
-      expect(platinum.platformFeePercentage).toBe(2);
-      expect(platinum.monthlyPriceUsd).toBe(99);
-      expect(platinum.badge).toContain('2%');
+      expect(platinum.platformFeePercentage).toBe(3);
+      expect(platinum.monthlyPriceUsd).toBe(100);
+      expect(platinum.badge).toContain('3%');
       expect(platinum.storageFormatted).toBe('250 GB');
       expect(platinum.storageBytes).toBe(250 * 1024 * 1024 * 1024);
       expect(platinum.maxFileUploadBytes).toBe(500 * 1024 * 1024);
@@ -123,12 +123,12 @@ describe('Circles Tiered Platform Fees, Storage & Feature Gating', () => {
       expect(res.creatorNetCents).toBe(9500);
     });
 
-    it('calculates 2% platform fee for Platinum tier', () => {
+    it('calculates 3% platform fee for Platinum tier', () => {
       const res = calculatePlatformFee('platinum', 10000);
       expect(res.planTier).toBe('platinum');
-      expect(res.feePercentage).toBe(2);
-      expect(res.feeCents).toBe(200);
-      expect(res.creatorNetCents).toBe(9800);
+      expect(res.feePercentage).toBe(3);
+      expect(res.feeCents).toBe(300);
+      expect(res.creatorNetCents).toBe(9700);
     });
 
     it('calculates Enterprise tier with custom fee percentage', () => {
@@ -153,8 +153,8 @@ describe('Circles Tiered Platform Fees, Storage & Feature Gating', () => {
       expect(resFree.creatorNetCents).toBe(4499);
 
       const resPlat = calculatePlatformFee('platinum', 4999);
-      expect(resPlat.feeCents).toBe(100);
-      expect(resPlat.creatorNetCents).toBe(4899);
+      expect(resPlat.feeCents).toBe(150);
+      expect(resPlat.creatorNetCents).toBe(4849);
     });
 
     it('handles zero or negative amounts safely', () => {
