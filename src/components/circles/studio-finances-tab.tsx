@@ -23,6 +23,9 @@ import {
   Check,
   HardDrive,
   Trash2,
+  X,
+  ShieldAlert,
+  Lock,
 } from 'lucide-react';
 import {
   BillingType,
@@ -100,6 +103,20 @@ export function StudioFinancesTab({
     isOverQuota: boolean;
   } | null>(null);
   const [tierSaving, setTierSaving] = useState(false);
+
+  // Tier Upgrade / Downgrade checkout state
+  const [showUpgradeModal, setShowUpgradeModal] = useState<PlatformPlanTier | null>(null);
+  const [showDowngradeModal, setShowDowngradeModal] = useState(false);
+  const [upgradeLoading, setUpgradeLoading] = useState(false);
+  const [upgradeSessionData, setUpgradeSessionData] = useState<{
+    sessionId: string;
+    checkoutUrl: string;
+    invoiceId: string;
+    targetTier: PlatformPlanTier;
+    amountCents: number;
+    isSimulated: boolean;
+  } | null>(null);
+  const [upgradeModalError, setUpgradeModalError] = useState<string | null>(null);
 
   // Modals state
   const [showCreatePlanModal, setShowCreatePlanModal] = useState(false);
@@ -199,7 +216,7 @@ export function StudioFinancesTab({
     loadAllFinancialData();
   }, [loadAllFinancialData]);
 
-  async function handleSwitchTier(targetTier: PlatformPlanTier) {
+  async function handleDowngradeToFree() {
     setTierSaving(true);
     setError(null);
     try {
@@ -208,19 +225,76 @@ export function StudioFinancesTab({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'update_tier',
+          tier: 'free',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to downgrade to Free');
+
+      setCurrentTier('free');
+      setShowDowngradeModal(false);
+      showSuccess('Circle plan changed to Free / Basic tier.');
+      loadAllFinancialData();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Error downgrading tier');
+    } finally {
+      setTierSaving(false);
+    }
+  }
+
+  async function handleInitiateTierCheckout(targetTier: PlatformPlanTier) {
+    setUpgradeLoading(true);
+    setUpgradeModalError(null);
+    try {
+      const res = await fetch(`/api/circles/${circle.id}/finances`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'upgrade_tier_checkout',
           tier: targetTier,
         }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to update plan tier');
+      if (!res.ok) throw new Error(data.error || 'Failed to initiate checkout');
 
-      setCurrentTier(targetTier);
-      showSuccess(`Successfully changed circle tier to ${PLATFORM_TIERS[targetTier].name}!`);
+      if (data.isSimulated) {
+        setUpgradeSessionData(data);
+      } else if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      }
+    } catch (err: unknown) {
+      setUpgradeModalError(err instanceof Error ? err.message : 'Checkout initiation failed');
+    } finally {
+      setUpgradeLoading(false);
+    }
+  }
+
+  async function handleCompleteSimulatedTierPayment() {
+    if (!upgradeSessionData) return;
+    setUpgradeLoading(true);
+    setUpgradeModalError(null);
+    try {
+      const res = await fetch(`/api/circles/${circle.id}/finances`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'confirm_tier_payment',
+          invoiceId: upgradeSessionData.invoiceId,
+          paymentReference: `BACHS_SIM_${Date.now()}`,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Payment confirmation failed');
+
+      setCurrentTier(upgradeSessionData.targetTier);
+      showSuccess(`Payment confirmed! Upgraded to ${PLATFORM_TIERS[upgradeSessionData.targetTier].name}.`);
+      setShowUpgradeModal(null);
+      setUpgradeSessionData(null);
       loadAllFinancialData();
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Error switching tier');
+      setUpgradeModalError(err instanceof Error ? err.message : 'Error completing payment');
     } finally {
-      setTierSaving(false);
+      setUpgradeLoading(false);
     }
   }
 
@@ -1048,7 +1122,15 @@ export function StudioFinancesTab({
                     : `${storageUsage?.usedPercentage || 0}% Used`}
                 </Badge>
                 {currentTier === 'free' && (
-                  <Button size="sm" onClick={() => handleSwitchTier('pro')} disabled={tierSaving}>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setShowUpgradeModal('pro');
+                      setUpgradeSessionData(null);
+                      setUpgradeModalError(null);
+                    }}
+                    disabled={tierSaving || upgradeLoading}
+                  >
                     Upgrade to Pro (50 GB)
                   </Button>
                 )}
@@ -1189,15 +1271,31 @@ export function StudioFinancesTab({
                           <Check className="h-3.5 w-3.5 mr-1 text-stone-900" />
                           <span>Active Plan</span>
                         </button>
-                      ) : (
+                      ) : tierKey === 'free' ? (
                         <Button
-                          onClick={() => handleSwitchTier(tierKey)}
-                          disabled={tierSaving}
-                          variant={tierKey === 'pro' || tierKey === 'platinum' ? 'primary' : 'outline'}
-                          className="w-full"
+                          type="button"
+                          onClick={() => setShowDowngradeModal(true)}
+                          disabled={tierSaving || upgradeLoading}
+                          variant="outline"
+                          className="w-full text-stone-600 hover:text-stone-900 border-stone-300"
                           size="sm"
                         >
-                          {tierSaving ? 'Switching...' : `Select ${tierDef.name.split(' ')[0]}`}
+                          Downgrade to Free
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          onClick={() => {
+                            setShowUpgradeModal(tierKey);
+                            setUpgradeSessionData(null);
+                            setUpgradeModalError(null);
+                          }}
+                          disabled={tierSaving || upgradeLoading}
+                          variant={tierKey === 'pro' || tierKey === 'platinum' ? 'primary' : 'outline'}
+                          className="w-full font-bold"
+                          size="sm"
+                        >
+                          Upgrade (${tierDef.monthlyPriceUsd}/mo)
                         </Button>
                       )}
                     </div>
@@ -2139,6 +2237,184 @@ export function StudioFinancesTab({
                 </Button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: TIER UPGRADE CHECKOUT */}
+      {showUpgradeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl border border-stone-200">
+            {(() => {
+              const tierDef = PLATFORM_TIERS[showUpgradeModal];
+              if (!tierDef) return null;
+              return (
+                <div className="space-y-5">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-lg bg-stone-900 p-1.5 text-white">
+                          <Crown className="h-5 w-5" />
+                        </span>
+                        <h3 className="text-lg font-bold text-stone-900">
+                          Upgrade to {tierDef.name}
+                        </h3>
+                      </div>
+                      <p className="mt-1 text-xs text-stone-500">
+                        Unlock reduced take-rates, high-capacity storage, and creator superpowers.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowUpgradeModal(null);
+                        setUpgradeSessionData(null);
+                        setUpgradeModalError(null);
+                      }}
+                      className="rounded-lg p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+
+                  {upgradeModalError && (
+                    <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+                      <AlertCircle className="h-4 w-4 shrink-0" />
+                      <span>{upgradeModalError}</span>
+                    </div>
+                  )}
+
+                  {/* Pricing & Key Benefits Card */}
+                  <div className="rounded-xl border border-stone-200 bg-stone-50/70 p-4 space-y-3">
+                    <div className="flex items-baseline justify-between border-b border-stone-200/60 pb-3">
+                      <div>
+                        <span className="text-2xl font-black text-stone-900">
+                          ${tierDef.monthlyPriceUsd}
+                        </span>
+                        <span className="text-xs text-stone-500 font-semibold"> / month</span>
+                      </div>
+                      <span className="rounded-md bg-stone-900 text-white px-2 py-0.5 text-xs font-bold">
+                        {tierDef.badge}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span className="text-stone-500 block">Cloud Storage:</span>
+                        <span className="font-bold text-stone-900">{tierDef.storageFormatted}</span>
+                      </div>
+                      <div>
+                        <span className="text-stone-500 block">Member Ads:</span>
+                        <span className="font-bold text-stone-900">{tierDef.adPolicy}</span>
+                      </div>
+                      <div>
+                        <span className="text-stone-500 block">Custom Domain:</span>
+                        <span className="font-bold text-stone-900">
+                          {tierDef.customDomainAllowed ? 'Included' : 'Not included'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-stone-500 block">White-label Branding:</span>
+                        <span className="font-bold text-stone-900">
+                          {tierDef.whiteLabelEmailsAllowed ? 'Included' : 'Not included'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bachs Simulated vs Live Checkout */}
+                  {upgradeSessionData?.isSimulated ? (
+                    <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-4 space-y-2 text-xs text-blue-900">
+                      <div className="flex items-center gap-1.5 font-bold">
+                        <CreditCard className="h-4 w-4 text-blue-700" />
+                        <span>Bachs Payment Simulator (Sandbox Active)</span>
+                      </div>
+                      <p className="text-[11px] text-blue-700 leading-relaxed">
+                        Invoice #{upgradeSessionData.invoiceId.slice(0, 8)} created for ${tierDef.monthlyPriceUsd}.00 USD.
+                        Click below to verify the test transaction and immediately activate your {tierDef.name} tier.
+                      </p>
+                      <Button
+                        type="button"
+                        onClick={handleCompleteSimulatedTierPayment}
+                        disabled={upgradeLoading}
+                        className="w-full mt-2 bg-blue-700 hover:bg-blue-800 text-white font-bold text-xs"
+                      >
+                        {upgradeLoading ? 'Activating Plan...' : `Simulate Payment of $${tierDef.monthlyPriceUsd} & Activate`}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-3 pt-1">
+                      <p className="text-[11px] text-stone-500">
+                        Payments are securely processed via Bachs with support for international cards, bank transfers, mobile money, and crypto stablecoins. You can cancel or downgrade at any time.
+                      </p>
+
+                      <div className="flex items-center justify-end gap-2 pt-2 border-t border-stone-100">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={upgradeLoading}
+                          onClick={() => setShowUpgradeModal(null)}
+                          className="text-xs"
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          type="button"
+                          disabled={upgradeLoading}
+                          onClick={() => handleInitiateTierCheckout(showUpgradeModal)}
+                          className="bg-black hover:bg-stone-800 text-white text-xs font-bold px-4"
+                        >
+                          {upgradeLoading ? 'Opening Checkout...' : `Pay $${tierDef.monthlyPriceUsd} & Upgrade`}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: DOWNGRADE TO FREE WARNING */}
+      {showDowngradeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl border border-stone-200 space-y-4">
+            <div className="flex items-center gap-2 text-amber-700">
+              <ShieldAlert className="h-5 w-5" />
+              <h3 className="text-base font-bold text-stone-900">
+                Downgrade to Free Tier?
+              </h3>
+            </div>
+            <p className="text-xs text-stone-600 leading-relaxed">
+              Downgrading to the Free tier will:
+            </p>
+            <ul className="text-xs text-stone-600 space-y-1.5 list-disc pl-5">
+              <li>Increase your platform fee to <strong>10%</strong> on paid member transactions.</li>
+              <li>Reduce your cloud storage limit to <strong>500 MB</strong>.</li>
+              <li>Re-enable platform feed ad placements for members.</li>
+              <li>Deactivate custom domain mapping and white-labeling.</li>
+            </ul>
+
+            <div className="flex items-center justify-end gap-2 pt-3 border-t border-stone-100">
+              <Button
+                type="button"
+                variant="outline"
+                disabled={tierSaving}
+                onClick={() => setShowDowngradeModal(false)}
+                className="text-xs"
+              >
+                Keep My Plan
+              </Button>
+              <Button
+                type="button"
+                disabled={tierSaving}
+                onClick={handleDowngradeToFree}
+                className="bg-stone-900 hover:bg-black text-white text-xs font-bold"
+              >
+                {tierSaving ? 'Downgrading...' : 'Yes, Downgrade to Free'}
+              </Button>
+            </div>
           </div>
         </div>
       )}

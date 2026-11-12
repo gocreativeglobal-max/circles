@@ -279,4 +279,111 @@ describe('Phase 2: Financial API Route Handlers & Studio Operations Suite', () =
     expect(summaryData.summary.total_expense_cents).toBe(8500);
     expect(summaryData.summary.net_balance_cents).toBe(6500);
   });
+
+  it('6. Enforces paid tier checkout: blocks unpaid tier switching, creates Bachs checkout session, and activates on payment confirmation', async () => {
+    const suffix = Date.now();
+    const { user: owner, sessionToken: ownerToken } = await registerUser({
+      email: `tier-owner-${suffix}@test.local`,
+      password: 'Password123!',
+      username: `tierowner_${suffix}`,
+      displayName: 'Tier Owner',
+    });
+
+    const circle = await createCircle(owner.id, {
+      name: `Tier Circle ${suffix}`,
+      slug: `tier-circle-${suffix}`,
+      description: 'Circle to test tier checkout enforcement',
+      visibility: 'public',
+      membershipPolicy: 'open',
+    });
+
+    await updateCircleCapability(owner.id, circle.id, 'payments_finances', true);
+
+    // 1. Attempting to directly switch to Pro ($50/mo) via PATCH without payment -> 403 Forbidden
+    const unpaidPatchRes = await financesPatchRoute(
+      makeRequest(
+        `http://localhost:3000/api/circles/${circle.id}/finances`,
+        'PATCH',
+        {
+          action: 'update_tier',
+          tier: 'pro',
+        },
+        ownerToken
+      ),
+      { params: { circleId: circle.id } }
+    );
+    expect(unpaidPatchRes.status).toBe(403);
+    const unpaidPatchData = await unpaidPatchRes.json();
+    expect(unpaidPatchData.error).toMatch(/requires payment/i);
+
+    // 2. Initiating tier upgrade checkout via POST action: upgrade_tier_checkout
+    const checkoutRes = await financesPostRoute(
+      makeRequest(
+        `http://localhost:3000/api/circles/${circle.id}/finances`,
+        'POST',
+        {
+          action: 'upgrade_tier_checkout',
+          tier: 'pro',
+        },
+        ownerToken
+      ),
+      { params: { circleId: circle.id } }
+    );
+    expect(checkoutRes.status).toBe(200);
+    const checkoutData = await checkoutRes.json();
+    expect(checkoutData.targetTier).toBe('pro');
+    expect(checkoutData.amountCents).toBe(5000); // $50.00
+    expect(checkoutData.invoiceId).toBeDefined();
+    expect(checkoutData.checkoutUrl).toBeDefined();
+
+    // 3. Confirming simulated tier payment via POST action: confirm_tier_payment
+    const confirmRes = await financesPostRoute(
+      makeRequest(
+        `http://localhost:3000/api/circles/${circle.id}/finances`,
+        'POST',
+        {
+          action: 'confirm_tier_payment',
+          invoiceId: checkoutData.invoiceId,
+          paymentReference: `BACHS_CONFIRM_TEST_${suffix}`,
+        },
+        ownerToken
+      ),
+      { params: { circleId: circle.id } }
+    );
+    expect(confirmRes.status).toBe(200);
+    const confirmData = await confirmRes.json();
+    expect(confirmData.success).toBe(true);
+    expect(confirmData.tier).toBe('pro');
+
+    // 4. Verifying Circle tier is now Pro via GET platform_tier
+    const tierInfoRes = await financesGetRoute(
+      makeRequest(
+        `http://localhost:3000/api/circles/${circle.id}/finances?mode=platform_tier`,
+        'GET',
+        undefined,
+        ownerToken
+      ),
+      { params: { circleId: circle.id } }
+    );
+    expect(tierInfoRes.status).toBe(200);
+    const tierInfo = await tierInfoRes.json();
+    expect(tierInfo.planTier).toBe('pro');
+
+    // 5. Downgrading to Free is allowed without payment
+    const downgradeRes = await financesPatchRoute(
+      makeRequest(
+        `http://localhost:3000/api/circles/${circle.id}/finances`,
+        'PATCH',
+        {
+          action: 'update_tier',
+          tier: 'free',
+        },
+        ownerToken
+      ),
+      { params: { circleId: circle.id } }
+    );
+    expect(downgradeRes.status).toBe(200);
+    const downgradeData = await downgradeRes.json();
+    expect(downgradeData.updated.planTier).toBe('free');
+  });
 });

@@ -18,6 +18,8 @@ import {
   getCirclePlatformLedger,
   getCircleTierInfo,
   getCircleStorageUsage,
+  createPlatformTierCheckoutSession,
+  confirmPlatformTierPayment,
 } from '@/features/finances/platform-fees';
 import { withRlsTransaction } from '@/lib/db/postgres';
 import { handleApiError, resolveApiUser } from '@/lib/auth/api-helpers';
@@ -152,6 +154,31 @@ export async function POST(
       return NextResponse.json({ entitlement }, { status: 201 });
     }
 
+    if (action === 'upgrade_tier_checkout') {
+      if (!body.tier || !['starter', 'pro', 'platinum'].includes(body.tier)) {
+        throw new ValidationError('Valid paid tier (starter, pro, platinum) is required for checkout.');
+      }
+      const session = await createPlatformTierCheckoutSession(
+        user.id,
+        params.circleId,
+        body.tier
+      );
+      return NextResponse.json(session, { status: 200 });
+    }
+
+    if (action === 'confirm_tier_payment') {
+      if (!body.invoiceId) {
+        throw new ValidationError('invoiceId is required to confirm payment.');
+      }
+      const result = await confirmPlatformTierPayment(
+        user.id,
+        params.circleId,
+        body.invoiceId,
+        body.paymentReference
+      );
+      return NextResponse.json(result, { status: 200 });
+    }
+
     throw new ValidationError(`Unknown action: "${action}"`);
   } catch (error) {
     return handleApiError(error);
@@ -190,7 +217,8 @@ export async function PATCH(
         user.id,
         params.circleId,
         body.tier,
-        body.customFeePercentage != null ? Number(body.customFeePercentage) : null
+        body.customFeePercentage != null ? Number(body.customFeePercentage) : null,
+        body.paymentReference || null
       );
       return NextResponse.json({ updated });
     }
