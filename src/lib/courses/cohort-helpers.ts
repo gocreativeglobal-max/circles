@@ -136,3 +136,96 @@ export function generateGoogleCalendarUrl({
 
   return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${textParam}&dates=${datesParam}&details=${detailsParam}&location=${locationParam}`;
 }
+
+export interface DayOfWeekOption {
+  key: string;
+  short: string;
+  label: string;
+  letter: string;
+}
+
+export const DAYS_OF_WEEK: DayOfWeekOption[] = [
+  { key: 'mon', short: 'Mon', label: 'Monday', letter: 'M' },
+  { key: 'tue', short: 'Tue', label: 'Tuesday', letter: 'T' },
+  { key: 'wed', short: 'Wed', label: 'Wednesday', letter: 'W' },
+  { key: 'thu', short: 'Thu', label: 'Thursday', letter: 'T' },
+  { key: 'fri', short: 'Fri', label: 'Friday', letter: 'F' },
+  { key: 'sat', short: 'Sat', label: 'Saturday', letter: 'S' },
+  { key: 'sun', short: 'Sun', label: 'Sunday', letter: 'S' },
+];
+
+export function parseDaysFromSchedule(scheduleDescription?: string | null): string[] {
+  if (!scheduleDescription) return [];
+  const lower = scheduleDescription.toLowerCase();
+  const matched: string[] = [];
+
+  if (lower.includes('everyday') || lower.includes('every day') || lower.includes('daily')) {
+    return DAYS_OF_WEEK.map((d) => d.key);
+  }
+  if (lower.includes('weekday') || lower.includes('mon-fri') || lower.includes('mon – fri')) {
+    return ['mon', 'tue', 'wed', 'thu', 'fri'];
+  }
+  if (lower.includes('weekend')) {
+    return ['sat', 'sun'];
+  }
+
+  DAYS_OF_WEEK.forEach((d) => {
+    if (lower.includes(d.key) || lower.includes(d.label.toLowerCase())) {
+      matched.push(d.key);
+    }
+  });
+
+  return matched;
+}
+
+export function formatTime12h(time24?: string): string {
+  if (!time24) return '';
+  // If already contains am/pm, return as is
+  if (/am|pm/i.test(time24)) return time24;
+  const parts = time24.split(':');
+  if (parts.length < 2) return time24;
+  const hours = parseInt(parts[0], 10);
+  const minutes = parts[1];
+  if (isNaN(hours)) return time24;
+  const period = hours >= 12 ? 'PM' : 'AM';
+  const hours12 = hours % 12 || 12;
+  return `${hours12}:${minutes} ${period}`;
+}
+
+export function formatWeeklySchedule({
+  selectedDays,
+  time,
+  timezone,
+}: {
+  selectedDays: string[];
+  time?: string;
+  timezone?: string;
+}): string {
+  if (selectedDays.length === 0) return '';
+
+  let daysLabel = '';
+  if (selectedDays.length === 7) {
+    daysLabel = 'Daily (Every day)';
+  } else if (
+    selectedDays.length === 5 &&
+    ['mon', 'tue', 'wed', 'thu', 'fri'].every((d) => selectedDays.includes(d))
+  ) {
+    daysLabel = 'Every Weekday (Mon–Fri)';
+  } else if (
+    selectedDays.length === 2 &&
+    selectedDays.includes('sat') &&
+    selectedDays.includes('sun')
+  ) {
+    daysLabel = 'Weekends (Sat & Sun)';
+  } else {
+    const sorted = DAYS_OF_WEEK.filter((d) => selectedDays.includes(d.key)).map((d) => d.short);
+    daysLabel = `Every ${sorted.join(', ')}`;
+  }
+
+  const timeFormatted = time ? formatTime12h(time) : '';
+  const timePart = timeFormatted ? ` at ${timeFormatted}` : '';
+  const tzPart = timezone ? ` ${timezone}` : '';
+
+  return `${daysLabel}${timePart}${tzPart}`.trim();
+}
+

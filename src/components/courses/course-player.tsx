@@ -47,6 +47,7 @@ import { CourseSettingsModal } from './course-settings-modal';
 import { CourseLandingView } from './course-landing-view';
 import { formatBachsAmount, getBachsCurrency } from '@/lib/payments/currencies';
 import { detectMeetingPlatform } from '@/lib/courses/cohort-helpers';
+import { ClassScheduleDaysStrip } from './class-schedule-picker';
 
 export function CoursePlayer({
   circleId,
@@ -1212,9 +1213,15 @@ export function CoursePlayer({
                         Live Cohort Classroom Active
                       </span>
                     </div>
-                    <h3 className="text-sm font-bold text-white mt-0.5">
-                      {course.cohort_schedule_description || 'Interactive live workshops with instructor'}
-                    </h3>
+                    <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                      <h3 className="text-sm font-bold text-white">
+                        {course.cohort_schedule_description || 'Interactive live workshops with instructor'}
+                      </h3>
+                      <ClassScheduleDaysStrip
+                        scheduleDescription={course.cohort_schedule_description}
+                        className="scale-90 origin-left"
+                      />
+                    </div>
                     <p className="text-[11px] text-stone-300">
                       Live sessions are interactive. Recorded replays are automatically archived below in the curriculum.
                     </p>

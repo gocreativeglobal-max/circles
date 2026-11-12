@@ -26,6 +26,7 @@ import { ImageUploader } from '@/components/ui/image-uploader';
 import { LearningPathsView } from './learning-paths-view';
 import { CourseSettingsModal } from './course-settings-modal';
 import { detectMeetingPlatform } from '@/lib/courses/cohort-helpers';
+import { ClassSchedulePicker, ClassScheduleDaysStrip } from './class-schedule-picker';
 
 export function CoursesCatalog({
   circleId,
@@ -462,9 +463,12 @@ export function CoursesCatalog({
                       </p>
 
                       {course.course_format === 'live_cohort' && course.cohort_schedule_description && (
-                        <div className="mt-2.5 flex items-center gap-1.5 rounded-lg bg-blue-50/80 border border-blue-100 px-2.5 py-1 text-[11px] font-medium text-blue-800">
-                          <Video className="h-3 w-3 text-blue-600 shrink-0" />
-                          <span className="truncate">{course.cohort_schedule_description}</span>
+                        <div className="mt-2.5 space-y-1.5 rounded-xl bg-blue-50/80 border border-blue-100 p-2 text-[11px] font-medium text-blue-900">
+                          <div className="flex items-center gap-1.5">
+                            <Video className="h-3 w-3 text-blue-600 shrink-0" />
+                            <span className="truncate">{course.cohort_schedule_description}</span>
+                          </div>
+                          <ClassScheduleDaysStrip scheduleDescription={course.cohort_schedule_description} />
                         </div>
                       )}
                     </div>
@@ -720,61 +724,37 @@ export function CoursesCatalog({
                       </div>
                     </div>
 
-                    {/* Meeting Link & Schedule Inputs */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                      <div>
-                        <div className="flex items-center justify-between">
-                          <label className="block text-[11px] font-semibold text-stone-700">
-                            Live Video Classroom URL <span className="text-red-500">*</span>
-                          </label>
-                          {cohortMeetingUrl && (
-                            <span className="text-[10px] text-stone-400 font-mono">
-                              {detectedPlatform.name}
-                            </span>
-                          )}
-                        </div>
-                        <input
-                          type="url"
-                          placeholder={detectedPlatform.defaultPlaceholder}
-                          value={cohortMeetingUrl}
-                          onChange={(e) => setCohortMeetingUrl(e.target.value)}
-                          className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-2.5 py-2 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
-                        />
-                        <p className="mt-1 text-[10px] text-stone-500">
-                          Enrolled students will see a direct &ldquo;Join Live Video Room&rdquo; button.
-                        </p>
-                      </div>
-
-                      <div>
+                    {/* Meeting Link URL */}
+                    <div>
+                      <div className="flex items-center justify-between">
                         <label className="block text-[11px] font-semibold text-stone-700">
-                          Class Schedule Description
+                          Live Video Classroom URL <span className="text-red-500">*</span>
                         </label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Tuesdays & Thursdays at 6:00 PM UTC"
-                          value={cohortScheduleDescription}
-                          onChange={(e) => setCohortScheduleDescription(e.target.value)}
-                          className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-2.5 py-2 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
-                        />
-                        <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                          <span className="text-[10px] text-stone-400">Presets:</span>
-                          {[
-                            'Tue & Thu 6:00 PM UTC',
-                            'Every Sat 10:00 AM UTC',
-                            'Mon-Fri Bootcamp',
-                          ].map((preset) => (
-                            <button
-                              key={preset}
-                              type="button"
-                              onClick={() => setCohortScheduleDescription(preset)}
-                              className="text-[10px] text-blue-700 hover:underline"
-                            >
-                              {preset}
-                            </button>
-                          ))}
-                        </div>
+                        {cohortMeetingUrl && (
+                          <span className="text-[10px] text-stone-400 font-mono">
+                            {detectedPlatform.name}
+                          </span>
+                        )}
                       </div>
+                      <input
+                        type="url"
+                        placeholder={detectedPlatform.defaultPlaceholder}
+                        value={cohortMeetingUrl}
+                        onChange={(e) => setCohortMeetingUrl(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
+                      />
+                      <p className="mt-1 text-[10px] text-stone-500">
+                        Enrolled students will see a direct &ldquo;Join Live Video Room&rdquo; button.
+                      </p>
                     </div>
+
+                    {/* Interactive Days of the Week & Schedule Picker */}
+                    <ClassSchedulePicker
+                      value={cohortScheduleDescription}
+                      onChange={setCohortScheduleDescription}
+                      label="Class Days & Weekly Schedule"
+                      helperText="Click the day boxes to select when the live class meets each week."
+                    />
 
                     {/* Cohort Dates & Timezone */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 border-t border-stone-100 pt-3">

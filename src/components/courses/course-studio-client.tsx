@@ -40,6 +40,7 @@ import { ImageUploader } from '@/components/ui/image-uploader';
 import { LessonBlockBuilder } from './lesson-block-builder';
 import { compressImage } from '@/lib/media/compressor';
 import { detectMeetingPlatform } from '@/lib/courses/cohort-helpers';
+import { ClassSchedulePicker } from './class-schedule-picker';
 import {
   BACHS_ACCEPTED_CURRENCIES,
   formatBachsAmount,
@@ -2075,32 +2076,25 @@ export function CourseStudioClient({
                       )}
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                      <div>
-                        <label className="text-[11px] font-semibold text-stone-700 block">
-                          Live Video Classroom Link (Zoom / Meet / Teams)
-                        </label>
-                        <input
-                          type="url"
-                          value={cohortMeetingUrl}
-                          onChange={(e) => setCohortMeetingUrl(e.target.value)}
-                          placeholder={detectedPlatform.defaultPlaceholder}
-                          className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[11px] font-semibold text-stone-700 block">
-                          Class Schedule Description
-                        </label>
-                        <input
-                          type="text"
-                          value={cohortScheduleDescription}
-                          onChange={(e) => setCohortScheduleDescription(e.target.value)}
-                          placeholder="e.g. Thursdays at 7:00 PM UTC"
-                          className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
-                        />
-                      </div>
+                    <div>
+                      <label className="text-[11px] font-semibold text-stone-700 block">
+                        Live Video Classroom Link (Zoom / Meet / Teams)
+                      </label>
+                      <input
+                        type="url"
+                        value={cohortMeetingUrl}
+                        onChange={(e) => setCohortMeetingUrl(e.target.value)}
+                        placeholder={detectedPlatform.defaultPlaceholder}
+                        className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
+                      />
                     </div>
+
+                    <ClassSchedulePicker
+                      value={cohortScheduleDescription}
+                      onChange={setCohortScheduleDescription}
+                      label="Class Schedule & Weekly Days"
+                      helperText="Select the days of the week when live workshops take place."
+                    />
                   </div>
                 )}
               </div>

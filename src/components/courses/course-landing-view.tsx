@@ -43,6 +43,7 @@ import {
   formatCohortDateRange,
   generateGoogleCalendarUrl,
 } from '@/lib/courses/cohort-helpers';
+import { ClassScheduleDaysStrip } from './class-schedule-picker';
 
 export interface CourseLandingViewProps {
   circleId: string;
@@ -482,10 +483,13 @@ export function CourseLandingView({
                 {/* Cohort Details Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Schedule Card */}
-                  <div className="rounded-xl border border-blue-100 bg-white p-4 space-y-2">
-                    <div className="flex items-center gap-2 text-xs font-bold text-stone-800">
-                      <Clock className="h-4 w-4 text-blue-600" />
-                      <span>Live Session Schedule</span>
+                  <div className="rounded-xl border border-blue-100 bg-white p-4 space-y-2.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
+                      <div className="flex items-center gap-2 text-xs font-bold text-stone-800">
+                        <Clock className="h-4 w-4 text-blue-600" />
+                        <span>Live Session Schedule</span>
+                      </div>
+                      <ClassScheduleDaysStrip scheduleDescription={course.cohort_schedule_description} />
                     </div>
                     <p className="text-sm font-semibold text-stone-900">
                       {course.cohort_schedule_description || 'Weekly scheduled live interactive workshops'}
