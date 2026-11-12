@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -11,7 +11,9 @@ import {
   Calendar,
   Check,
   CheckCircle2,
+  ChevronDown,
   ChevronRight,
+  ChevronUp,
   Clock,
   Compass,
   ExternalLink,
@@ -23,7 +25,10 @@ import {
   Layers,
   Lock,
   MapPin,
+  Menu,
   MessageSquare,
+  PanelLeft,
+  PanelLeftClose,
   Pin,
   Play,
   Plus,
@@ -197,6 +202,32 @@ export function SocialNewsfeedClient({
   const [contentType, setContentType] = useState<ContentTypeFilter>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Collapsible Sidemenu state (Desktop & Mobile)
+  const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('circles_newsfeed_sidebar_collapsed') === 'true') {
+        setIsDesktopSidebarCollapsed(true);
+      }
+    } catch {
+      // Ignore in private browsing
+    }
+  }, []);
+
+  function toggleDesktopSidebar() {
+    setIsDesktopSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('circles_newsfeed_sidebar_collapsed', String(next));
+      } catch {
+        // Ignore
+      }
+      return next;
+    });
+  }
 
   // Track Circles joined during this session (circleId -> 'active' | 'pending')
   const [joinedCircleMap, setJoinedCircleMap] = useState<Record<string, 'active' | 'pending'>>({});
@@ -791,20 +822,80 @@ export function SocialNewsfeedClient({
       {/* ===================================================================== */}
       {/* 2. THREE-COLUMN SOCIAL COMMUNITY NEWSFEED WORKSPACE                   */}
       {/* ===================================================================== */}
-      <div className="mx-auto max-w-7xl px-4 pt-6 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 pt-6 sm:px-6 lg:px-8 space-y-4">
+        {/* Mobile Sidemenu Collapsible Trigger (Visible strictly on mobile screens < lg) */}
+        <div className="lg:hidden">
+          <button
+            type="button"
+            onClick={() => setIsMobileSidebarOpen((prev) => !prev)}
+            className="flex w-full items-center justify-between rounded-2xl border border-stone-200/90 bg-white p-3.5 shadow-xs text-xs font-semibold text-stone-800 hover:bg-stone-50 transition-colors"
+            aria-expanded={isMobileSidebarOpen}
+            aria-label="Toggle Newsfeed Navigation Menu"
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-black text-white">
+                <PanelLeft className="h-4 w-4" />
+              </span>
+              <div className="text-left">
+                <span className="block text-[10px] font-mono uppercase text-stone-400 font-bold">Menu</span>
+                <span className="font-bold text-stone-900">
+                  {scope === 'public'
+                    ? 'Public Live Feed'
+                    : scope === 'my_circles'
+                    ? `My Circles Feed (${myCircles.length})`
+                    : 'Saved Posts'}
+                </span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5 rounded-xl bg-stone-100 px-2.5 py-1 text-xs font-bold text-stone-700">
+              <span>{isMobileSidebarOpen ? 'Close Menu' : 'Open Menu'}</span>
+              {isMobileSidebarOpen ? (
+                <ChevronUp className="h-3.5 w-3.5 text-stone-600" />
+              ) : (
+                <ChevronDown className="h-3.5 w-3.5 text-stone-600" />
+              )}
+            </div>
+          </button>
+        </div>
+
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           {/* ----------------------------------------------------------------- */}
-          {/* LEFT SIDEBAR: Feed Switcher & User's Joined Communities (3 cols)  */}
+          {/* LEFT SIDEBAR: Feed Switcher & User's Joined Communities           */}
           {/* ----------------------------------------------------------------- */}
-          <aside className="space-y-5 lg:col-span-3">
+          <aside
+            className={`space-y-5 transition-all duration-200 ${
+              isMobileSidebarOpen ? 'block' : 'hidden'
+            } ${
+              isDesktopSidebarCollapsed
+                ? 'lg:hidden'
+                : 'lg:block lg:col-span-3'
+            }`}
+          >
             {/* Feed Navigation Card */}
             <div className="rounded-2xl border border-stone-200/90 bg-white p-3.5 shadow-xs space-y-1">
-              <p className="px-2.5 pb-1.5 text-[11px] font-mono font-bold uppercase tracking-wider text-stone-400">
-                Newsfeed
-              </p>
+              <div className="flex items-center justify-between px-2.5 pb-1.5">
+                <p className="text-[11px] font-mono font-bold uppercase tracking-wider text-stone-400">
+                  Newsfeed
+                </p>
+                {/* Desktop collapse button */}
+                <button
+                  type="button"
+                  onClick={toggleDesktopSidebar}
+                  className="hidden lg:flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] text-stone-400 hover:text-stone-900 hover:bg-stone-100 transition-colors"
+                  title="Collapse sidebar (widen feed view)"
+                  aria-label="Collapse sidebar"
+                >
+                  <PanelLeftClose className="h-3.5 w-3.5" />
+                  <span className="font-medium">Collapse</span>
+                </button>
+              </div>
+
               <button
                 type="button"
-                onClick={() => setScope('public')}
+                onClick={() => {
+                  setScope('public');
+                  setIsMobileSidebarOpen(false);
+                }}
                 className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
                   scope === 'public'
                     ? 'bg-black text-white shadow-xs'
@@ -829,7 +920,10 @@ export function SocialNewsfeedClient({
               {currentUser && (
                 <button
                   type="button"
-                  onClick={() => setScope('my_circles')}
+                  onClick={() => {
+                    setScope('my_circles');
+                    setIsMobileSidebarOpen(false);
+                  }}
                   className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
                     scope === 'my_circles'
                       ? 'bg-black text-white shadow-xs'
@@ -855,7 +949,10 @@ export function SocialNewsfeedClient({
               {currentUser && (
                 <button
                   type="button"
-                  onClick={() => setScope('saved')}
+                  onClick={() => {
+                    setScope('saved');
+                    setIsMobileSidebarOpen(false);
+                  }}
                   className={`flex w-full items-center justify-between rounded-xl px-3 py-2 text-xs font-semibold transition-all ${
                     scope === 'saved'
                       ? 'bg-black text-white shadow-xs'
@@ -942,9 +1039,39 @@ export function SocialNewsfeedClient({
           </aside>
 
           {/* ----------------------------------------------------------------- */}
-          {/* CENTER COLUMN: Quick Composer, Filter Bar & Social Feed (6 cols)  */}
+          {/* CENTER COLUMN: Quick Composer, Filter Bar & Social Feed           */}
           {/* ----------------------------------------------------------------- */}
-          <div className="space-y-4 lg:col-span-6">
+          <div
+            className={`space-y-4 transition-all duration-200 ${
+              isDesktopSidebarCollapsed
+                ? 'lg:col-span-9'
+                : 'lg:col-span-6'
+            }`}
+          >
+            {/* Desktop Expand Sidebar Banner (shown only when collapsed on desktop) */}
+            {isDesktopSidebarCollapsed && (
+              <div className="hidden lg:flex items-center justify-between rounded-2xl border border-stone-200/90 bg-white px-4 py-2.5 shadow-xs animate-in fade-in duration-150">
+                <button
+                  type="button"
+                  onClick={toggleDesktopSidebar}
+                  className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-bold text-stone-900 hover:bg-stone-100 hover:border-black transition-all shadow-2xs"
+                  title="Expand sidemenu"
+                >
+                  <PanelLeft className="h-3.5 w-3.5 text-stone-700" />
+                  <span>Show Sidemenu</span>
+                  <span className="rounded-md bg-white border border-stone-200 px-1.5 py-0.5 text-[10px] font-mono font-bold text-stone-600">
+                    {scope === 'public'
+                      ? 'Public Feed'
+                      : scope === 'my_circles'
+                      ? `My Circles (${myCircles.length})`
+                      : 'Saved Posts'}
+                  </span>
+                </button>
+                <span className="text-[11px] font-medium text-stone-400">
+                  Expanded reading view active · Click to restore side navigation
+                </span>
+              </div>
+            )}
             {/* Quick-Post Composer for Logged-in Users */}
             {currentUser && composerCircles.length > 0 && (
               <div className="rounded-2xl border border-stone-200/90 bg-white p-4 shadow-xs">
@@ -1191,6 +1318,17 @@ export function SocialNewsfeedClient({
               <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
                 {/* Content Type Tabs (Mixed Stream Switcher) */}
                 <div className="flex items-center gap-1 rounded-xl bg-stone-100/80 p-1 overflow-x-auto no-scrollbar">
+                  {isDesktopSidebarCollapsed && (
+                    <button
+                      type="button"
+                      onClick={toggleDesktopSidebar}
+                      className="hidden lg:inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1.5 text-xs font-bold text-stone-900 border border-stone-200 shadow-2xs hover:bg-stone-50 transition-all shrink-0"
+                      title="Show Sidemenu"
+                    >
+                      <PanelLeft className="h-3.5 w-3.5 text-stone-600" />
+                      <span>Menu</span>
+                    </button>
+                  )}
                   {[
                     { key: 'all', label: 'All Activity' },
                     { key: 'posts', label: 'Posts & Polls' },
