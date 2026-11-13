@@ -66,6 +66,23 @@ export const createCircleSchema = z.object({
   templateKey: z.string().trim().optional().nullable(),
 });
 
+export const circleThemeSettingsSchema = z.object({
+  primaryColor: z
+    .string()
+    .trim()
+    .regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, 'Must be a valid hex color code (e.g. #2563eb)')
+    .nullable()
+    .optional(),
+  accentColor: z
+    .string()
+    .trim()
+    .regex(/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/, 'Must be a valid hex color code (e.g. #3b82f6)')
+    .nullable()
+    .optional(),
+  brandMode: z.enum(['light', 'dark', 'system']).nullable().optional(),
+  borderRadius: z.enum(['none', 'sm', 'md', 'lg', 'full']).nullable().optional(),
+});
+
 export const updateCircleSchema = z.object({
   name: z.string().trim().min(2).max(100).optional(),
   description: z.string().trim().max(2000).optional(),
@@ -75,6 +92,7 @@ export const updateCircleSchema = z.object({
   coverUrl: z.string().trim().max(500).nullable().optional(),
   visibility: circleVisibilityEnum.optional(),
   membershipPolicy: membershipPolicyEnum.optional(),
+  themeSettings: circleThemeSettingsSchema.nullable().optional(),
 });
 
 export const createSpaceSchema = z.object({

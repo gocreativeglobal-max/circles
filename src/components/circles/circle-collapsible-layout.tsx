@@ -235,15 +235,29 @@ function SidebarLink({
       href={href}
       title={collapsed ? label : undefined}
       aria-current={active ? 'page' : undefined}
-      className={`flex items-center rounded-lg text-sm transition-colors ${
+      style={
+        active
+          ? {
+              backgroundColor: 'var(--circle-primary-subtle, rgba(0, 0, 0, 0.06))',
+              color: 'var(--circle-primary, #18181b)',
+              borderRadius: 'var(--circle-radius, 0.5rem)',
+            }
+          : undefined
+      }
+      className={`flex items-center text-sm transition-colors ${
         collapsed ? 'mx-auto h-9 w-9 justify-center' : 'gap-2.5 px-3 py-1.5'
       } ${
         active
-          ? 'bg-stone-200/60 font-medium text-stone-900'
-          : 'text-stone-600 hover:bg-stone-100 hover:text-stone-900'
+          ? 'font-semibold'
+          : 'rounded-lg text-stone-600 hover:bg-stone-100 hover:text-stone-900'
       }`}
     >
-      <span className={active ? 'text-stone-900' : 'text-stone-400'}>{icon}</span>
+      <span
+        style={active ? { color: 'var(--circle-primary, #18181b)' } : undefined}
+        className={active ? '' : 'text-stone-400'}
+      >
+        {icon}
+      </span>
       {!collapsed && <span className="truncate">{label}</span>}
     </Link>
   );
@@ -263,8 +277,9 @@ function DockLink({
   return (
     <Link
       href={href}
-      className={`flex flex-col items-center gap-0.5 px-3 py-1 text-[10px] font-medium ${
-        active ? 'text-stone-900 font-semibold' : 'text-stone-500'
+      style={active ? { color: 'var(--circle-primary, #18181b)' } : undefined}
+      className={`flex flex-col items-center gap-0.5 px-3 py-1 text-[10px] font-medium transition-colors ${
+        active ? 'font-bold' : 'text-stone-500'
       }`}
     >
       {icon}

@@ -230,6 +230,16 @@ export async function updateCircle(
       nextPolicyRaw
     );
 
+    const nextThemeSettings =
+      updates.themeSettings !== undefined
+        ? updates.themeSettings
+          ? {
+              ...(existing.theme_settings || {}),
+              ...updates.themeSettings,
+            }
+          : null
+        : existing.theme_settings;
+
     const updatedRes = await tx.query<Circle>(
       `UPDATE public.circles
        SET name = $1,
@@ -240,8 +250,9 @@ export async function updateCircle(
            cover_url = $6,
            visibility = $7,
            membership_policy = $8,
+           theme_settings = $9::jsonb,
            updated_at = NOW()
-       WHERE id = $9
+       WHERE id = $10
        RETURNING *;`,
       [
         updates.name ?? existing.name,
@@ -252,6 +263,7 @@ export async function updateCircle(
         updates.coverUrl !== undefined ? updates.coverUrl : existing.cover_url,
         visibility,
         membershipPolicy,
+        JSON.stringify(nextThemeSettings || {}),
         circleId,
       ]
     );

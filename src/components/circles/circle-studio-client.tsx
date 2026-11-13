@@ -18,11 +18,13 @@ import {
   UserCheck,
   UserPlus,
   Users,
+  Palette,
   X,
 } from 'lucide-react';
 import { StudioFinancesTab } from './studio-finances-tab';
 import { InviteModal } from './invite-modal';
 import { BACHS_ACCEPTED_CURRENCIES } from '@/lib/payments/currencies';
+import { THEME_PRESETS, getContrastColor, getRadiusValue } from '@/lib/theme/utils';
 import {
   AuditLogItem,
   Circle,
@@ -33,6 +35,7 @@ import {
   CircleMembership,
   CircleRole,
   CircleSpace,
+  CircleThemeSettings,
   CircleVisibility,
   MembershipPolicy,
 } from '@/types/domain';
@@ -58,8 +61,44 @@ export function CircleStudioClient({
 }: CircleStudioClientProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<
-    'general' | 'capabilities' | 'spaces' | 'members' | 'audit' | 'finances'
+    'general' | 'branding' | 'capabilities' | 'spaces' | 'members' | 'audit' | 'finances'
   >('general');
+
+  const [themeSettings, setThemeSettings] = useState<CircleThemeSettings>({
+    primaryColor: initialCircle.theme_settings?.primaryColor || '#18181b',
+    accentColor: initialCircle.theme_settings?.accentColor || '#2563eb',
+    brandMode: initialCircle.theme_settings?.brandMode || 'system',
+    borderRadius: initialCircle.theme_settings?.borderRadius || 'md',
+  });
+  const [themeSaving, setThemeSaving] = useState(false);
+  const [themeSuccess, setThemeSuccess] = useState(false);
+  const [themeError, setThemeError] = useState<string | null>(null);
+
+  async function handleSaveTheme() {
+    setThemeSaving(true);
+    setThemeError(null);
+    setThemeSuccess(false);
+    try {
+      const res = await fetch(`/api/circles/${initialCircle.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          themeSettings,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to update theme settings');
+      }
+      setThemeSuccess(true);
+      setTimeout(() => setThemeSuccess(false), 3500);
+      router.refresh();
+    } catch (err: unknown) {
+      setThemeError(err instanceof Error ? err.message : 'Error updating theme');
+    } finally {
+      setThemeSaving(false);
+    }
+  }
 
   const [name, setName] = useState(initialCircle.name);
   const [description, setDescription] = useState(initialCircle.description);
@@ -446,6 +485,7 @@ export function CircleStudioClient({
         <div className="flex items-center gap-1 overflow-x-auto no-scrollbar">
           {[
             { id: 'general', label: 'General', icon: Settings },
+            { id: 'branding', label: 'Brand & Theme', icon: Palette },
             { id: 'capabilities', label: 'Features', icon: Sliders },
             { id: 'spaces', label: 'Spaces', icon: LayoutGrid },
             {
@@ -628,6 +668,285 @@ export function CircleStudioClient({
             </button>
           </div>
         </form>
+      )}
+
+      {/* TAB: BRANDING & THEME */}
+      {activeTab === 'branding' && (
+        <div className="space-y-6">
+          <div className="rounded-2xl border border-stone-200/80 bg-white p-6 shadow-xs space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-stone-900">
+                    Community Theme & Brand Colors
+                  </h3>
+                  <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800">
+                    All Communities • 100% Free
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-stone-500 leading-relaxed max-w-2xl">
+                  Choose a signature brand palette or enter custom hex codes. Theme colors instantly customize your community avatar, navigation indicators, primary buttons, and accents.
+                </p>
+              </div>
+            </div>
+
+            {themeError && (
+              <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700">
+                <AlertCircle className="h-4 w-4 shrink-0" />
+                <span>{themeError}</span>
+              </div>
+            )}
+
+            {themeSuccess && (
+              <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-700">
+                <CheckCircle2 className="h-4 w-4 shrink-0" />
+                <span>Community theme saved and applied successfully!</span>
+              </div>
+            )}
+
+            {/* Quick Theme Presets */}
+            <div className="border-t border-stone-100 pt-5 space-y-3">
+              <label className="block text-xs font-bold uppercase tracking-wider text-stone-700">
+                1. Quick Theme Presets
+              </label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+                {THEME_PRESETS.map((preset) => {
+                  const isSelected =
+                    themeSettings.primaryColor?.toLowerCase() === preset.primaryColor.toLowerCase() &&
+                    themeSettings.accentColor?.toLowerCase() === preset.accentColor.toLowerCase();
+                  return (
+                    <button
+                      key={preset.id}
+                      type="button"
+                      onClick={() => {
+                        setThemeSettings((prev) => ({
+                          ...prev,
+                          primaryColor: preset.primaryColor,
+                          accentColor: preset.accentColor,
+                        }));
+                      }}
+                      className={`flex flex-col rounded-xl border p-3 text-left transition-all ${
+                        isSelected
+                          ? 'border-black bg-stone-50 shadow-xs ring-1 ring-black'
+                          : 'border-stone-200 bg-stone-50/50 hover:border-stone-300 hover:bg-stone-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <span
+                          className="h-4 w-4 rounded-full border border-black/10 shadow-2xs"
+                          style={{ backgroundColor: preset.primaryColor }}
+                        />
+                        <span
+                          className="h-4 w-4 rounded-full border border-black/10 shadow-2xs"
+                          style={{ backgroundColor: preset.accentColor }}
+                        />
+                      </div>
+                      <span className="text-xs font-bold text-stone-900 truncate">
+                        {preset.name}
+                      </span>
+                      <span className="mt-0.5 text-[10px] text-stone-400 line-clamp-1">
+                        {preset.primaryColor}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Custom Hex Pickers */}
+            <div className="border-t border-stone-100 pt-5 grid grid-cols-1 md:grid-cols-2 gap-5">
+              {/* Primary Color */}
+              <div className="space-y-2 rounded-xl border border-stone-200/80 bg-stone-50/50 p-4">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-stone-800">
+                    Primary Brand Color
+                  </label>
+                  <span
+                    className="rounded-md px-1.5 py-0.5 text-[10px] font-bold border"
+                    style={{
+                      backgroundColor: themeSettings.primaryColor || '#18181b',
+                      color: getContrastColor(themeSettings.primaryColor || '#18181b'),
+                    }}
+                  >
+                    Contrast Text
+                  </span>
+                </div>
+                <p className="text-[11px] text-stone-500">
+                  Used for community avatars, active navigation indicators, and primary call-to-actions.
+                </p>
+                <div className="flex items-center gap-3 pt-1">
+                  <input
+                    type="color"
+                    value={themeSettings.primaryColor || '#18181b'}
+                    onChange={(e) =>
+                      setThemeSettings((prev) => ({ ...prev, primaryColor: e.target.value }))
+                    }
+                    className="h-9 w-12 cursor-pointer rounded-lg border border-stone-300 p-0.5 bg-white shadow-2xs"
+                  />
+                  <input
+                    type="text"
+                    value={themeSettings.primaryColor || ''}
+                    onChange={(e) =>
+                      setThemeSettings((prev) => ({ ...prev, primaryColor: e.target.value }))
+                    }
+                    placeholder="#18181b"
+                    className="w-36 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-mono font-bold text-stone-900 focus:border-black focus:outline-none focus:ring-1 focus:ring-black"
+                  />
+                </div>
+              </div>
+
+              {/* Accent Color */}
+              <div className="space-y-2 rounded-xl border border-stone-200/80 bg-stone-50/50 p-4">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold uppercase tracking-wider text-stone-800">
+                    Accent / Secondary Color
+                  </label>
+                  <span
+                    className="rounded-md px-1.5 py-0.5 text-[10px] font-bold border"
+                    style={{
+                      backgroundColor: themeSettings.accentColor || '#2563eb',
+                      color: getContrastColor(themeSettings.accentColor || '#2563eb'),
+                    }}
+                  >
+                    Accent Text
+                  </span>
+                </div>
+                <p className="text-[11px] text-stone-500">
+                  Used for event tags, badges, secondary highlights, and interactive links.
+                </p>
+                <div className="flex items-center gap-3 pt-1">
+                  <input
+                    type="color"
+                    value={themeSettings.accentColor || '#2563eb'}
+                    onChange={(e) =>
+                      setThemeSettings((prev) => ({ ...prev, accentColor: e.target.value }))
+                    }
+                    className="h-9 w-12 cursor-pointer rounded-lg border border-stone-300 p-0.5 bg-white shadow-2xs"
+                  />
+                  <input
+                    type="text"
+                    value={themeSettings.accentColor || ''}
+                    onChange={(e) =>
+                      setThemeSettings((prev) => ({ ...prev, accentColor: e.target.value }))
+                    }
+                    placeholder="#2563eb"
+                    className="w-36 rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-mono font-bold text-stone-900 focus:border-black focus:outline-none focus:ring-1 focus:ring-black"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Corner Radius Selection */}
+            <div className="border-t border-stone-100 pt-5 space-y-2">
+              <label className="block text-xs font-bold uppercase tracking-wider text-stone-800">
+                Corner Shape & Radius
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { id: 'none', label: 'Sharp (0px)' },
+                  { id: 'sm', label: 'Subtle (4px)' },
+                  { id: 'md', label: 'Standard (8px)' },
+                  { id: 'lg', label: 'Rounded (12px)' },
+                  { id: 'full', label: 'Pill / Full' },
+                ].map((rad) => {
+                  const isSel = (themeSettings.borderRadius || 'md') === rad.id;
+                  return (
+                    <button
+                      key={rad.id}
+                      type="button"
+                      onClick={() =>
+                        setThemeSettings((prev) => ({
+                          ...prev,
+                          borderRadius: rad.id as CircleThemeSettings['borderRadius'],
+                        }))
+                      }
+                      className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+                        isSel
+                          ? 'bg-black text-white shadow-2xs font-semibold'
+                          : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+                      }`}
+                    >
+                      {rad.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Live Interactive Sandbox Preview */}
+            <div className="border-t border-stone-100 pt-5 space-y-3">
+              <label className="block text-xs font-bold uppercase tracking-wider text-stone-800">
+                Live Community Component Preview
+              </label>
+              <div className="rounded-xl border border-stone-200 bg-[#FAF9F6] p-5 space-y-4">
+                <div className="flex items-center justify-between border-b border-stone-200/80 bg-white p-3 rounded-xl shadow-2xs">
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className="flex h-9 w-9 items-center justify-center text-sm font-bold shadow-2xs"
+                      style={{
+                        backgroundColor: themeSettings.primaryColor || '#18181b',
+                        color: getContrastColor(themeSettings.primaryColor || '#18181b'),
+                        borderRadius: getRadiusValue(themeSettings.borderRadius),
+                      }}
+                    >
+                      {initialCircle.name.slice(0, 1).toUpperCase()}
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-bold text-stone-900">{initialCircle.name}</h4>
+                      <p className="text-[10px] text-stone-500">Live Appearance Preview</p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="px-3 py-1 text-xs font-semibold shadow-2xs cursor-default"
+                    style={{
+                      backgroundColor: themeSettings.primaryColor || '#18181b',
+                      color: getContrastColor(themeSettings.primaryColor || '#18181b'),
+                      borderRadius: getRadiusValue(themeSettings.borderRadius),
+                    }}
+                  >
+                    Join Circle
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div
+                    className="px-3 py-1 text-xs font-semibold"
+                    style={{
+                      backgroundColor: `${themeSettings.primaryColor}15`,
+                      color: themeSettings.primaryColor || '#18181b',
+                      borderRadius: getRadiusValue(themeSettings.borderRadius),
+                    }}
+                  >
+                    # general-discussion (Active Space)
+                  </div>
+                  <div
+                    className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+                    style={{
+                      backgroundColor: `${themeSettings.accentColor}18`,
+                      color: themeSettings.accentColor || '#2563eb',
+                      borderRadius: getRadiusValue(themeSettings.borderRadius),
+                    }}
+                  >
+                    Featured Event
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Save Action Bar */}
+            <div className="flex justify-end border-t border-stone-100 pt-4">
+              <button
+                type="button"
+                onClick={handleSaveTheme}
+                disabled={themeSaving}
+                className="rounded-xl bg-black px-6 py-2 text-xs font-semibold text-white shadow-xs hover:bg-zinc-800 disabled:opacity-40 transition-all active:scale-[0.98]"
+              >
+                {themeSaving ? 'Saving Theme...' : 'Save Theme & Colors'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* TAB 2: FEATURES / CAPABILITIES */}

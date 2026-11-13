@@ -48,6 +48,13 @@ export interface UserProfile {
   updated_at: string;
 }
 
+export interface CircleThemeSettings {
+  primaryColor?: string | null;
+  accentColor?: string | null;
+  brandMode?: 'light' | 'dark' | 'system' | null;
+  borderRadius?: 'none' | 'sm' | 'md' | 'lg' | 'full' | null;
+}
+
 export interface Circle {
   id: string;
   name: string;
@@ -64,6 +71,7 @@ export interface Circle {
   template_key: string | null;
   template_version: number | null;
   settings: Record<string, unknown>;
+  theme_settings?: CircleThemeSettings | null;
   created_at: string;
   updated_at: string;
   member_count?: number;
