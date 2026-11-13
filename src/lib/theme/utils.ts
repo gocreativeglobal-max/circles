@@ -1,7 +1,7 @@
 import React from 'react';
 import { CircleThemeSettings } from '@/types/domain';
 import { getPresetBannerUrl } from './background-presets';
-import { getCommunityDoodleSvg } from './doodles';
+import { getCanvasTonePreset, getCommunityDoodleSvg } from './doodles';
 
 export function hexToRgb(hexStr?: string | null): { r: number; g: number; b: number } | null {
   if (!hexStr) return null;
@@ -179,7 +179,8 @@ export function generateCircleThemeStyles(
 export function getCommunityCanvasStyle(
   settings?: CircleThemeSettings | null
 ): React.CSSProperties {
-  const canvasHex = settings?.canvasColor || '#FAF9F6';
+  // Always resolve to a curated light tone — dark canvases are not supported.
+  const canvasHex = getCanvasTonePreset(settings?.canvasColor).hex;
   const isEnabled = Boolean(settings?.doodlePatternEnabled);
 
   if (!isEnabled) {
@@ -188,8 +189,7 @@ export function getCommunityCanvasStyle(
     };
   }
 
-  const isDark = canvasHex === '#18181B' || canvasHex.toLowerCase() === '#18181b';
-  const doodleSvg = getCommunityDoodleSvg(isDark);
+  const doodleSvg = getCommunityDoodleSvg();
 
   return {
     backgroundColor: canvasHex,

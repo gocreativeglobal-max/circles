@@ -9,7 +9,6 @@ export interface CanvasTonePreset {
   hex: string;
   border: string;
   description: string;
-  isDark?: boolean;
 }
 
 export const CANVAS_TONE_PRESETS: CanvasTonePreset[] = [
@@ -50,28 +49,25 @@ export const CANVAS_TONE_PRESETS: CanvasTonePreset[] = [
   },
 ];
 
+/**
+ * Resolves a canvas tone strictly to one of the curated light presets.
+ * Any unknown or legacy value (e.g. a previously saved dark tone) falls back to Warm Linen.
+ */
 export function getCanvasTonePreset(idOrHex?: string | null): CanvasTonePreset {
   if (!idOrHex) return CANVAS_TONE_PRESETS[0];
-  const byId = CANVAS_TONE_PRESETS.find((p) => p.id === idOrHex);
-  if (byId) return byId;
-  const byHex = CANVAS_TONE_PRESETS.find((p) => p.hex.toLowerCase() === idOrHex.toLowerCase());
-  if (byHex) return byHex;
-  return {
-    id: 'custom',
-    name: 'Custom',
-    hex: idOrHex,
-    border: '#E7E5E4',
-    description: 'Custom community canvas tone',
-  };
+  const normalized = idOrHex.toLowerCase();
+  return (
+    CANVAS_TONE_PRESETS.find((p) => p.id === normalized || p.hex.toLowerCase() === normalized) ||
+    CANVAS_TONE_PRESETS[0]
+  );
 }
 
 /**
- * Generates an optimized, seamless SVG doodle tile data-uri.
- * Stroke color adjusts automatically based on whether the background is light or dark.
+ * Generates an optimized, seamless SVG doodle tile data-uri (light canvases only).
  */
-export function getCommunityDoodleSvg(isDark: boolean = false): string {
-  const strokeColor = isDark ? '%23ffffff' : '%2352525b';
-  const strokeOpacity = isDark ? '0.14' : '0.075';
+export function getCommunityDoodleSvg(): string {
+  const strokeColor = '%2352525b';
+  const strokeOpacity = '0.075';
 
   return `data:image/svg+xml,%3Csvg width='200' height='200' viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' stroke='${strokeColor}' stroke-width='1.35' stroke-linecap='round' stroke-linejoin='round' opacity='${strokeOpacity}'%3E` +
     // 1. Coffee Mug with Steam (x: 15-42, y: 18-45)

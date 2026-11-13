@@ -31,7 +31,7 @@ import {
   getEffectiveBannerUrl,
   getCommunityCanvasStyle,
 } from '@/lib/theme/utils';
-import { CANVAS_TONE_PRESETS } from '@/lib/theme/doodles';
+import { CANVAS_TONE_PRESETS, getCanvasTonePreset } from '@/lib/theme/doodles';
 import {
   HERO_BANNER_PRESETS,
 } from '@/lib/theme/background-presets';
@@ -82,7 +82,7 @@ export function CircleStudioClient({
     coverPreset: initialCircle.theme_settings?.coverPreset || null,
     coverOverlayOpacity: initialCircle.theme_settings?.coverOverlayOpacity ?? 0.6,
     doodlePatternEnabled: Boolean(initialCircle.theme_settings?.doodlePatternEnabled),
-    canvasColor: initialCircle.theme_settings?.canvasColor || '#FAF9F6',
+    canvasColor: getCanvasTonePreset(initialCircle.theme_settings?.canvasColor).hex,
   });
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialCircle.avatar_url || null);
   const [themeSaving, setThemeSaving] = useState(false);
