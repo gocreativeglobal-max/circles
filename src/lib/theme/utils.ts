@@ -154,8 +154,6 @@ export function generateCircleThemeStyles(
   const primaryFg = getContrastColor(primary);
   const accentFg = getContrastColor(accent);
 
-  const isFrosted = settings?.cardStyle === 'frosted';
-
   return {
     '--circle-primary': primary,
     '--circle-primary-fg': primaryFg,
@@ -165,9 +163,9 @@ export function generateCircleThemeStyles(
     '--circle-accent-fg': accentFg,
     '--circle-accent-subtle': `rgba(${rgbAccent.r}, ${rgbAccent.g}, ${rgbAccent.b}, 0.1)`,
     '--circle-radius': radius,
-    '--circle-card-bg': isFrosted ? 'rgba(255, 255, 255, 0.82)' : '#ffffff',
-    '--circle-card-border': isFrosted ? 'rgba(255, 255, 255, 0.45)' : 'rgba(231, 229, 228, 0.8)',
-    '--circle-card-backdrop': isFrosted ? 'blur(12px)' : 'none',
+    '--circle-card-bg': '#ffffff',
+    '--circle-card-border': 'rgba(231, 229, 228, 0.8)',
+    '--circle-card-backdrop': 'none',
   };
 }
 

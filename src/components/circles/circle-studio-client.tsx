@@ -27,7 +27,6 @@ import { BACHS_ACCEPTED_CURRENCIES } from '@/lib/payments/currencies';
 import {
   THEME_PRESETS,
   getContrastColor,
-  getRadiusValue,
   getEffectiveBannerUrl,
   getPageAmbientBackgroundStyle,
 } from '@/lib/theme/utils';
@@ -77,7 +76,6 @@ export function CircleStudioClient({
     primaryColor: initialCircle.theme_settings?.primaryColor || '#18181b',
     accentColor: initialCircle.theme_settings?.accentColor || '#2563eb',
     brandMode: initialCircle.theme_settings?.brandMode || 'system',
-    borderRadius: initialCircle.theme_settings?.borderRadius || 'md',
     coverUrl: initialCircle.theme_settings?.coverUrl || initialCircle.cover_url || null,
     coverPreset: initialCircle.theme_settings?.coverPreset || null,
     coverOverlayOpacity: initialCircle.theme_settings?.coverOverlayOpacity ?? 0.6,
@@ -86,7 +84,6 @@ export function CircleStudioClient({
     pageBackgroundPattern: initialCircle.theme_settings?.pageBackgroundPattern || 'dots',
     pageBackgroundBlur: initialCircle.theme_settings?.pageBackgroundBlur ?? 16,
     pageBackgroundOpacity: initialCircle.theme_settings?.pageBackgroundOpacity ?? 0.15,
-    cardStyle: initialCircle.theme_settings?.cardStyle || 'solid',
   });
   const [themeSaving, setThemeSaving] = useState(false);
   const [themeSuccess, setThemeSuccess] = useState(false);
@@ -926,7 +923,6 @@ export function CircleStudioClient({
                         setThemeSettings((prev) => ({
                           ...prev,
                           pageBackgroundMode: 'banner',
-                          cardStyle: 'frosted',
                         }))
                       }
                       className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-stone-800 hover:text-black underline underline-offset-2"
@@ -991,7 +987,6 @@ export function CircleStudioClient({
                         setThemeSettings((prev) => ({
                           ...prev,
                           pageBackgroundMode: mode.id as CircleThemeSettings['pageBackgroundMode'],
-                          cardStyle: mode.id !== 'none' ? 'frosted' : prev.cardStyle,
                         }))
                       }
                       className={`p-3 text-left rounded-xl border transition-all ${
@@ -1112,84 +1107,10 @@ export function CircleStudioClient({
               )}
             </div>
 
-            {/* 4. Card Styling & Corner Radius */}
-            <div className="border-t border-stone-100 pt-5 grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Card Surface Style: Solid vs Frosted Glass */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-800">
-                  Card Surface Appearance
-                </label>
-                <div className="flex gap-2.5">
-                  <button
-                    type="button"
-                    onClick={() => setThemeSettings((prev) => ({ ...prev, cardStyle: 'solid' }))}
-                    className={`flex-1 p-3 rounded-xl border text-left transition-all ${
-                      (themeSettings.cardStyle || 'solid') === 'solid'
-                        ? 'border-black bg-stone-50 ring-1 ring-black shadow-2xs font-semibold'
-                        : 'border-stone-200 hover:border-stone-300'
-                    }`}
-                  >
-                    <p className="text-xs font-bold text-stone-900">Solid White</p>
-                    <p className="text-[10px] text-stone-500 mt-0.5">Classic crisp card containers</p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setThemeSettings((prev) => ({ ...prev, cardStyle: 'frosted' }))}
-                    className={`flex-1 p-3 rounded-xl border text-left transition-all ${
-                      themeSettings.cardStyle === 'frosted'
-                        ? 'border-black bg-stone-50 ring-1 ring-black shadow-2xs font-semibold'
-                        : 'border-stone-200 hover:border-stone-300'
-                    }`}
-                  >
-                    <p className="text-xs font-bold text-stone-900">Frosted Glass</p>
-                    <p className="text-[10px] text-stone-500 mt-0.5">Translucent with backdrop blur</p>
-                  </button>
-                </div>
-              </div>
-
-              {/* Corner Radius Selection */}
-              <div className="space-y-2">
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-800">
-                  Corner Shape & Radius
-                </label>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { id: 'none', label: 'Sharp (0px)' },
-                    { id: 'sm', label: 'Subtle (4px)' },
-                    { id: 'md', label: 'Standard (8px)' },
-                    { id: 'lg', label: 'Rounded (12px)' },
-                    { id: 'full', label: 'Pill / Full' },
-                  ].map((rad) => {
-                    const isSel = (themeSettings.borderRadius || 'md') === rad.id;
-                    return (
-                      <button
-                        key={rad.id}
-                        type="button"
-                        onClick={() =>
-                          setThemeSettings((prev) => ({
-                            ...prev,
-                            borderRadius: rad.id as CircleThemeSettings['borderRadius'],
-                          }))
-                        }
-                        className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                          isSel
-                            ? 'bg-black text-white shadow-2xs font-semibold'
-                            : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
-                        }`}
-                      >
-                        {rad.label}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
-            {/* 5. Live Interactive Sandbox Preview */}
+            {/* 4. Live Interactive Sandbox Preview */}
             <div className="border-t border-stone-100 pt-5 space-y-3">
               <label className="block text-xs font-bold uppercase tracking-wider text-stone-800">
-                5. Live Community Appearance Sandbox
+                4. Live Community Appearance Sandbox
               </label>
 
               {/* Sandbox Container with ambient background layer */}
@@ -1223,11 +1144,10 @@ export function CircleStudioClient({
                       <div className="relative z-10 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <div
-                            className="flex h-12 w-12 items-center justify-center text-lg font-extrabold shadow-md border border-white/20"
+                            className="flex h-12 w-12 items-center justify-center rounded-xl text-lg font-extrabold shadow-md border border-white/20"
                             style={{
                               backgroundColor: themeSettings.primaryColor || '#18181b',
                               color: getContrastColor(themeSettings.primaryColor || '#18181b'),
-                              borderRadius: getRadiusValue(themeSettings.borderRadius),
                             }}
                           >
                             {initialCircle.name.slice(0, 1).toUpperCase()}
@@ -1239,11 +1159,10 @@ export function CircleStudioClient({
                         </div>
 
                         <span
-                          className="px-4 py-1.5 text-xs font-bold shadow-sm"
+                          className="rounded-lg px-4 py-1.5 text-xs font-bold shadow-sm"
                           style={{
                             backgroundColor: themeSettings.primaryColor || '#18181b',
                             color: getContrastColor(themeSettings.primaryColor || '#18181b'),
-                            borderRadius: getRadiusValue(themeSettings.borderRadius),
                           }}
                         >
                           Join Circle
@@ -1253,49 +1172,33 @@ export function CircleStudioClient({
                   );
                 })()}
 
-                {/* Simulated Cards (Solid vs Frosted) */}
+                {/* Simulated Cards */}
                 <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div
-                    className={`p-4 transition-all shadow-sm ${
-                      themeSettings.cardStyle === 'frosted'
-                        ? 'border border-white/60 bg-white/80 backdrop-blur-md'
-                        : 'border border-stone-200 bg-white'
-                    }`}
-                    style={{ borderRadius: getRadiusValue(themeSettings.borderRadius) }}
-                  >
+                  <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-bold text-stone-900">Discussion Feed Card</span>
                       <span
-                        className="px-2 py-0.5 text-[10px] font-bold uppercase"
+                        className="rounded-md px-2 py-0.5 text-[10px] font-bold uppercase"
                         style={{
                           backgroundColor: `${themeSettings.accentColor}18`,
                           color: themeSettings.accentColor || '#2563eb',
-                          borderRadius: getRadiusValue(themeSettings.borderRadius),
                         }}
                       >
                         Featured
                       </span>
                     </div>
                     <p className="text-xs text-stone-600 line-clamp-2">
-                      Cards adopt your chosen surface style (Solid or Frosted Glass) with custom corner curvature.
+                      Live preview of your community theme colors and ambient atmosphere.
                     </p>
                   </div>
 
-                  <div
-                    className={`p-4 transition-all shadow-sm ${
-                      themeSettings.cardStyle === 'frosted'
-                        ? 'border border-white/60 bg-white/80 backdrop-blur-md'
-                        : 'border border-stone-200 bg-white'
-                    }`}
-                    style={{ borderRadius: getRadiusValue(themeSettings.borderRadius) }}
-                  >
+                  <div className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
                     <span className="text-xs font-bold text-stone-900 block mb-1">Active Space Pill</span>
                     <span
-                      className="inline-block px-3 py-1 text-xs font-semibold"
+                      className="inline-block rounded-md px-3 py-1 text-xs font-semibold"
                       style={{
                         backgroundColor: `${themeSettings.primaryColor}15`,
                         color: themeSettings.primaryColor || '#18181b',
-                        borderRadius: getRadiusValue(themeSettings.borderRadius),
                       }}
                     >
                       # general-announcements

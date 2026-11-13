@@ -283,10 +283,7 @@ export function CommunityActivityStream({
 
   const effectiveBanner = getEffectiveBannerUrl(circle.theme_settings, circle.cover_url);
   const coverOverlayOpacity = circle.theme_settings?.coverOverlayOpacity ?? 0.6;
-  const isFrosted = circle.theme_settings?.cardStyle === 'frosted';
-  const cardBgClass = isFrosted
-    ? 'border border-white/60 bg-white/80 backdrop-blur-md shadow-sm'
-    : 'border border-stone-200 bg-white shadow-sm';
+  const cardBgClass = 'border border-stone-200 bg-white shadow-sm';
 
   return (
     <div className="space-y-6">
