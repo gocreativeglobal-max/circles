@@ -12,17 +12,17 @@ import {
   ChevronDown,
   FileText,
   FolderGit2,
+  Globe,
   Heart,
   HeartHandshake,
+  Lock,
   MapPin,
   MessageCircle,
   MessageSquare,
   MoreHorizontal,
   Plus,
   Quote,
-  Repeat2,
   Share2,
-  Sparkles,
   User,
   Users,
 } from 'lucide-react';
@@ -80,12 +80,20 @@ function formatPrice(listing: MarketplaceListingItem): string {
   return listing.pricing_unit && listing.pricing_unit !== 'fixed' ? `${text}/${listing.pricing_unit}` : text;
 }
 
+function extractMediaUrl(body: string): string | null {
+  const mdMatch = body.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/);
+  if (mdMatch) return mdMatch[1];
+  const urlMatch = body.match(/https?:\/\/[^\s]+\.(png|jpe?g|webp|gif|svg)/i);
+  if (urlMatch) return urlMatch[0];
+  return null;
+}
+
 export function CommunityActivityStream({
   circle,
   initialItems,
   upcomingEvents,
-  featuredListings: _featuredListings,
-  featuredCourses: _featuredCourses = [],
+  featuredListings = [],
+  featuredCourses = [],
   featuredCauses = [],
   featuredProjects = [],
   enabledCapabilityKeys,
@@ -106,9 +114,22 @@ export function CommunityActivityStream({
   const [rsvpLoading, setRsvpLoading] = useState<Record<string, boolean>>({});
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
-  const [repostedPosts, setRepostedPosts] = useState<Record<string, boolean>>({});
   const [copiedShare, setCopiedShare] = useState(false);
   const [moreNavOpen, setMoreNavOpen] = useState(false);
+
+  // Extract hashtags dynamically from real posts only
+  const trendingTopics = useMemo(() => {
+    const set = new Set<string>();
+    items.forEach((item) => {
+      if (item.itemType === 'post') {
+        const matches = (item.data.body + ' ' + (item.data.title || '')).match(/#[a-zA-Z0-9_]+/g);
+        if (matches) {
+          matches.forEach((t) => set.add(t));
+        }
+      }
+    });
+    return Array.from(set).slice(0, 8);
+  }, [items]);
 
   const visibleFilters = FILTERS.filter(
     (f) =>
@@ -172,15 +193,11 @@ export function CommunityActivityStream({
     }
   }
 
-  function handleToggleLike(postId: string) {
+  function handleToggleLike(postId: string, initialCount: number) {
     const isLiked = likedPosts[postId] ?? false;
-    const current = likeCounts[postId] ?? (isLiked ? 1 : 0);
+    const current = likeCounts[postId] ?? initialCount;
     setLikedPosts((prev) => ({ ...prev, [postId]: !isLiked }));
     setLikeCounts((prev) => ({ ...prev, [postId]: isLiked ? Math.max(0, current - 1) : current + 1 }));
-  }
-
-  function handleToggleRepost(postId: string) {
-    setRepostedPosts((prev) => ({ ...prev, [postId]: !prev[postId] }));
   }
 
   function handleShareCommunity() {
@@ -247,33 +264,25 @@ export function CommunityActivityStream({
     }
   }
 
-  // Active cause calculation
-  const featuredCause = featuredCauses.length > 0 ? featuredCauses[0] : null;
-  const causeGoal = featuredCause?.goal_amount ?? 1000;
-  const causePledged = featuredCause?.pledged_total ?? 680;
-  const causeCurrency = featuredCause?.currency ?? '$';
-  const causePct = Math.min(100, Math.round((causePledged / (causeGoal || 1)) * 100));
-
-  // Active project calculation
-  const featuredProject = featuredProjects.length > 0 ? featuredProjects[0] : null;
-
-  // Active event calculation
   const spotlightEvent = upcomingEvents.length > 0 ? upcomingEvents[0] : null;
-  const eventDate = spotlightEvent ? new Date(spotlightEvent.starts_at) : new Date();
+  const eventDate = spotlightEvent ? new Date(spotlightEvent.starts_at) : null;
 
-  // Trending topic list
-  const trendingTopics = [
-    '#DigitalArt',
-    '#CreativeTools',
-    '#ArtExhibition',
-    '#Filmmaking',
-    '#DesignInspo',
-    '#CreatorTips',
-  ];
+  const featuredCause = featuredCauses.length > 0 ? featuredCauses[0] : null;
+  const causeGoal = featuredCause?.goal_amount ?? 0;
+  const causePledged = featuredCause?.pledged_total ?? 0;
+  const causeCurrency = featuredCause?.currency ?? '$';
+  const causePct = causeGoal > 0 ? Math.min(100, Math.round((causePledged / causeGoal) * 100)) : 0;
+
+  const featuredProject = featuredProjects.length > 0 ? featuredProjects[0] : null;
+  const isVerified = Boolean(circle.settings?.verified);
+  const customTagline = circle.settings?.tagline ? String(circle.settings.tagline) : null;
+  const customMotto = circle.settings?.motto ? String(circle.settings.motto) : null;
+  const memberCount = circle.member_count ?? 1;
+  const postCount = items.filter((i) => i.itemType === 'post').length;
 
   return (
     <div className="space-y-6">
-      {/* 1. TOP HERO BANNER CARD */}
+      {/* 1. TOP HERO BANNER CARD (REAL DATA ONLY) */}
       <section className="relative overflow-hidden rounded-3xl border border-stone-200/80 bg-stone-900 text-white shadow-xl">
         {/* Cover Art / Gradient Overlay */}
         <div
@@ -281,25 +290,24 @@ export function CommunityActivityStream({
           style={{
             backgroundImage: circle.cover_url
               ? `url(${circle.cover_url})`
-              : 'linear-gradient(135deg, rgba(30,15,50,0.92) 0%, rgba(18,10,30,0.96) 50%, rgba(40,10,20,0.94) 100%)',
+              : 'linear-gradient(135deg, rgba(24,24,27,0.95) 0%, rgba(9,9,11,0.98) 100%)',
           }}
         />
-        {/* Artistic paint splash / blur overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-950/60 to-transparent" />
         <div
-          className="pointer-events-none absolute -right-20 -top-20 h-96 w-96 rounded-full opacity-40 blur-3xl"
-          style={{ backgroundColor: 'var(--circle-primary, #8b5cf6)' }}
+          className="pointer-events-none absolute -right-20 -top-20 h-96 w-96 rounded-full opacity-30 blur-3xl"
+          style={{ backgroundColor: 'var(--circle-primary, #6366f1)' }}
         />
 
         {/* Hero Content */}
         <div className="relative z-10 flex flex-col justify-between gap-6 p-6 sm:p-8 md:flex-row md:items-end">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-            {/* Community Avatar / Logo with Glow */}
+            {/* Real Avatar */}
             <div className="relative shrink-0">
               <div
                 className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border-2 border-white/20 bg-stone-900 shadow-2xl backdrop-blur-md sm:h-24 sm:w-24"
                 style={{
-                  boxShadow: '0 10px 25px -5px var(--circle-primary, rgba(139,92,246,0.5))',
+                  boxShadow: '0 10px 25px -5px var(--circle-primary, rgba(99,102,241,0.4))',
                 }}
               >
                 {circle.avatar_url ? (
@@ -313,61 +321,49 @@ export function CommunityActivityStream({
               </div>
             </div>
 
-            {/* Title, Tagline, Description & Active Count */}
+            {/* Title, Tagline, Description & Real Member Count */}
             <div className="space-y-1.5">
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-extrabold tracking-tight text-white sm:text-3xl">{circle.name}</h1>
-                <BadgeCheck className="h-6 w-6 text-indigo-400" aria-label="Verified Community" />
+                {isVerified && (
+                  <BadgeCheck className="h-6 w-6 text-indigo-400" aria-label="Verified Community" />
+                )}
               </div>
 
-              <p className="text-sm font-semibold tracking-wide text-stone-200">
-                {String(circle.settings?.tagline || 'Create. Collaborate. Grow.')}
-              </p>
+              {customTagline && (
+                <p className="text-sm font-semibold tracking-wide text-stone-200">{customTagline}</p>
+              )}
 
               {circle.description && (
                 <p className="max-w-xl text-xs leading-relaxed text-stone-300 sm:text-sm">{circle.description}</p>
               )}
 
-              {/* Members stack + Active dot */}
-              <div className="flex items-center gap-3 pt-1">
-                <div className="flex -space-x-2 overflow-hidden">
-                  <div className="inline-block h-6 w-6 rounded-full ring-2 ring-stone-900 bg-amber-500 text-[10px] font-bold text-white flex items-center justify-center">
-                    A
-                  </div>
-                  <div className="inline-block h-6 w-6 rounded-full ring-2 ring-stone-900 bg-indigo-500 text-[10px] font-bold text-white flex items-center justify-center">
-                    M
-                  </div>
-                  <div className="inline-block h-6 w-6 rounded-full ring-2 ring-stone-900 bg-emerald-500 text-[10px] font-bold text-white flex items-center justify-center">
-                    J
-                  </div>
-                  <div className="inline-block h-6 w-6 rounded-full ring-2 ring-stone-900 bg-purple-500 text-[10px] font-bold text-white flex items-center justify-center">
-                    K
-                  </div>
-                </div>
-                <span className="text-xs font-semibold text-stone-200">
-                  {circle.member_count ? `${circle.member_count.toLocaleString()} Members` : '24.8K Members'}
+              {/* Real Member Count */}
+              <div className="flex items-center gap-2 pt-1 text-xs font-semibold text-stone-200">
+                <Users className="h-4 w-4 text-stone-400" />
+                <span>
+                  {memberCount.toLocaleString()} {memberCount === 1 ? 'Member' : 'Members'}
                 </span>
-                <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-400">
-                  <span className="relative flex h-2 w-2">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-                  </span>
-                  Active now
-                </span>
+                {circle.location && (
+                  <>
+                    <span className="text-stone-500">•</span>
+                    <span className="flex items-center gap-1 text-stone-300">
+                      <MapPin className="h-3.5 w-3.5 text-stone-400" />
+                      {circle.location}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           </div>
 
-          {/* Action Buttons: Joined / More */}
+          {/* Action Buttons: Joined / Join & Share */}
           <div className="flex items-center gap-2.5">
             {isMember ? (
-              <button
-                type="button"
-                className="inline-flex items-center gap-1.5 rounded-full bg-white px-5 py-2.5 text-xs font-bold text-stone-900 shadow-md hover:bg-stone-100 transition-all active:scale-95"
-              >
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white px-5 py-2.5 text-xs font-bold text-stone-900 shadow-md">
                 <Check className="h-4 w-4 text-stone-900 stroke-[2.5]" />
                 <span>Joined</span>
-              </button>
+              </span>
             ) : (
               <Link
                 href={`/circles/${circle.slug}/join`}
@@ -385,7 +381,7 @@ export function CommunityActivityStream({
               className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur-md hover:bg-white/20 transition-colors"
               title="Share Community Link"
             >
-              {copiedShare ? <Check className="h-4 w-4 text-emerald-400" /> : <MoreHorizontal className="h-4 w-4" />}
+              {copiedShare ? <Check className="h-4 w-4 text-emerald-400" /> : <Share2 className="h-4 w-4" />}
             </button>
           </div>
         </div>
@@ -395,7 +391,7 @@ export function CommunityActivityStream({
       <nav className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
         <Link
           href={`/circles/${circle.slug}`}
-          className="inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs font-bold shadow-sm transition-all"
+          className="inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs font-bold shadow-xs transition-all"
           style={{
             backgroundColor: 'var(--circle-primary-subtle, #f3f4f6)',
             color: 'var(--circle-primary, #111827)',
@@ -435,21 +431,25 @@ export function CommunityActivityStream({
           </Link>
         )}
 
-        <Link
-          href={`/circles/${circle.slug}/causes`}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-stone-200 bg-white px-4 py-2 text-xs font-semibold text-stone-600 hover:bg-stone-50 hover:text-stone-900 transition-colors shadow-2xs"
-        >
-          <HeartHandshake className="h-3.5 w-3.5" />
-          <span>Causes</span>
-        </Link>
+        {enabledCapabilityKeys.includes('fundraising_campaigns') && (
+          <Link
+            href={`/circles/${circle.slug}/causes`}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-stone-200 bg-white px-4 py-2 text-xs font-semibold text-stone-600 hover:bg-stone-50 hover:text-stone-900 transition-colors shadow-2xs"
+          >
+            <HeartHandshake className="h-3.5 w-3.5" />
+            <span>Causes</span>
+          </Link>
+        )}
 
-        <Link
-          href={`/circles/${circle.slug}/resources`}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-stone-200 bg-white px-4 py-2 text-xs font-semibold text-stone-600 hover:bg-stone-50 hover:text-stone-900 transition-colors shadow-2xs"
-        >
-          <FileText className="h-3.5 w-3.5" />
-          <span>Resources</span>
-        </Link>
+        {enabledCapabilityKeys.includes('learning_resources') && (
+          <Link
+            href={`/circles/${circle.slug}/resources`}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-stone-200 bg-white px-4 py-2 text-xs font-semibold text-stone-600 hover:bg-stone-50 hover:text-stone-900 transition-colors shadow-2xs"
+          >
+            <FileText className="h-3.5 w-3.5" />
+            <span>Resources</span>
+          </Link>
+        )}
 
         <Link
           href={`/circles/${circle.slug}/members`}
@@ -501,142 +501,156 @@ export function CommunityActivityStream({
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* ================= LEFT COLUMN (lg:col-span-3) ================= */}
         <aside className="space-y-5 lg:col-span-3">
-          {/* Upcoming Events Card */}
-          <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-            <div className="mb-3 flex items-center justify-between">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-stone-900">Upcoming Events</h3>
-              <Link
-                href={`/circles/${circle.slug}/events`}
-                className="text-xs font-semibold text-stone-500 hover:text-stone-900 transition-colors"
-              >
-                See all →
-              </Link>
-            </div>
-
-            <div className="flex items-start gap-3">
-              {/* Day / Date / Month Badge */}
-              <div className="flex h-14 w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-stone-100 text-stone-900 border border-stone-200 shadow-2xs">
-                <span className="text-[9px] font-bold uppercase text-stone-500 leading-none">
-                  {eventDate.toLocaleString('en-US', { weekday: 'short' })}
-                </span>
-                <span className="my-0.5 text-base font-extrabold leading-none">{eventDate.getDate()}</span>
-                <span className="text-[9px] font-bold uppercase text-stone-500 leading-none">
-                  {eventDate.toLocaleString('en-US', { month: 'short' })}
-                </span>
+          {/* Real Upcoming Events Card (only if upcomingEvents exist) */}
+          {spotlightEvent && eventDate && (
+            <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-stone-900">Upcoming Events</h3>
+                <Link
+                  href={`/circles/${circle.slug}/events`}
+                  className="text-xs font-semibold text-stone-500 hover:text-stone-900 transition-colors"
+                >
+                  See all →
+                </Link>
               </div>
 
-              {/* Event Info */}
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-bold text-stone-900">
-                  {spotlightEvent?.title || `${circle.name} Creator Workshop`}
-                </p>
-                <p className="mt-0.5 text-[11px] text-stone-500 truncate">
-                  {spotlightEvent?.starts_at
-                    ? new Date(spotlightEvent.starts_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
-                    : '4:00 PM'}
-                  {' • '}
-                  {spotlightEvent?.venue_text || 'Creative Studio'}
-                </p>
-
-                {/* Attendees stack */}
-                <div className="mt-2 flex items-center gap-1.5">
-                  <div className="flex -space-x-1.5 overflow-hidden">
-                    <div className="inline-block h-4 w-4 rounded-full bg-amber-400 ring-1 ring-white" />
-                    <div className="inline-block h-4 w-4 rounded-full bg-purple-400 ring-1 ring-white" />
-                    <div className="inline-block h-4 w-4 rounded-full bg-emerald-400 ring-1 ring-white" />
-                  </div>
-                  <span className="text-[10px] font-semibold text-stone-500">
-                    +{spotlightEvent?.going_count ? spotlightEvent.going_count + 120 : 124} going
+              <div className="flex items-start gap-3">
+                <div className="flex h-14 w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-stone-100 text-stone-900 border border-stone-200 shadow-2xs">
+                  <span className="text-[9px] font-bold uppercase text-stone-500 leading-none">
+                    {eventDate.toLocaleString('en-US', { weekday: 'short' })}
+                  </span>
+                  <span className="my-0.5 text-base font-extrabold leading-none">{eventDate.getDate()}</span>
+                  <span className="text-[9px] font-bold uppercase text-stone-500 leading-none">
+                    {eventDate.toLocaleString('en-US', { month: 'short' })}
                   </span>
                 </div>
-              </div>
-            </div>
-          </section>
 
-          {/* Trending Topics Card */}
-          <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-            <div className="mb-3 flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <span className="text-amber-500">🔥</span>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-stone-900">Trending Topics</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedTopic(null)}
-                className="text-xs font-semibold text-stone-500 hover:text-stone-900 transition-colors"
-              >
-                {selectedTopic ? 'Clear' : 'See all →'}
-              </button>
-            </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-xs font-bold text-stone-900">{spotlightEvent.title}</p>
+                  <p className="mt-0.5 text-[11px] text-stone-500 truncate">
+                    {new Date(spotlightEvent.starts_at).toLocaleTimeString([], {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })}
+                    {spotlightEvent.venue_text ? ` • ${spotlightEvent.venue_text}` : ''}
+                  </p>
 
-            <div className="flex flex-wrap gap-1.5">
-              {trendingTopics.map((topic) => {
-                const isSelected = selectedTopic === topic;
-                return (
+                  <div className="mt-2 flex items-center gap-1.5 text-[10px] font-semibold text-stone-500">
+                    <Users className="h-3 w-3 text-stone-400" />
+                    <span>{spotlightEvent.going_count ?? 0} attending</span>
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Real Trending Topics Card (only if hashtags exist in discussions) */}
+          {trendingTopics.length > 0 && (
+            <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-stone-900">Topics</h3>
+                {selectedTopic && (
                   <button
-                    key={topic}
                     type="button"
-                    onClick={() => setSelectedTopic(isSelected ? null : topic)}
-                    className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
-                      isSelected
-                        ? 'bg-stone-900 text-white shadow-xs'
-                        : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
-                    }`}
+                    onClick={() => setSelectedTopic(null)}
+                    className="text-xs font-semibold text-stone-500 hover:text-stone-900 transition-colors"
                   >
-                    {topic}
+                    Clear
                   </button>
-                );
-              })}
-            </div>
-          </section>
-
-          {/* The Creative Fund / Causes Spotlight Card */}
-          <section className="relative overflow-hidden rounded-2xl border border-purple-900/30 bg-gradient-to-br from-indigo-950 via-purple-950 to-stone-950 p-4 text-white shadow-md">
-            <div className="flex items-start justify-between">
-              <div>
-                <span className="text-xs font-semibold uppercase tracking-wider text-purple-300">
-                  Crowdfunding
-                </span>
-                <h3 className="mt-0.5 text-sm font-bold text-white">
-                  {featuredCause?.title || `The ${circle.name} Creative Fund`}
-                </h3>
+                )}
               </div>
-              <span className="rounded-full bg-white/10 p-1 text-amber-300 backdrop-blur-xs">
-                <Sparkles className="h-3.5 w-3.5" />
+
+              <div className="flex flex-wrap gap-1.5">
+                {trendingTopics.map((topic) => {
+                  const isSelected = selectedTopic === topic;
+                  return (
+                    <button
+                      key={topic}
+                      type="button"
+                      onClick={() => setSelectedTopic(isSelected ? null : topic)}
+                      className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+                        isSelected
+                          ? 'bg-stone-900 text-white shadow-xs'
+                          : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+                      }`}
+                    >
+                      {topic}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {/* Real Causes / Crowdfunding Card (only if a real campaign exists) */}
+          {featuredCause && (
+            <section className="relative overflow-hidden rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500">
+                Fundraising Campaign
               </span>
-            </div>
+              <h3 className="mt-1 text-sm font-bold text-stone-900">{featuredCause.title}</h3>
 
-            <p className="mt-2 text-xs leading-relaxed text-stone-300">
-              {featuredCause?.description || 'Support creators, Build more creative opportunities.'}
-            </p>
+              {featuredCause.description && (
+                <p className="mt-1.5 text-xs text-stone-600 line-clamp-2">{featuredCause.description}</p>
+              )}
 
-            {/* Progress bar */}
-            <div className="mt-4 space-y-1.5">
-              <div className="flex items-center justify-between text-xs font-semibold">
-                <span className="text-purple-300">{causePct}% funded</span>
-                <span className="text-stone-300">
-                  {causeCurrency}
-                  {causePledged.toLocaleString()} / {causeCurrency}
-                  {causeGoal.toLocaleString()}
+              {causeGoal > 0 && (
+                <div className="mt-3 space-y-1.5">
+                  <div className="flex items-center justify-between text-xs font-semibold text-stone-700">
+                    <span>{causePct}% funded</span>
+                    <span>
+                      {causeCurrency}
+                      {causePledged.toLocaleString()} / {causeCurrency}
+                      {causeGoal.toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-stone-100">
+                    <div
+                      className="h-full rounded-full transition-all duration-500"
+                      style={{
+                        width: `${causePct}%`,
+                        backgroundColor: 'var(--circle-primary, #111827)',
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <Link
+                href={`/circles/${circle.slug}/causes`}
+                className="mt-3 block w-full rounded-xl border border-stone-200 bg-stone-50 py-1.5 text-center text-xs font-semibold text-stone-900 hover:bg-stone-100 transition-colors"
+              >
+                View Campaign →
+              </Link>
+            </section>
+          )}
+
+          {/* About & Community Metadata Card */}
+          <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm space-y-3">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-stone-900">About</h3>
+            <div className="space-y-2 text-xs text-stone-600">
+              <div className="flex items-center justify-between">
+                <span className="text-stone-400">Category</span>
+                <span className="font-semibold text-stone-800 capitalize">{circle.category.replace('_', ' ')}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-stone-400">Access</span>
+                <span className="flex items-center gap-1 font-semibold text-stone-800 capitalize">
+                  {circle.visibility === 'public' ? (
+                    <Globe className="h-3.5 w-3.5 text-stone-500" />
+                  ) : (
+                    <Lock className="h-3.5 w-3.5 text-stone-500" />
+                  )}
+                  {circle.visibility.replace('_', ' ')}
                 </span>
               </div>
-              <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
-                <div
-                  className="h-full rounded-full transition-all duration-500"
-                  style={{
-                    width: `${causePct}%`,
-                    backgroundColor: 'var(--circle-primary, #a855f7)',
-                  }}
-                />
-              </div>
+              {circle.location && (
+                <div className="flex items-center justify-between">
+                  <span className="text-stone-400">Location</span>
+                  <span className="font-semibold text-stone-800">{circle.location}</span>
+                </div>
+              )}
             </div>
-
-            <Link
-              href={`/circles/${circle.slug}/causes`}
-              className="mt-4 block w-full rounded-xl bg-white py-2 text-center text-xs font-bold text-stone-950 shadow-sm hover:bg-stone-100 transition-colors"
-            >
-              Donate Now →
-            </Link>
           </section>
         </aside>
 
@@ -657,7 +671,7 @@ export function CommunityActivityStream({
                   />
                 </div>
 
-                {/* Action Pills & Post Button */}
+                {/* Real Action Buttons for Enabled Capabilities */}
                 <div className="flex flex-wrap items-center justify-between gap-2 border-t border-stone-100 pt-3">
                   <div className="flex flex-wrap items-center gap-1 sm:gap-2">
                     <button
@@ -668,34 +682,47 @@ export function CommunityActivityStream({
                       <Camera className="h-3.5 w-3.5 text-emerald-500" />
                       <span>Photo</span>
                     </button>
-                    <Link
-                      href={`/circles/${circle.slug}/events?create=true`}
-                      className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-stone-600 hover:bg-stone-100 transition-colors"
-                    >
-                      <Calendar className="h-3.5 w-3.5 text-indigo-500" />
-                      <span>Event</span>
-                    </Link>
-                    <Link
-                      href={`/circles/${circle.slug}/projects?create=true`}
-                      className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-stone-600 hover:bg-stone-100 transition-colors"
-                    >
-                      <FolderGit2 className="h-3.5 w-3.5 text-amber-500" />
-                      <span>Project</span>
-                    </Link>
-                    <Link
-                      href={`/circles/${circle.slug}/polls?create=true`}
-                      className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-stone-600 hover:bg-stone-100 transition-colors"
-                    >
-                      <BarChart2 className="h-3.5 w-3.5 text-purple-500" />
-                      <span>Poll</span>
-                    </Link>
-                    <Link
-                      href={`/circles/${circle.slug}/causes?create=true`}
-                      className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-stone-600 hover:bg-stone-100 transition-colors"
-                    >
-                      <Heart className="h-3.5 w-3.5 text-rose-500" />
-                      <span>Cause</span>
-                    </Link>
+
+                    {(enabledCapabilityKeys.includes('events') ||
+                      enabledCapabilityKeys.includes('events_activities')) && (
+                      <Link
+                        href={`/circles/${circle.slug}/events?create=true`}
+                        className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-stone-600 hover:bg-stone-100 transition-colors"
+                      >
+                        <Calendar className="h-3.5 w-3.5 text-indigo-500" />
+                        <span>Event</span>
+                      </Link>
+                    )}
+
+                    {enabledCapabilityKeys.includes('learning_resources') && (
+                      <Link
+                        href={`/circles/${circle.slug}/projects?create=true`}
+                        className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-stone-600 hover:bg-stone-100 transition-colors"
+                      >
+                        <FolderGit2 className="h-3.5 w-3.5 text-amber-500" />
+                        <span>Project</span>
+                      </Link>
+                    )}
+
+                    {enabledCapabilityKeys.includes('polls_decisions') && (
+                      <Link
+                        href={`/circles/${circle.slug}/polls?create=true`}
+                        className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-stone-600 hover:bg-stone-100 transition-colors"
+                      >
+                        <BarChart2 className="h-3.5 w-3.5 text-purple-500" />
+                        <span>Poll</span>
+                      </Link>
+                    )}
+
+                    {enabledCapabilityKeys.includes('fundraising_campaigns') && (
+                      <Link
+                        href={`/circles/${circle.slug}/causes?create=true`}
+                        className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-stone-600 hover:bg-stone-100 transition-colors"
+                      >
+                        <Heart className="h-3.5 w-3.5 text-rose-500" />
+                        <span>Cause</span>
+                      </Link>
+                    )}
                   </div>
 
                   <button
@@ -738,7 +765,7 @@ export function CommunityActivityStream({
           {/* Activity Feed Items */}
           {visibleItems.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-stone-200 bg-white py-16 text-center text-sm text-stone-500">
-              No updates match your filter yet.
+              No updates yet in this section.
             </div>
           ) : (
             <div className="space-y-4">
@@ -749,11 +776,16 @@ export function CommunityActivityStream({
                   circle={circle}
                   currentUserId={currentUserId}
                   isMember={isMember}
-                  isLiked={likedPosts[item.id] ?? false}
-                  likeCount={likeCounts[item.id] ?? (item.itemType === 'post' ? 892 : 0)}
-                  isReposted={repostedPosts[item.id] ?? false}
-                  onToggleLike={() => handleToggleLike(item.id)}
-                  onToggleRepost={() => handleToggleRepost(item.id)}
+                  isLiked={likedPosts[item.id] ?? (item.itemType === 'post' ? Boolean(item.data.viewer_has_liked) : false)}
+                  likeCount={
+                    likeCounts[item.id] ?? (item.itemType === 'post' ? item.data.reaction_count ?? 0 : 0)
+                  }
+                  onToggleLike={() =>
+                    handleToggleLike(
+                      item.id,
+                      item.itemType === 'post' ? item.data.reaction_count ?? 0 : 0
+                    )
+                  }
                   onInquire={handleInquireListing}
                   onVote={handleVotePoll}
                   votedOption={votedPolls[item.data.id]}
@@ -769,7 +801,7 @@ export function CommunityActivityStream({
 
         {/* ================= RIGHT COLUMN (lg:col-span-3) ================= */}
         <aside className="space-y-5 lg:col-span-3">
-          {/* Community Stats Card with Smooth Sparkline */}
+          {/* Real Community Stats Card */}
           <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
             <div className="mb-3 flex items-center justify-between">
               <div className="flex items-center gap-1.5">
@@ -778,116 +810,123 @@ export function CommunityActivityStream({
               </div>
             </div>
 
-            {/* Metrics Row */}
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div>
-                <p className="text-sm font-extrabold text-stone-900">
-                  {circle.member_count ? `${circle.member_count}` : '24.8K'}
-                </p>
-                <p className="text-[10px] text-stone-500">Members</p>
+            {/* Real Metrics Only */}
+            <div className="grid grid-cols-2 gap-3 text-center">
+              <div className="rounded-xl bg-stone-50 p-2.5 border border-stone-100">
+                <p className="text-base font-extrabold text-stone-900">{memberCount.toLocaleString()}</p>
+                <p className="text-[10px] text-stone-500 font-medium">Members</p>
               </div>
-              <div>
-                <p className="text-sm font-extrabold text-stone-900">1.2K</p>
-                <p className="text-[10px] text-stone-500">Active Today</p>
-              </div>
-              <div>
-                <p className="text-sm font-extrabold text-stone-900">98%</p>
-                <p className="text-[10px] text-stone-500">Engagement</p>
+              <div className="rounded-xl bg-stone-50 p-2.5 border border-stone-100">
+                <p className="text-base font-extrabold text-stone-900">{postCount}</p>
+                <p className="text-[10px] text-stone-500 font-medium">Discussions</p>
               </div>
             </div>
 
-            {/* Smooth SVG Sparkline Graph */}
-            <div className="mt-4 pt-1">
-              <svg viewBox="0 0 200 45" className="h-12 w-full overflow-visible">
-                <defs>
-                  <linearGradient id="statsGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--circle-primary, #8b5cf6)" stopOpacity="0.25" />
-                    <stop offset="100%" stopColor="var(--circle-primary, #8b5cf6)" stopOpacity="0" />
-                  </linearGradient>
-                </defs>
-                <path
-                  d="M 5,35 Q 35,38 65,22 T 125,26 T 175,12 T 195,5 L 195,45 L 5,45 Z"
-                  fill="url(#statsGradient)"
-                />
-                <path
-                  d="M 5,35 Q 35,38 65,22 T 125,26 T 175,12 T 195,5"
-                  fill="none"
-                  stroke="var(--circle-primary, #8b5cf6)"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <circle cx="65" cy="22" r="3" fill="var(--circle-primary, #8b5cf6)" />
-                <circle cx="125" cy="26" r="3" fill="var(--circle-primary, #8b5cf6)" />
-                <circle cx="195" cy="5" r="4" fill="var(--circle-primary, #8b5cf6)" />
-              </svg>
+            <div className="mt-3 pt-3 border-t border-stone-100 text-[11px] text-stone-500 flex justify-between">
+              <span>Created</span>
+              <span className="font-medium text-stone-700">
+                {new Date(circle.created_at).toLocaleDateString([], { month: 'short', year: 'numeric' })}
+              </span>
             </div>
           </section>
 
-          {/* Featured Projects Card */}
-          <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
-            <div className="mb-3 flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <span className="text-amber-500">★</span>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-stone-900">Featured Projects</h3>
-              </div>
-              <Link
-                href={`/circles/${circle.slug}/projects`}
-                className="text-xs font-semibold text-stone-500 hover:text-stone-900 transition-colors"
-              >
-                See all →
-              </Link>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <h4 className="text-xs font-bold text-stone-900">
-                  {featuredProject?.name || `${circle.name} Creative Studio`}
-                </h4>
-                <span className="rounded-full bg-purple-50 px-2 py-0.5 text-[10px] font-bold text-purple-700 border border-purple-200">
-                  ● Community Project
-                </span>
-              </div>
-
-              {/* Contributor avatars + count */}
-              <div className="flex items-center gap-2 pt-1">
-                <div className="flex -space-x-1.5 overflow-hidden">
-                  <div className="inline-block h-5 w-5 rounded-full bg-rose-400 ring-1 ring-white" />
-                  <div className="inline-block h-5 w-5 rounded-full bg-indigo-400 ring-1 ring-white" />
-                  <div className="inline-block h-5 w-5 rounded-full bg-amber-400 ring-1 ring-white" />
+          {/* Real Featured Projects Card (only if projects exist) */}
+          {featuredProject && (
+            <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+              <div className="mb-3 flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <FolderGit2 className="h-4 w-4 text-amber-500" />
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-stone-900">Featured Project</h3>
                 </div>
-                <span className="text-[11px] font-medium text-stone-500">312 contributors</span>
+                <Link
+                  href={`/circles/${circle.slug}/projects`}
+                  className="text-xs font-semibold text-stone-500 hover:text-stone-900 transition-colors"
+                >
+                  See all →
+                </Link>
               </div>
 
-              {/* Progress bar */}
-              <div className="space-y-1 pt-2">
-                <div className="flex justify-end text-[10px] font-bold text-stone-700">
-                  <span>78%</span>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-stone-900 truncate">{featuredProject.name}</h4>
+                  <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-bold text-stone-700 capitalize">
+                    {featuredProject.status}
+                  </span>
                 </div>
-                <div className="h-2 w-full overflow-hidden rounded-full bg-stone-100">
-                  <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{
-                      width: '78%',
-                      backgroundColor: 'var(--circle-primary, #8b5cf6)',
-                    }}
-                  />
-                </div>
+                {featuredProject.description && (
+                  <p className="text-xs text-stone-600 line-clamp-2">{featuredProject.description}</p>
+                )}
               </div>
-            </div>
-          </section>
+            </section>
+          )}
 
-          {/* Inspirational Motto Card */}
-          <section className="relative overflow-hidden rounded-2xl border border-stone-800 bg-stone-900 p-5 text-white shadow-md">
-            <Quote className="h-6 w-6 text-stone-500 mb-2" />
-            <p className="text-xs italic leading-relaxed text-stone-200 font-serif">
-              &ldquo;Great art is not what you see, but what you make others see.&rdquo;
-            </p>
-            <p className="mt-2 text-[11px] font-semibold text-stone-400">— Anonymous</p>
-            <div className="pointer-events-none absolute -bottom-4 -right-2 text-7xl font-serif text-stone-800/40 select-none">
-              ”
-            </div>
-          </section>
+          {/* Real Featured Courses (only if courses exist) */}
+          {featuredCourses.length > 0 && (
+            <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-stone-900">Courses</h3>
+                <Link
+                  href={`/circles/${circle.slug}/courses`}
+                  className="text-xs font-semibold text-stone-500 hover:text-stone-900 transition-colors"
+                >
+                  See all →
+                </Link>
+              </div>
+              <ul className="space-y-2">
+                {featuredCourses.slice(0, 3).map((crs) => (
+                  <li key={crs.id}>
+                    <Link
+                      href={`/circles/${circle.slug}/courses/${crs.id}`}
+                      className="block text-xs font-semibold text-stone-900 hover:underline truncate"
+                    >
+                      {crs.title}
+                    </Link>
+                    <span className="text-[10px] text-stone-400">
+                      {crs.total_lessons_count || 0} lessons
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {/* Real Featured Marketplace Listings (only if listings exist) */}
+          {featuredListings.length > 0 && (
+            <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-stone-900">Marketplace</h3>
+                <Link
+                  href={`/circles/${circle.slug}/marketplace`}
+                  className="text-xs font-semibold text-stone-500 hover:text-stone-900 transition-colors"
+                >
+                  See all →
+                </Link>
+              </div>
+              <ul className="space-y-2">
+                {featuredListings.slice(0, 3).map((item) => (
+                  <li key={item.id} className="flex items-center justify-between text-xs">
+                    <Link
+                      href={`/circles/${circle.slug}/marketplace/${item.id}`}
+                      className="truncate font-medium text-stone-800 hover:underline"
+                    >
+                      {item.title}
+                    </Link>
+                    <span className="shrink-0 font-bold text-stone-900">{formatPrice(item)}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {/* Community Motto / Mission (only if real custom motto is configured) */}
+          {customMotto && (
+            <section className="relative overflow-hidden rounded-2xl border border-stone-800 bg-stone-900 p-5 text-white shadow-md">
+              <Quote className="h-5 w-5 text-stone-400 mb-2" />
+              <p className="text-xs italic leading-relaxed text-stone-200 font-serif">
+                &ldquo;{customMotto}&rdquo;
+              </p>
+            </section>
+          )}
         </aside>
       </div>
 
@@ -905,7 +944,7 @@ export function CommunityActivityStream({
 }
 
 // -----------------------------------------------------------------------------
-// FEED CARDS WITH INTERACTIVE ENGAGEMENT BAR
+// FEED CARDS (REAL DATA ONLY)
 // -----------------------------------------------------------------------------
 
 interface ActivityFeedCardProps {
@@ -915,9 +954,7 @@ interface ActivityFeedCardProps {
   isMember: boolean;
   isLiked: boolean;
   likeCount: number;
-  isReposted: boolean;
   onToggleLike: () => void;
-  onToggleRepost: () => void;
   onInquire: (listing: MarketplaceListingItem) => void;
   onVote: (pollId: string, optionId: string) => void;
   votedOption?: string;
@@ -934,9 +971,7 @@ function ActivityFeedCard({
   isMember,
   isLiked,
   likeCount,
-  isReposted,
   onToggleLike,
-  onToggleRepost,
   onInquire,
   onVote,
   votedOption,
@@ -951,21 +986,25 @@ function ActivityFeedCard({
   if (item.itemType === 'post') {
     const post = item.data;
     const href = `/circles/${circle.slug}/discussions/${post.id}`;
+    const mediaUrl = extractMediaUrl(post.body);
+    const authorName = post.author?.display_name || 'Member';
+    const authorUsername = post.author?.username ? `@${post.author.username}` : null;
+
     return (
       <article className="space-y-3 rounded-2xl border border-stone-200 bg-white p-4 transition-all hover:border-stone-300 shadow-sm">
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2.5">
-            <Avatar url={post.author?.avatar_url} name={post.author?.display_name || 'Member'} />
+            <Avatar url={post.author?.avatar_url} name={authorName} />
             <div className="min-w-0 text-sm">
               <div className="flex items-center gap-1.5">
-                <span className="font-bold text-stone-900 truncate">
-                  {post.author?.display_name || 'Aisha Creative'}
-                </span>
-                <BadgeCheck className="h-4 w-4 text-indigo-500 shrink-0" />
+                <span className="font-bold text-stone-900 truncate">{authorName}</span>
+                {post.space?.name && (
+                  <span className="text-xs text-stone-400">in #{post.space.name}</span>
+                )}
               </div>
               <div className="flex items-center gap-1.5 text-xs text-stone-400">
-                <span>@{post.author?.username || 'aishacreative'}</span>
-                <span>•</span>
+                {authorUsername && <span>{authorUsername}</span>}
+                {authorUsername && <span>•</span>}
                 <span>{time}</span>
               </div>
             </div>
@@ -981,22 +1020,15 @@ function ActivityFeedCard({
           <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-xs leading-relaxed text-stone-700">{post.body}</p>
         </Link>
 
-        {/* Post Gallery / Artwork Preview if post contains image URLs or creative artwork */}
-        <div className="relative overflow-hidden rounded-xl border border-stone-200 bg-stone-900">
-          {/* Multi-image pagination badge */}
-          <div className="absolute right-2.5 top-2.5 z-10 rounded-full bg-stone-950/70 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-md">
-            1/3
+        {/* Only show image container if the post actually contains a media image */}
+        {mediaUrl && (
+          <div className="relative overflow-hidden rounded-xl border border-stone-200 bg-stone-100 max-h-80">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={mediaUrl} alt="Post attachment" className="h-full w-full object-cover" />
           </div>
-          <div
-            className="h-64 w-full bg-cover bg-center transition-transform duration-500 hover:scale-105"
-            style={{
-              backgroundImage:
-                'url(https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?auto=format&fit=crop&w=1000&q=80)',
-            }}
-          />
-        </div>
+        )}
 
-        {/* Engagement Bar: Heart, Comment, Repost, Share */}
+        {/* Real Engagement Bar */}
         <div className="flex items-center justify-between border-t border-stone-100 pt-2 text-stone-500">
           <button
             type="button"
@@ -1014,19 +1046,8 @@ function ActivityFeedCard({
             className="inline-flex items-center gap-1.5 text-xs font-semibold hover:text-indigo-600 transition-colors"
           >
             <MessageCircle className="h-4 w-4" />
-            <span>{post.comment_count ?? 210}</span>
+            <span>{post.comment_count ?? 0}</span>
           </Link>
-
-          <button
-            type="button"
-            onClick={onToggleRepost}
-            className={`inline-flex items-center gap-1.5 text-xs font-semibold transition-colors ${
-              isReposted ? 'text-emerald-500' : 'hover:text-emerald-500'
-            }`}
-          >
-            <Repeat2 className="h-4 w-4" />
-            <span>{isReposted ? 74 : 73}</span>
-          </button>
 
           <button
             type="button"
@@ -1053,7 +1074,7 @@ function ActivityFeedCard({
       <article className="space-y-3 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
         <div className="flex items-center justify-between">
           <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-700">
-            📊 Community Poll
+            Poll
           </span>
           <span className="text-xs text-stone-400">{time}</span>
         </div>
@@ -1095,7 +1116,7 @@ function ActivityFeedCard({
           <DateBadge date={date} />
           <div className="min-w-0 flex-1">
             <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-bold text-indigo-700">
-              📅 Event
+              Event
             </span>
             <h3 className="font-bold text-stone-900 text-sm mt-1">{event.title}</h3>
             <p className="text-xs text-stone-500 mt-0.5">
@@ -1185,7 +1206,7 @@ function ActivityFeedCard({
     );
   }
 
-  // 6. Projects & Causes
+  // 6. Projects, Causes, and Resources
   if (item.itemType === 'project' || item.itemType === 'cause' || item.itemType === 'resource') {
     return (
       <article className="space-y-2 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
