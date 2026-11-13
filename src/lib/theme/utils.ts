@@ -1,6 +1,6 @@
 import React from 'react';
 import { CircleThemeSettings } from '@/types/domain';
-import { getPresetBannerUrl, WALLPAPER_PATTERNS } from './background-presets';
+import { getPresetBannerUrl } from './background-presets';
 
 export function hexToRgb(hexStr?: string | null): { r: number; g: number; b: number } | null {
   if (!hexStr) return null;
@@ -167,76 +167,4 @@ export function generateCircleThemeStyles(
     '--circle-card-border': 'rgba(231, 229, 228, 0.8)',
     '--circle-card-backdrop': 'none',
   };
-}
-
-export function getPageAmbientBackgroundStyle(
-  settings?: CircleThemeSettings | null,
-  fallbackCoverUrl?: string | null
-): React.CSSProperties | null {
-  if (!settings || !settings.pageBackgroundMode || settings.pageBackgroundMode === 'none') {
-    return null;
-  }
-
-  const mode = settings.pageBackgroundMode;
-
-  // 1. Soft Banner Aura: Ambient glow subtly derived from community hero banner, fading into canvas
-  if (mode === 'banner') {
-    const bannerUrl = getEffectiveBannerUrl(settings, fallbackCoverUrl);
-    if (!bannerUrl) return null;
-    return {
-      backgroundImage: `url(${bannerUrl})`,
-      backgroundSize: 'cover',
-      backgroundPosition: 'center top',
-      backgroundRepeat: 'no-repeat',
-      filter: 'blur(36px)',
-      transform: 'scale(1.1)',
-      opacity: 0.22,
-      WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.5) 260px, rgba(0,0,0,0) 520px)',
-      maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.5) 260px, rgba(0,0,0,0) 520px)',
-    };
-  }
-
-  // 2. Custom Artwork: Carefully clamped and masked so it stays a soft, minimal backdrop
-  if (mode === 'custom' && settings.pageBackgroundUrl) {
-    return {
-      backgroundImage: `url(${settings.pageBackgroundUrl})`,
-      backgroundSize: 'cover',
-      backgroundPosition: 'center top',
-      backgroundRepeat: 'no-repeat',
-      filter: 'blur(32px)',
-      transform: 'scale(1.1)',
-      opacity: 0.16,
-      WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.5) 260px, rgba(0,0,0,0) 520px)',
-      maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.5) 260px, rgba(0,0,0,0) 520px)',
-    };
-  }
-
-  // 3. Generative Mesh: Soft fluid ambient glow with top fade mask
-  if (mode === 'mesh') {
-    const primary = settings.primaryColor || '#6366f1';
-    const accent = settings.accentColor || '#ec4899';
-    return {
-      backgroundImage: `radial-gradient(at 0% 0%, ${primary} 0px, transparent 50%), radial-gradient(at 100% 40%, ${accent} 0px, transparent 50%), radial-gradient(at 50% 20%, ${primary}40 0px, transparent 60%)`,
-      filter: 'blur(40px)',
-      transform: 'scale(1.1)',
-      opacity: 0.14,
-      WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 480px)',
-      maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 480px)',
-    };
-  }
-
-  // 4. Subtle Patterns: Lightweight geometric textures (dots, grid) with graceful fade
-  if (mode === 'pattern') {
-    const patternKey = settings.pageBackgroundPattern || 'dots';
-    const patternSvg = WALLPAPER_PATTERNS[patternKey] || WALLPAPER_PATTERNS.dots;
-    return {
-      backgroundImage: `url("${patternSvg}")`,
-      backgroundRepeat: 'repeat',
-      opacity: 0.5,
-      WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.4) 350px, rgba(0,0,0,0.08) 700px)',
-      maskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.4) 350px, rgba(0,0,0,0.08) 700px)',
-    };
-  }
-
-  return null;
 }

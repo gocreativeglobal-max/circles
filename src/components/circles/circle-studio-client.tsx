@@ -28,7 +28,6 @@ import {
   THEME_PRESETS,
   getContrastColor,
   getEffectiveBannerUrl,
-  getPageAmbientBackgroundStyle,
 } from '@/lib/theme/utils';
 import {
   HERO_BANNER_PRESETS,
@@ -79,11 +78,6 @@ export function CircleStudioClient({
     coverUrl: initialCircle.theme_settings?.coverUrl || initialCircle.cover_url || null,
     coverPreset: initialCircle.theme_settings?.coverPreset || null,
     coverOverlayOpacity: initialCircle.theme_settings?.coverOverlayOpacity ?? 0.6,
-    pageBackgroundMode: initialCircle.theme_settings?.pageBackgroundMode || 'none',
-    pageBackgroundUrl: initialCircle.theme_settings?.pageBackgroundUrl || null,
-    pageBackgroundPattern: initialCircle.theme_settings?.pageBackgroundPattern || 'dots',
-    pageBackgroundBlur: initialCircle.theme_settings?.pageBackgroundBlur ?? 16,
-    pageBackgroundOpacity: initialCircle.theme_settings?.pageBackgroundOpacity ?? 0.15,
   });
   const [themeSaving, setThemeSaving] = useState(false);
   const [themeSuccess, setThemeSuccess] = useState(false);
@@ -915,21 +909,6 @@ export function CircleStudioClient({
                     placeholder="https://example.com/banner.jpg"
                     className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs text-stone-900 placeholder-stone-400 focus:border-black focus:outline-hidden"
                   />
-                  {/* Quick Shortcut to use Banner as Background */}
-                  <div className="pt-1">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setThemeSettings((prev) => ({
-                          ...prev,
-                          pageBackgroundMode: 'banner',
-                        }))
-                      }
-                      className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-stone-800 hover:text-black underline underline-offset-2"
-                    >
-                      <span>✨ Enable soft ambient glow from this banner</span>
-                    </button>
-                  </div>
                 </div>
 
                 <div className="space-y-1.5">
@@ -958,124 +937,14 @@ export function CircleStudioClient({
               </div>
             </div>
 
-            {/* 3. Community Ambient Atmosphere */}
-            <div className="border-t border-stone-100 pt-5 space-y-4">
-              <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-stone-800">
-                  3. Minimal Background & Ambient Glow
-                </label>
-                <p className="text-[11px] text-stone-500 mt-0.5">
-                  Subtle, distraction-free atmosphere. Never interferes with post readability.
-                </p>
-              </div>
-
-              {/* Minimal Atmosphere Options */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                {[
-                  { id: 'none', label: 'Clean Canvas', desc: 'Minimalist neutral stone surface' },
-                  { id: 'banner', label: 'Soft Banner Glow', desc: 'Gentle top aura derived from hero banner' },
-                  { id: 'pattern', label: 'Architectural Grid', desc: 'Subtle technical texture' },
-                  { id: 'custom', label: 'Custom Artwork', desc: 'Dedicated image with auto-calibrated fade' },
-                ].map((mode) => {
-                  const isSel = (themeSettings.pageBackgroundMode || 'none') === mode.id;
-                  return (
-                    <button
-                      key={mode.id}
-                      type="button"
-                      onClick={() =>
-                        setThemeSettings((prev) => ({
-                          ...prev,
-                          pageBackgroundMode: mode.id as CircleThemeSettings['pageBackgroundMode'],
-                          pageBackgroundPattern:
-                            mode.id === 'pattern' ? prev.pageBackgroundPattern || 'grid' : prev.pageBackgroundPattern,
-                        }))
-                      }
-                      className={`p-3 text-left rounded-xl border transition-all ${
-                        isSel
-                          ? 'border-black bg-stone-50 ring-1 ring-black shadow-2xs font-semibold'
-                          : 'border-stone-200 hover:border-stone-300'
-                      }`}
-                    >
-                      <p className="text-xs font-bold text-stone-900">{mode.label}</p>
-                      <p className="text-[10px] text-stone-500 mt-0.5">{mode.desc}</p>
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Pattern sub-options when 'pattern' is selected */}
-              {themeSettings.pageBackgroundMode === 'pattern' && (
-                <div className="space-y-1.5 pt-1">
-                  <label className="text-[11px] font-bold text-stone-700">Texture Style</label>
-                  <div className="flex flex-wrap gap-2">
-                    {[
-                      { id: 'grid', label: 'Micro Grid' },
-                      { id: 'dots', label: 'Dot Matrix' },
-                      { id: 'topography', label: 'Topography Lines' },
-                      { id: 'noise', label: 'Subtle Grain' },
-                    ].map((pat) => {
-                      const isSel = (themeSettings.pageBackgroundPattern || 'grid') === pat.id;
-                      return (
-                        <button
-                          key={pat.id}
-                          type="button"
-                          onClick={() =>
-                            setThemeSettings((prev) => ({
-                              ...prev,
-                              pageBackgroundPattern: pat.id as CircleThemeSettings['pageBackgroundPattern'],
-                            }))
-                          }
-                          className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
-                            isSel ? 'bg-stone-900 text-white' : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
-                          }`}
-                        >
-                          {pat.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Custom Image input when 'custom' is selected */}
-              {themeSettings.pageBackgroundMode === 'custom' && (
-                <div className="space-y-1.5 pt-1">
-                  <label className="text-[11px] font-bold text-stone-700">Custom Artwork Image URL</label>
-                  <input
-                    type="url"
-                    value={themeSettings.pageBackgroundUrl || ''}
-                    onChange={(e) =>
-                      setThemeSettings((prev) => ({
-                        ...prev,
-                        pageBackgroundUrl: e.target.value.trim() || null,
-                      }))
-                    }
-                    placeholder="https://example.com/artwork.jpg"
-                    className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs text-stone-900 placeholder-stone-400 focus:border-black focus:outline-hidden"
-                  />
-                  <p className="text-[10px] text-stone-500">
-                    Image is automatically softened with an ambient blur and top-to-bottom fade so discussions stay crisp and legible.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* 4. Live Interactive Sandbox Preview */}
+            {/* 3. Live Interactive Sandbox Preview */}
             <div className="border-t border-stone-100 pt-5 space-y-3">
               <label className="block text-xs font-bold uppercase tracking-wider text-stone-800">
-                4. Live Community Appearance Sandbox
+                3. Live Community Appearance Sandbox
               </label>
 
-              {/* Sandbox Container with ambient background layer */}
+              {/* Sandbox Container */}
               <div className="relative overflow-hidden rounded-2xl border border-stone-200 bg-[#FAF9F6] p-6 space-y-5">
-                {/* Simulated Ambient Layer */}
-                {(() => {
-                  const amb = getPageAmbientBackgroundStyle(themeSettings, initialCircle.cover_url);
-                  return amb ? (
-                    <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" style={amb} aria-hidden="true" />
-                  ) : null;
-                })()}
-
                 {/* Simulated Hero Banner */}
                 {(() => {
                   const banner = getEffectiveBannerUrl(themeSettings, initialCircle.cover_url);

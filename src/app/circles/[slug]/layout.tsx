@@ -6,7 +6,7 @@ import { getCircleBySlugOrId } from '@/features/circles/service';
 import { getCircleNavigation } from '@/features/capabilities/service';
 import { CircleMembershipActions } from '@/components/circles/circle-membership-actions';
 import { CircleCollapsibleLayout } from '@/components/circles/circle-collapsible-layout';
-import { generateCircleThemeStyles, getPageAmbientBackgroundStyle } from '@/lib/theme/utils';
+import { generateCircleThemeStyles } from '@/lib/theme/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,26 +32,12 @@ export default async function CircleLayout({
     circle.visibility === 'private' ? Lock : circle.visibility === 'discoverable_approval' ? Shield : Globe;
   const memberCount = circle.member_count ?? 1;
   const themeStyles = generateCircleThemeStyles(circle.theme_settings);
-  const ambientBackgroundStyle = getPageAmbientBackgroundStyle(
-    circle.theme_settings,
-    circle.cover_url
-  );
 
   return (
     <div
-      className={`relative min-h-[calc(100vh-4rem)] ${
-        ambientBackgroundStyle ? 'bg-stone-900' : 'bg-[#FAF9F6]'
-      } overflow-x-hidden`}
+      className="relative min-h-[calc(100vh-4rem)] bg-[#FAF9F6] overflow-x-hidden"
       style={themeStyles}
     >
-      {/* Full-Page Ambient Wallpaper / Pattern / Banner Background Layer */}
-      {ambientBackgroundStyle && (
-        <div
-          className="pointer-events-none fixed inset-0 z-0 overflow-hidden transition-opacity duration-700"
-          style={ambientBackgroundStyle}
-          aria-hidden="true"
-        />
-      )}
 
       {/* Slim circle header */}
       <header className="relative z-10 border-b border-stone-200/80 bg-white/95 backdrop-blur-md">
