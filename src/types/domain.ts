@@ -59,7 +59,7 @@ export interface CircleThemeSettings {
   coverPreset?: string | null;
   coverOverlayOpacity?: number | null; // 0.1 to 0.9
 
-  pageBackgroundMode?: 'none' | 'mesh' | 'pattern' | 'custom' | null;
+  pageBackgroundMode?: 'none' | 'banner' | 'custom' | 'mesh' | 'pattern' | null;
   pageBackgroundUrl?: string | null;
   pageBackgroundPattern?: 'dots' | 'grid' | 'topography' | 'noise' | null;
   pageBackgroundBlur?: number | null; // 0 to 40 px

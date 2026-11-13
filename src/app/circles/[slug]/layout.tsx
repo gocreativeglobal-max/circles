@@ -32,17 +32,32 @@ export default async function CircleLayout({
     circle.visibility === 'private' ? Lock : circle.visibility === 'discoverable_approval' ? Shield : Globe;
   const memberCount = circle.member_count ?? 1;
   const themeStyles = generateCircleThemeStyles(circle.theme_settings);
-  const ambientBackgroundStyle = getPageAmbientBackgroundStyle(circle.theme_settings);
+  const ambientBackgroundStyle = getPageAmbientBackgroundStyle(
+    circle.theme_settings,
+    circle.cover_url
+  );
 
   return (
-    <div className="relative min-h-[calc(100vh-4rem)] bg-[#FAF9F6] overflow-x-hidden" style={themeStyles}>
-      {/* Full-Page Ambient Wallpaper / Pattern Layer */}
+    <div
+      className={`relative min-h-[calc(100vh-4rem)] ${
+        ambientBackgroundStyle ? 'bg-stone-900' : 'bg-[#FAF9F6]'
+      } overflow-x-hidden`}
+      style={themeStyles}
+    >
+      {/* Full-Page Ambient Wallpaper / Pattern / Banner Background Layer */}
       {ambientBackgroundStyle && (
-        <div
-          className="pointer-events-none fixed inset-0 z-0 transition-opacity duration-700"
-          style={ambientBackgroundStyle}
-          aria-hidden="true"
-        />
+        <>
+          <div
+            className="pointer-events-none fixed inset-0 z-0 transition-opacity duration-700"
+            style={ambientBackgroundStyle}
+            aria-hidden="true"
+          />
+          {/* Subtle contrast wash for comfortable text and card readability */}
+          <div
+            className="pointer-events-none fixed inset-0 z-0 bg-black/25 backdrop-blur-[0.5px]"
+            aria-hidden="true"
+          />
+        </>
       )}
 
       {/* Slim circle header */}

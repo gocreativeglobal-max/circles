@@ -918,6 +918,22 @@ export function CircleStudioClient({
                     placeholder="https://example.com/banner.jpg"
                     className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs text-stone-900 placeholder-stone-400 focus:border-black focus:outline-hidden"
                   />
+                  {/* Quick Shortcut to use Banner as Background */}
+                  <div className="pt-1">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setThemeSettings((prev) => ({
+                          ...prev,
+                          pageBackgroundMode: 'banner',
+                          cardStyle: 'frosted',
+                        }))
+                      }
+                      className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-stone-800 hover:text-black underline underline-offset-2"
+                    >
+                      <span>✨ Use this banner as full community background</span>
+                    </button>
+                  </div>
                 </div>
 
                 <div className="space-y-1.5">
@@ -950,20 +966,21 @@ export function CircleStudioClient({
             <div className="border-t border-stone-100 pt-5 space-y-4">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-stone-800">
-                  3. Full-Page Ambient Wallpaper & Canvas
+                  3. Community Background Image & Atmosphere
                 </label>
                 <p className="text-[11px] text-stone-500 mt-0.5">
-                  Give your entire community an immersive atmospheric backdrop behind all feeds and sidebars.
+                  Set a full background image across your entire community canvas behind all posts, feeds, and sidebars.
                 </p>
               </div>
 
               {/* Mode Toggle */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
                 {[
-                  { id: 'none', label: 'Off (Clean Canvas)', desc: 'Standard solid surface' },
+                  { id: 'none', label: 'Off', desc: 'Clean solid canvas' },
+                  { id: 'banner', label: 'Use Hero Banner', desc: 'Mirror banner as full background' },
+                  { id: 'custom', label: 'Custom Image', desc: 'Dedicated background image' },
                   { id: 'mesh', label: 'Generative Mesh', desc: 'Fluid multi-color gradient' },
                   { id: 'pattern', label: 'Subtle Pattern', desc: 'Geometric texture' },
-                  { id: 'custom', label: 'Custom Wallpaper', desc: 'Custom image backdrop' },
                 ].map((mode) => {
                   const isSel = (themeSettings.pageBackgroundMode || 'none') === mode.id;
                   return (
@@ -974,6 +991,7 @@ export function CircleStudioClient({
                         setThemeSettings((prev) => ({
                           ...prev,
                           pageBackgroundMode: mode.id as CircleThemeSettings['pageBackgroundMode'],
+                          cardStyle: mode.id !== 'none' ? 'frosted' : prev.cardStyle,
                         }))
                       }
                       className={`p-3 text-left rounded-xl border transition-all ${
@@ -1178,7 +1196,7 @@ export function CircleStudioClient({
               <div className="relative overflow-hidden rounded-2xl border border-stone-200 bg-[#FAF9F6] p-6 space-y-5">
                 {/* Simulated Ambient Layer */}
                 {(() => {
-                  const amb = getPageAmbientBackgroundStyle(themeSettings);
+                  const amb = getPageAmbientBackgroundStyle(themeSettings, initialCircle.cover_url);
                   return amb ? (
                     <div className="pointer-events-none absolute inset-0 z-0" style={amb} aria-hidden="true" />
                   ) : null;

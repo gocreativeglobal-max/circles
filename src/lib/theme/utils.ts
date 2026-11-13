@@ -172,22 +172,37 @@ export function generateCircleThemeStyles(
 }
 
 export function getPageAmbientBackgroundStyle(
-  settings?: CircleThemeSettings | null
+  settings?: CircleThemeSettings | null,
+  fallbackCoverUrl?: string | null
 ): React.CSSProperties | null {
   if (!settings || !settings.pageBackgroundMode || settings.pageBackgroundMode === 'none') {
     return null;
   }
 
   const mode = settings.pageBackgroundMode;
-  const blurPx = settings.pageBackgroundBlur ?? 16;
-  const opacity = settings.pageBackgroundOpacity ?? 0.15;
+  const blurPx = settings.pageBackgroundBlur ?? 0;
+  const opacity = settings.pageBackgroundOpacity ?? 0.85;
+
+  if (mode === 'banner') {
+    const bannerUrl = getEffectiveBannerUrl(settings, fallbackCoverUrl);
+    if (!bannerUrl) return null;
+    return {
+      backgroundImage: `url(${bannerUrl})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center top',
+      backgroundAttachment: 'fixed',
+      filter: blurPx > 0 ? `blur(${blurPx}px)` : undefined,
+      opacity,
+    };
+  }
 
   if (mode === 'custom' && settings.pageBackgroundUrl) {
     return {
       backgroundImage: `url(${settings.pageBackgroundUrl})`,
       backgroundSize: 'cover',
-      backgroundPosition: 'center',
-      filter: `blur(${blurPx}px)`,
+      backgroundPosition: 'center top',
+      backgroundAttachment: 'fixed',
+      filter: blurPx > 0 ? `blur(${blurPx}px)` : undefined,
       opacity,
     };
   }
@@ -197,8 +212,8 @@ export function getPageAmbientBackgroundStyle(
     const accent = settings.accentColor || '#ec4899';
     return {
       backgroundImage: `radial-gradient(at 0% 0%, ${primary} 0px, transparent 50%), radial-gradient(at 100% 100%, ${accent} 0px, transparent 50%), radial-gradient(at 50% 50%, ${primary}40 0px, transparent 60%)`,
-      filter: `blur(${blurPx}px)`,
-      opacity: Math.max(0.12, opacity),
+      filter: blurPx > 0 ? `blur(${blurPx}px)` : 'blur(20px)',
+      opacity: Math.max(0.15, opacity),
     };
   }
 
