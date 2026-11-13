@@ -927,7 +927,7 @@ export function CircleStudioClient({
                       }
                       className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-stone-800 hover:text-black underline underline-offset-2"
                     >
-                      <span>✨ Use this banner as full community background</span>
+                      <span>✨ Enable soft ambient glow from this banner</span>
                     </button>
                   </div>
                 </div>
@@ -958,25 +958,24 @@ export function CircleStudioClient({
               </div>
             </div>
 
-            {/* 3. Full-Page Ambient Wallpaper & Atmosphere */}
+            {/* 3. Community Ambient Atmosphere */}
             <div className="border-t border-stone-100 pt-5 space-y-4">
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-stone-800">
-                  3. Community Background Image & Atmosphere
+                  3. Minimal Background & Ambient Glow
                 </label>
                 <p className="text-[11px] text-stone-500 mt-0.5">
-                  Set a full background image across your entire community canvas behind all posts, feeds, and sidebars.
+                  Subtle, distraction-free atmosphere. Never interferes with post readability.
                 </p>
               </div>
 
-              {/* Mode Toggle */}
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+              {/* Minimal Atmosphere Options */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                 {[
-                  { id: 'none', label: 'Off', desc: 'Clean solid canvas' },
-                  { id: 'banner', label: 'Use Hero Banner', desc: 'Mirror banner as full background' },
-                  { id: 'custom', label: 'Custom Image', desc: 'Dedicated background image' },
-                  { id: 'mesh', label: 'Generative Mesh', desc: 'Fluid multi-color gradient' },
-                  { id: 'pattern', label: 'Subtle Pattern', desc: 'Geometric texture' },
+                  { id: 'none', label: 'Clean Canvas', desc: 'Minimalist neutral stone surface' },
+                  { id: 'banner', label: 'Soft Banner Glow', desc: 'Gentle top aura derived from hero banner' },
+                  { id: 'pattern', label: 'Architectural Grid', desc: 'Subtle technical texture' },
+                  { id: 'custom', label: 'Custom Artwork', desc: 'Dedicated image with auto-calibrated fade' },
                 ].map((mode) => {
                   const isSel = (themeSettings.pageBackgroundMode || 'none') === mode.id;
                   return (
@@ -987,11 +986,13 @@ export function CircleStudioClient({
                         setThemeSettings((prev) => ({
                           ...prev,
                           pageBackgroundMode: mode.id as CircleThemeSettings['pageBackgroundMode'],
+                          pageBackgroundPattern:
+                            mode.id === 'pattern' ? prev.pageBackgroundPattern || 'grid' : prev.pageBackgroundPattern,
                         }))
                       }
                       className={`p-3 text-left rounded-xl border transition-all ${
                         isSel
-                          ? 'border-black bg-stone-50 ring-1 ring-black shadow-2xs'
+                          ? 'border-black bg-stone-50 ring-1 ring-black shadow-2xs font-semibold'
                           : 'border-stone-200 hover:border-stone-300'
                       }`}
                     >
@@ -1002,18 +1003,18 @@ export function CircleStudioClient({
                 })}
               </div>
 
-              {/* Conditional Options for Pattern */}
+              {/* Pattern sub-options when 'pattern' is selected */}
               {themeSettings.pageBackgroundMode === 'pattern' && (
                 <div className="space-y-1.5 pt-1">
-                  <label className="text-[11px] font-bold text-stone-700">Pattern Style</label>
+                  <label className="text-[11px] font-bold text-stone-700">Texture Style</label>
                   <div className="flex flex-wrap gap-2">
                     {[
-                      { id: 'dots', label: 'Dot Matrix' },
                       { id: 'grid', label: 'Micro Grid' },
+                      { id: 'dots', label: 'Dot Matrix' },
                       { id: 'topography', label: 'Topography Lines' },
                       { id: 'noise', label: 'Subtle Grain' },
                     ].map((pat) => {
-                      const isSel = (themeSettings.pageBackgroundPattern || 'dots') === pat.id;
+                      const isSel = (themeSettings.pageBackgroundPattern || 'grid') === pat.id;
                       return (
                         <button
                           key={pat.id}
@@ -1036,10 +1037,10 @@ export function CircleStudioClient({
                 </div>
               )}
 
-              {/* Conditional Options for Custom Wallpaper */}
+              {/* Custom Image input when 'custom' is selected */}
               {themeSettings.pageBackgroundMode === 'custom' && (
                 <div className="space-y-1.5 pt-1">
-                  <label className="text-[11px] font-bold text-stone-700">Custom Wallpaper Image URL</label>
+                  <label className="text-[11px] font-bold text-stone-700">Custom Artwork Image URL</label>
                   <input
                     type="url"
                     value={themeSettings.pageBackgroundUrl || ''}
@@ -1049,60 +1050,12 @@ export function CircleStudioClient({
                         pageBackgroundUrl: e.target.value.trim() || null,
                       }))
                     }
-                    placeholder="https://example.com/wallpaper.jpg"
+                    placeholder="https://example.com/artwork.jpg"
                     className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs text-stone-900 placeholder-stone-400 focus:border-black focus:outline-hidden"
                   />
-                </div>
-              )}
-
-              {/* Sliders for Blur & Opacity (when wallpaper/mesh active) */}
-              {themeSettings.pageBackgroundMode && themeSettings.pageBackgroundMode !== 'none' && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-bold text-stone-700">Ambient Blur</label>
-                      <span className="text-[11px] font-mono font-bold text-stone-600">
-                        {themeSettings.pageBackgroundBlur ?? 16}px
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0"
-                      max="40"
-                      step="2"
-                      value={themeSettings.pageBackgroundBlur ?? 16}
-                      onChange={(e) =>
-                        setThemeSettings((prev) => ({
-                          ...prev,
-                          pageBackgroundBlur: parseInt(e.target.value, 10),
-                        }))
-                      }
-                      className="w-full accent-black cursor-pointer"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <label className="text-[11px] font-bold text-stone-700">Ambient Opacity</label>
-                      <span className="text-[11px] font-mono font-bold text-stone-600">
-                        {Math.round((themeSettings.pageBackgroundOpacity ?? 0.15) * 100)}%
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min="0.05"
-                      max="0.6"
-                      step="0.05"
-                      value={themeSettings.pageBackgroundOpacity ?? 0.15}
-                      onChange={(e) =>
-                        setThemeSettings((prev) => ({
-                          ...prev,
-                          pageBackgroundOpacity: parseFloat(e.target.value),
-                        }))
-                      }
-                      className="w-full accent-black cursor-pointer"
-                    />
-                  </div>
+                  <p className="text-[10px] text-stone-500">
+                    Image is automatically softened with an ambient blur and top-to-bottom fade so discussions stay crisp and legible.
+                  </p>
                 </div>
               )}
             </div>
@@ -1119,7 +1072,7 @@ export function CircleStudioClient({
                 {(() => {
                   const amb = getPageAmbientBackgroundStyle(themeSettings, initialCircle.cover_url);
                   return amb ? (
-                    <div className="pointer-events-none absolute inset-0 z-0" style={amb} aria-hidden="true" />
+                    <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" style={amb} aria-hidden="true" />
                   ) : null;
                 })()}
 

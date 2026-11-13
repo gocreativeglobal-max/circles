@@ -46,18 +46,11 @@ export default async function CircleLayout({
     >
       {/* Full-Page Ambient Wallpaper / Pattern / Banner Background Layer */}
       {ambientBackgroundStyle && (
-        <>
-          <div
-            className="pointer-events-none fixed inset-0 z-0 transition-opacity duration-700"
-            style={ambientBackgroundStyle}
-            aria-hidden="true"
-          />
-          {/* Subtle contrast wash for comfortable text and card readability */}
-          <div
-            className="pointer-events-none fixed inset-0 z-0 bg-black/25 backdrop-blur-[0.5px]"
-            aria-hidden="true"
-          />
-        </>
+        <div
+          className="pointer-events-none fixed inset-0 z-0 overflow-hidden transition-opacity duration-700"
+          style={ambientBackgroundStyle}
+          aria-hidden="true"
+        />
       )}
 
       {/* Slim circle header */}

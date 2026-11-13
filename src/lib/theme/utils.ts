@@ -178,9 +178,8 @@ export function getPageAmbientBackgroundStyle(
   }
 
   const mode = settings.pageBackgroundMode;
-  const blurPx = settings.pageBackgroundBlur ?? 0;
-  const opacity = settings.pageBackgroundOpacity ?? 0.85;
 
+  // 1. Soft Banner Aura: Ambient glow subtly derived from community hero banner, fading into canvas
   if (mode === 'banner') {
     const bannerUrl = getEffectiveBannerUrl(settings, fallbackCoverUrl);
     if (!bannerUrl) return null;
@@ -188,40 +187,54 @@ export function getPageAmbientBackgroundStyle(
       backgroundImage: `url(${bannerUrl})`,
       backgroundSize: 'cover',
       backgroundPosition: 'center top',
-      backgroundAttachment: 'fixed',
-      filter: blurPx > 0 ? `blur(${blurPx}px)` : undefined,
-      opacity,
+      backgroundRepeat: 'no-repeat',
+      filter: 'blur(36px)',
+      transform: 'scale(1.1)',
+      opacity: 0.22,
+      WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.5) 260px, rgba(0,0,0,0) 520px)',
+      maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.5) 260px, rgba(0,0,0,0) 520px)',
     };
   }
 
+  // 2. Custom Artwork: Carefully clamped and masked so it stays a soft, minimal backdrop
   if (mode === 'custom' && settings.pageBackgroundUrl) {
     return {
       backgroundImage: `url(${settings.pageBackgroundUrl})`,
       backgroundSize: 'cover',
       backgroundPosition: 'center top',
-      backgroundAttachment: 'fixed',
-      filter: blurPx > 0 ? `blur(${blurPx}px)` : undefined,
-      opacity,
+      backgroundRepeat: 'no-repeat',
+      filter: 'blur(32px)',
+      transform: 'scale(1.1)',
+      opacity: 0.16,
+      WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.5) 260px, rgba(0,0,0,0) 520px)',
+      maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0.5) 260px, rgba(0,0,0,0) 520px)',
     };
   }
 
+  // 3. Generative Mesh: Soft fluid ambient glow with top fade mask
   if (mode === 'mesh') {
     const primary = settings.primaryColor || '#6366f1';
     const accent = settings.accentColor || '#ec4899';
     return {
-      backgroundImage: `radial-gradient(at 0% 0%, ${primary} 0px, transparent 50%), radial-gradient(at 100% 100%, ${accent} 0px, transparent 50%), radial-gradient(at 50% 50%, ${primary}40 0px, transparent 60%)`,
-      filter: blurPx > 0 ? `blur(${blurPx}px)` : 'blur(20px)',
-      opacity: Math.max(0.15, opacity),
+      backgroundImage: `radial-gradient(at 0% 0%, ${primary} 0px, transparent 50%), radial-gradient(at 100% 40%, ${accent} 0px, transparent 50%), radial-gradient(at 50% 20%, ${primary}40 0px, transparent 60%)`,
+      filter: 'blur(40px)',
+      transform: 'scale(1.1)',
+      opacity: 0.14,
+      WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 480px)',
+      maskImage: 'linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,0) 480px)',
     };
   }
 
+  // 4. Subtle Patterns: Lightweight geometric textures (dots, grid) with graceful fade
   if (mode === 'pattern') {
     const patternKey = settings.pageBackgroundPattern || 'dots';
     const patternSvg = WALLPAPER_PATTERNS[patternKey] || WALLPAPER_PATTERNS.dots;
     return {
       backgroundImage: `url("${patternSvg}")`,
       backgroundRepeat: 'repeat',
-      opacity: Math.max(0.4, opacity * 2.5),
+      opacity: 0.5,
+      WebkitMaskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.4) 350px, rgba(0,0,0,0.08) 700px)',
+      maskImage: 'linear-gradient(to bottom, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.4) 350px, rgba(0,0,0,0.08) 700px)',
     };
   }
 
