@@ -28,7 +28,9 @@ import {
   THEME_PRESETS,
   getContrastColor,
   getEffectiveBannerUrl,
+  getCommunityCanvasStyle,
 } from '@/lib/theme/utils';
+import { CANVAS_TONE_PRESETS } from '@/lib/theme/doodles';
 import {
   HERO_BANNER_PRESETS,
 } from '@/lib/theme/background-presets';
@@ -78,6 +80,8 @@ export function CircleStudioClient({
     coverUrl: initialCircle.theme_settings?.coverUrl || initialCircle.cover_url || null,
     coverPreset: initialCircle.theme_settings?.coverPreset || null,
     coverOverlayOpacity: initialCircle.theme_settings?.coverOverlayOpacity ?? 0.6,
+    doodlePatternEnabled: Boolean(initialCircle.theme_settings?.doodlePatternEnabled),
+    canvasColor: initialCircle.theme_settings?.canvasColor || '#FAF9F6',
   });
   const [themeSaving, setThemeSaving] = useState(false);
   const [themeSuccess, setThemeSuccess] = useState(false);
@@ -937,14 +941,96 @@ export function CircleStudioClient({
               </div>
             </div>
 
-            {/* 3. Live Interactive Sandbox Preview */}
+            {/* 3. Community Canvas Atmosphere (WhatsApp-Style Subtle Doodles) */}
+            <div className="border-t border-stone-100 pt-5 space-y-4">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-800">
+                    3. Community Canvas Doodles (WhatsApp Style)
+                  </label>
+                  <p className="text-[11px] text-stone-500 mt-0.5">
+                    Cozy, subtle hairline community doodles behind discussion feeds. Default is clean off-white canvas without doodles.
+                  </p>
+                </div>
+
+                {/* Toggle Switch */}
+                <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(themeSettings.doodlePatternEnabled)}
+                    onChange={(e) =>
+                      setThemeSettings((prev) => ({
+                        ...prev,
+                        doodlePatternEnabled: e.target.checked,
+                      }))
+                    }
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-stone-200 peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-stone-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-black" />
+                </label>
+              </div>
+
+              {/* Curated Pastel Canvas Tones (Visible when toggled on) */}
+              {themeSettings.doodlePatternEnabled && (
+                <div className="space-y-2 pt-2 border-t border-stone-100">
+                  <label className="text-[11px] font-bold text-stone-700">Canvas Tone</label>
+                  <div className="grid grid-cols-2 sm:grid-cols-6 gap-2.5">
+                    {CANVAS_TONE_PRESETS.map((tone) => {
+                      const isSel = (themeSettings.canvasColor || '#FAF9F6').toLowerCase() === tone.hex.toLowerCase();
+                      return (
+                        <button
+                          key={tone.id}
+                          type="button"
+                          onClick={() =>
+                            setThemeSettings((prev) => ({
+                              ...prev,
+                              canvasColor: tone.hex,
+                            }))
+                          }
+                          className={`p-2.5 rounded-xl border text-left transition-all ${
+                            isSel
+                              ? 'border-black ring-2 ring-black/10 shadow-xs'
+                              : 'border-stone-200 hover:border-stone-300'
+                          }`}
+                          style={{ backgroundColor: tone.hex }}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span
+                              className={`h-3 w-3 rounded-full border ${
+                                tone.isDark ? 'border-stone-600 bg-stone-900' : 'border-stone-300 bg-white'
+                              }`}
+                            />
+                            {isSel && (
+                              <span className={`text-[10px] font-bold ${tone.isDark ? 'text-white' : 'text-stone-900'}`}>
+                                ✓
+                              </span>
+                            )}
+                          </div>
+                          <p className={`text-xs font-bold ${tone.isDark ? 'text-white' : 'text-stone-900'}`}>
+                            {tone.name}
+                          </p>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[10px] text-stone-500">
+                    Hand-drawn community vector icons (books, coffee, speech bubbles, lightbulbs) rendered at 7% hairline opacity.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* 4. Live Interactive Sandbox Preview */}
             <div className="border-t border-stone-100 pt-5 space-y-3">
               <label className="block text-xs font-bold uppercase tracking-wider text-stone-800">
-                3. Live Community Appearance Sandbox
+                4. Live Community Appearance Sandbox
               </label>
 
               {/* Sandbox Container */}
-              <div className="relative overflow-hidden rounded-2xl border border-stone-200 bg-[#FAF9F6] p-6 space-y-5">
+              <div
+                className="relative overflow-hidden rounded-2xl border border-stone-200 p-6 space-y-5 transition-colors"
+                style={getCommunityCanvasStyle(themeSettings)}
+              >
                 {/* Simulated Hero Banner */}
                 {(() => {
                   const banner = getEffectiveBannerUrl(themeSettings, initialCircle.cover_url);

@@ -6,7 +6,7 @@ import { getCircleBySlugOrId } from '@/features/circles/service';
 import { getCircleNavigation } from '@/features/capabilities/service';
 import { CircleMembershipActions } from '@/components/circles/circle-membership-actions';
 import { CircleCollapsibleLayout } from '@/components/circles/circle-collapsible-layout';
-import { generateCircleThemeStyles } from '@/lib/theme/utils';
+import { generateCircleThemeStyles, getCommunityCanvasStyle } from '@/lib/theme/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,11 +32,12 @@ export default async function CircleLayout({
     circle.visibility === 'private' ? Lock : circle.visibility === 'discoverable_approval' ? Shield : Globe;
   const memberCount = circle.member_count ?? 1;
   const themeStyles = generateCircleThemeStyles(circle.theme_settings);
+  const canvasStyle = getCommunityCanvasStyle(circle.theme_settings);
 
   return (
     <div
-      className="relative min-h-[calc(100vh-4rem)] bg-[#FAF9F6] overflow-x-hidden"
-      style={themeStyles}
+      className="relative min-h-[calc(100vh-4rem)] overflow-x-hidden transition-colors"
+      style={{ ...themeStyles, ...canvasStyle }}
     >
 
       {/* Slim circle header */}

@@ -1,6 +1,7 @@
 import React from 'react';
 import { CircleThemeSettings } from '@/types/domain';
 import { getPresetBannerUrl } from './background-presets';
+import { getCommunityDoodleSvg } from './doodles';
 
 export function hexToRgb(hexStr?: string | null): { r: number; g: number; b: number } | null {
   if (!hexStr) return null;
@@ -72,6 +73,8 @@ export const DEFAULT_THEME_SETTINGS: CircleThemeSettings = {
   brandMode: 'system',
   borderRadius: 'md',
   coverOverlayOpacity: 0.5,
+  doodlePatternEnabled: false,
+  canvasColor: '#FAF9F6',
   pageBackgroundMode: 'none',
   pageBackgroundBlur: 16,
   pageBackgroundOpacity: 0.15,
@@ -166,5 +169,31 @@ export function generateCircleThemeStyles(
     '--circle-card-bg': '#ffffff',
     '--circle-card-border': 'rgba(231, 229, 228, 0.8)',
     '--circle-card-backdrop': 'none',
+  };
+}
+
+/**
+ * Returns background styling for the community canvas (WhatsApp-style subtle doodles & pastel tint).
+ * By default (doodlePatternEnabled=false), returns clean #FAF9F6 without any background pattern.
+ */
+export function getCommunityCanvasStyle(
+  settings?: CircleThemeSettings | null
+): React.CSSProperties {
+  const canvasHex = settings?.canvasColor || '#FAF9F6';
+  const isEnabled = Boolean(settings?.doodlePatternEnabled);
+
+  if (!isEnabled) {
+    return {
+      backgroundColor: canvasHex,
+    };
+  }
+
+  const isDark = canvasHex === '#18181B' || canvasHex.toLowerCase() === '#18181b';
+  const doodleSvg = getCommunityDoodleSvg(isDark);
+
+  return {
+    backgroundColor: canvasHex,
+    backgroundImage: `url("${doodleSvg}")`,
+    backgroundRepeat: 'repeat',
   };
 }
