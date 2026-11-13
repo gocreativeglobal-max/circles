@@ -1,5 +1,6 @@
 import React from 'react';
 import { CircleThemeSettings } from '@/types/domain';
+import { getPresetBannerUrl, WALLPAPER_PATTERNS } from './background-presets';
 
 export function hexToRgb(hexStr?: string | null): { r: number; g: number; b: number } | null {
   if (!hexStr) return null;
@@ -60,6 +61,9 @@ export interface CircleThemeVariables extends React.CSSProperties {
   '--circle-accent-fg'?: string;
   '--circle-accent-subtle'?: string;
   '--circle-radius'?: string;
+  '--circle-card-bg'?: string;
+  '--circle-card-border'?: string;
+  '--circle-card-backdrop'?: string;
 }
 
 export const DEFAULT_THEME_SETTINGS: CircleThemeSettings = {
@@ -67,6 +71,11 @@ export const DEFAULT_THEME_SETTINGS: CircleThemeSettings = {
   accentColor: '#2563eb',  // Blue 600
   brandMode: 'system',
   borderRadius: 'md',
+  coverOverlayOpacity: 0.5,
+  pageBackgroundMode: 'none',
+  pageBackgroundBlur: 16,
+  pageBackgroundOpacity: 0.15,
+  cardStyle: 'solid',
 };
 
 export const THEME_PRESETS: Array<{
@@ -120,6 +129,18 @@ export const THEME_PRESETS: Array<{
   },
 ];
 
+export function getEffectiveBannerUrl(
+  settings?: CircleThemeSettings | null,
+  fallbackUrl?: string | null
+): string | null {
+  if (settings?.coverUrl) return settings.coverUrl;
+  if (settings?.coverPreset) {
+    const presetUrl = getPresetBannerUrl(settings.coverPreset);
+    if (presetUrl) return presetUrl;
+  }
+  return fallbackUrl || null;
+}
+
 export function generateCircleThemeStyles(
   settings?: CircleThemeSettings | null
 ): CircleThemeVariables {
@@ -133,6 +154,8 @@ export function generateCircleThemeStyles(
   const primaryFg = getContrastColor(primary);
   const accentFg = getContrastColor(accent);
 
+  const isFrosted = settings?.cardStyle === 'frosted';
+
   return {
     '--circle-primary': primary,
     '--circle-primary-fg': primaryFg,
@@ -142,5 +165,52 @@ export function generateCircleThemeStyles(
     '--circle-accent-fg': accentFg,
     '--circle-accent-subtle': `rgba(${rgbAccent.r}, ${rgbAccent.g}, ${rgbAccent.b}, 0.1)`,
     '--circle-radius': radius,
+    '--circle-card-bg': isFrosted ? 'rgba(255, 255, 255, 0.82)' : '#ffffff',
+    '--circle-card-border': isFrosted ? 'rgba(255, 255, 255, 0.45)' : 'rgba(231, 229, 228, 0.8)',
+    '--circle-card-backdrop': isFrosted ? 'blur(12px)' : 'none',
   };
+}
+
+export function getPageAmbientBackgroundStyle(
+  settings?: CircleThemeSettings | null
+): React.CSSProperties | null {
+  if (!settings || !settings.pageBackgroundMode || settings.pageBackgroundMode === 'none') {
+    return null;
+  }
+
+  const mode = settings.pageBackgroundMode;
+  const blurPx = settings.pageBackgroundBlur ?? 16;
+  const opacity = settings.pageBackgroundOpacity ?? 0.15;
+
+  if (mode === 'custom' && settings.pageBackgroundUrl) {
+    return {
+      backgroundImage: `url(${settings.pageBackgroundUrl})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      filter: `blur(${blurPx}px)`,
+      opacity,
+    };
+  }
+
+  if (mode === 'mesh') {
+    const primary = settings.primaryColor || '#6366f1';
+    const accent = settings.accentColor || '#ec4899';
+    return {
+      backgroundImage: `radial-gradient(at 0% 0%, ${primary} 0px, transparent 50%), radial-gradient(at 100% 100%, ${accent} 0px, transparent 50%), radial-gradient(at 50% 50%, ${primary}40 0px, transparent 60%)`,
+      filter: `blur(${blurPx}px)`,
+      opacity: Math.max(0.12, opacity),
+    };
+  }
+
+  if (mode === 'pattern') {
+    const patternKey = settings.pageBackgroundPattern || 'dots';
+    const patternSvg = WALLPAPER_PATTERNS[patternKey] || WALLPAPER_PATTERNS.dots;
+    return {
+      backgroundImage: `url("${patternSvg}")`,
+      backgroundRepeat: 'repeat',
+      opacity: Math.max(0.4, opacity * 2.5),
+    };
+  }
+
+  return null;
 }

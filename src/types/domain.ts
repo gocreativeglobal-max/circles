@@ -53,6 +53,18 @@ export interface CircleThemeSettings {
   accentColor?: string | null;
   brandMode?: 'light' | 'dark' | 'system' | null;
   borderRadius?: 'none' | 'sm' | 'md' | 'lg' | 'full' | null;
+
+  // Background Imagery & Atmosphere
+  coverUrl?: string | null;
+  coverPreset?: string | null;
+  coverOverlayOpacity?: number | null; // 0.1 to 0.9
+
+  pageBackgroundMode?: 'none' | 'mesh' | 'pattern' | 'custom' | null;
+  pageBackgroundUrl?: string | null;
+  pageBackgroundPattern?: 'dots' | 'grid' | 'topography' | 'noise' | null;
+  pageBackgroundBlur?: number | null; // 0 to 40 px
+  pageBackgroundOpacity?: number | null; // 0.05 to 0.8
+  cardStyle?: 'solid' | 'frosted' | null; // Frosted glass with backdrop blur
 }
 
 export interface Circle {

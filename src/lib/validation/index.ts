@@ -81,6 +81,18 @@ export const circleThemeSettingsSchema = z.object({
     .optional(),
   brandMode: z.enum(['light', 'dark', 'system']).nullable().optional(),
   borderRadius: z.enum(['none', 'sm', 'md', 'lg', 'full']).nullable().optional(),
+
+  // Background Imagery & Atmosphere
+  coverUrl: z.string().trim().url().max(1000).nullable().optional(),
+  coverPreset: z.string().trim().max(100).nullable().optional(),
+  coverOverlayOpacity: z.number().min(0).max(1).nullable().optional(),
+
+  pageBackgroundMode: z.enum(['none', 'mesh', 'pattern', 'custom']).nullable().optional(),
+  pageBackgroundUrl: z.string().trim().url().max(1000).nullable().optional(),
+  pageBackgroundPattern: z.enum(['dots', 'grid', 'topography', 'noise']).nullable().optional(),
+  pageBackgroundBlur: z.number().min(0).max(100).nullable().optional(),
+  pageBackgroundOpacity: z.number().min(0).max(1).nullable().optional(),
+  cardStyle: z.enum(['solid', 'frosted']).nullable().optional(),
 });
 
 export const updateCircleSchema = z.object({

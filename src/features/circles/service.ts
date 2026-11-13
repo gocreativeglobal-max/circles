@@ -260,7 +260,11 @@ export async function updateCircle(
         updates.category ?? existing.category,
         updates.location !== undefined ? updates.location : existing.location,
         updates.avatarUrl !== undefined ? updates.avatarUrl : existing.avatar_url,
-        updates.coverUrl !== undefined ? updates.coverUrl : existing.cover_url,
+        updates.coverUrl !== undefined
+          ? updates.coverUrl
+          : updates.themeSettings?.coverUrl !== undefined
+            ? updates.themeSettings.coverUrl
+            : existing.cover_url,
         visibility,
         membershipPolicy,
         JSON.stringify(nextThemeSettings || {}),

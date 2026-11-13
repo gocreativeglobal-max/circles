@@ -6,7 +6,7 @@ import { getCircleBySlugOrId } from '@/features/circles/service';
 import { getCircleNavigation } from '@/features/capabilities/service';
 import { CircleMembershipActions } from '@/components/circles/circle-membership-actions';
 import { CircleCollapsibleLayout } from '@/components/circles/circle-collapsible-layout';
-import { generateCircleThemeStyles } from '@/lib/theme/utils';
+import { generateCircleThemeStyles, getPageAmbientBackgroundStyle } from '@/lib/theme/utils';
 
 export const dynamic = 'force-dynamic';
 
@@ -32,11 +32,21 @@ export default async function CircleLayout({
     circle.visibility === 'private' ? Lock : circle.visibility === 'discoverable_approval' ? Shield : Globe;
   const memberCount = circle.member_count ?? 1;
   const themeStyles = generateCircleThemeStyles(circle.theme_settings);
+  const ambientBackgroundStyle = getPageAmbientBackgroundStyle(circle.theme_settings);
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-[#FAF9F6]" style={themeStyles}>
+    <div className="relative min-h-[calc(100vh-4rem)] bg-[#FAF9F6] overflow-x-hidden" style={themeStyles}>
+      {/* Full-Page Ambient Wallpaper / Pattern Layer */}
+      {ambientBackgroundStyle && (
+        <div
+          className="pointer-events-none fixed inset-0 z-0 transition-opacity duration-700"
+          style={ambientBackgroundStyle}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Slim circle header */}
-      <header className="border-b border-stone-200/80 bg-white">
+      <header className="relative z-10 border-b border-stone-200/80 bg-white/95 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <div
@@ -64,9 +74,11 @@ export default async function CircleLayout({
         </div>
       </header>
 
-      <CircleCollapsibleLayout circle={circle} navigation={navigation} isStaff={isStaff}>
-        {children}
-      </CircleCollapsibleLayout>
+      <div className="relative z-10">
+        <CircleCollapsibleLayout circle={circle} navigation={navigation} isStaff={isStaff}>
+          {children}
+        </CircleCollapsibleLayout>
+      </div>
     </div>
   );
 }

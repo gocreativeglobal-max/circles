@@ -11,6 +11,7 @@ import {
   LayoutGrid,
   Link as LinkIcon,
   Mail,
+  Palette,
   Plus,
   Settings,
   Settings2,
@@ -18,13 +19,21 @@ import {
   UserCheck,
   UserPlus,
   Users,
-  Palette,
   X,
 } from 'lucide-react';
 import { StudioFinancesTab } from './studio-finances-tab';
 import { InviteModal } from './invite-modal';
 import { BACHS_ACCEPTED_CURRENCIES } from '@/lib/payments/currencies';
-import { THEME_PRESETS, getContrastColor, getRadiusValue } from '@/lib/theme/utils';
+import {
+  THEME_PRESETS,
+  getContrastColor,
+  getRadiusValue,
+  getEffectiveBannerUrl,
+  getPageAmbientBackgroundStyle,
+} from '@/lib/theme/utils';
+import {
+  HERO_BANNER_PRESETS,
+} from '@/lib/theme/background-presets';
 import {
   AuditLogItem,
   Circle,
@@ -69,6 +78,15 @@ export function CircleStudioClient({
     accentColor: initialCircle.theme_settings?.accentColor || '#2563eb',
     brandMode: initialCircle.theme_settings?.brandMode || 'system',
     borderRadius: initialCircle.theme_settings?.borderRadius || 'md',
+    coverUrl: initialCircle.theme_settings?.coverUrl || initialCircle.cover_url || null,
+    coverPreset: initialCircle.theme_settings?.coverPreset || null,
+    coverOverlayOpacity: initialCircle.theme_settings?.coverOverlayOpacity ?? 0.6,
+    pageBackgroundMode: initialCircle.theme_settings?.pageBackgroundMode || 'none',
+    pageBackgroundUrl: initialCircle.theme_settings?.pageBackgroundUrl || null,
+    pageBackgroundPattern: initialCircle.theme_settings?.pageBackgroundPattern || 'dots',
+    pageBackgroundBlur: initialCircle.theme_settings?.pageBackgroundBlur ?? 16,
+    pageBackgroundOpacity: initialCircle.theme_settings?.pageBackgroundOpacity ?? 0.15,
+    cardStyle: initialCircle.theme_settings?.cardStyle || 'solid',
   });
   const [themeSaving, setThemeSaving] = useState(false);
   const [themeSuccess, setThemeSuccess] = useState(false);
@@ -673,19 +691,19 @@ export function CircleStudioClient({
       {/* TAB: BRANDING & THEME */}
       {activeTab === 'branding' && (
         <div className="space-y-6">
-          <div className="rounded-2xl border border-stone-200/80 bg-white p-6 shadow-xs space-y-5">
+          <div className="rounded-2xl border border-stone-200/80 bg-white p-6 shadow-xs space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-base font-bold text-stone-900">
-                    Community Theme & Brand Colors
+                    Community Theme, Atmosphere & Backgrounds
                   </h3>
                   <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800">
                     All Communities • 100% Free
                   </span>
                 </div>
                 <p className="mt-1 text-xs text-stone-500 leading-relaxed max-w-2xl">
-                  Choose a signature brand palette or enter custom hex codes. Theme colors instantly customize your community avatar, navigation indicators, primary buttons, and accents.
+                  Customize your community brand palette, hero artwork, full-page ambient wallpaper, and frosted card styling.
                 </p>
               </div>
             </div>
@@ -704,10 +722,10 @@ export function CircleStudioClient({
               </div>
             )}
 
-            {/* Quick Theme Presets */}
+            {/* 1. Quick Theme Presets */}
             <div className="border-t border-stone-100 pt-5 space-y-3">
               <label className="block text-xs font-bold uppercase tracking-wider text-stone-700">
-                1. Quick Theme Presets
+                1. Brand Color Presets
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
                 {THEME_PRESETS.map((preset) => {
@@ -836,99 +854,434 @@ export function CircleStudioClient({
               </div>
             </div>
 
-            {/* Corner Radius Selection */}
-            <div className="border-t border-stone-100 pt-5 space-y-2">
-              <label className="block text-xs font-bold uppercase tracking-wider text-stone-800">
-                Corner Shape & Radius
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { id: 'none', label: 'Sharp (0px)' },
-                  { id: 'sm', label: 'Subtle (4px)' },
-                  { id: 'md', label: 'Standard (8px)' },
-                  { id: 'lg', label: 'Rounded (12px)' },
-                  { id: 'full', label: 'Pill / Full' },
-                ].map((rad) => {
-                  const isSel = (themeSettings.borderRadius || 'md') === rad.id;
+            {/* 2. Hero Banner Artwork & Overlay */}
+            <div className="border-t border-stone-100 pt-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-stone-800">
+                    2. Hero Banner Artwork & Atmospheric Overlay
+                  </label>
+                  <p className="text-[11px] text-stone-500 mt-0.5">
+                    Select a curated artwork style or provide a custom high-resolution image URL.
+                  </p>
+                </div>
+              </div>
+
+              {/* Preset Artwork Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                {HERO_BANNER_PRESETS.map((preset) => {
+                  const isSelected = themeSettings.coverPreset === preset.id && !themeSettings.coverUrl;
                   return (
                     <button
-                      key={rad.id}
+                      key={preset.id}
                       type="button"
                       onClick={() =>
                         setThemeSettings((prev) => ({
                           ...prev,
-                          borderRadius: rad.id as CircleThemeSettings['borderRadius'],
+                          coverPreset: preset.id,
+                          coverUrl: null,
                         }))
                       }
-                      className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
-                        isSel
-                          ? 'bg-black text-white shadow-2xs font-semibold'
-                          : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+                      className={`group relative overflow-hidden rounded-xl border text-left transition-all ${
+                        isSelected
+                          ? 'border-black ring-2 ring-black shadow-sm'
+                          : 'border-stone-200 hover:border-stone-400'
                       }`}
                     >
-                      {rad.label}
+                      <div
+                        className="h-20 w-full bg-cover bg-center transition-transform duration-300 group-hover:scale-105"
+                        style={{ backgroundImage: `url(${preset.url})` }}
+                      />
+                      <div className="p-2 bg-white">
+                        <p className="text-[11px] font-bold text-stone-900 truncate">{preset.name}</p>
+                        <p className="text-[9px] text-stone-400 truncate">{preset.category}</p>
+                      </div>
                     </button>
                   );
                 })}
               </div>
+
+              {/* Custom Cover Image URL & Dark Overlay Slider */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-stone-700">Custom Banner Image URL</label>
+                  <input
+                    type="url"
+                    value={themeSettings.coverUrl || ''}
+                    onChange={(e) =>
+                      setThemeSettings((prev) => ({
+                        ...prev,
+                        coverUrl: e.target.value.trim() || null,
+                        coverPreset: null,
+                      }))
+                    }
+                    placeholder="https://example.com/banner.jpg"
+                    className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs text-stone-900 placeholder-stone-400 focus:border-black focus:outline-hidden"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-stone-700">Banner Dark Overlay</label>
+                    <span className="text-[11px] font-mono font-bold text-stone-600">
+                      {Math.round((themeSettings.coverOverlayOpacity ?? 0.6) * 100)}%
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.1"
+                    max="0.9"
+                    step="0.05"
+                    value={themeSettings.coverOverlayOpacity ?? 0.6}
+                    onChange={(e) =>
+                      setThemeSettings((prev) => ({
+                        ...prev,
+                        coverOverlayOpacity: parseFloat(e.target.value),
+                      }))
+                    }
+                    className="w-full accent-black cursor-pointer"
+                  />
+                  <p className="text-[10px] text-stone-400">Controls darkness vignette for maximum text readability.</p>
+                </div>
+              </div>
             </div>
 
-            {/* Live Interactive Sandbox Preview */}
+            {/* 3. Full-Page Ambient Wallpaper & Atmosphere */}
+            <div className="border-t border-stone-100 pt-5 space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-stone-800">
+                  3. Full-Page Ambient Wallpaper & Canvas
+                </label>
+                <p className="text-[11px] text-stone-500 mt-0.5">
+                  Give your entire community an immersive atmospheric backdrop behind all feeds and sidebars.
+                </p>
+              </div>
+
+              {/* Mode Toggle */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                {[
+                  { id: 'none', label: 'Off (Clean Canvas)', desc: 'Standard solid surface' },
+                  { id: 'mesh', label: 'Generative Mesh', desc: 'Fluid multi-color gradient' },
+                  { id: 'pattern', label: 'Subtle Pattern', desc: 'Geometric texture' },
+                  { id: 'custom', label: 'Custom Wallpaper', desc: 'Custom image backdrop' },
+                ].map((mode) => {
+                  const isSel = (themeSettings.pageBackgroundMode || 'none') === mode.id;
+                  return (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      onClick={() =>
+                        setThemeSettings((prev) => ({
+                          ...prev,
+                          pageBackgroundMode: mode.id as CircleThemeSettings['pageBackgroundMode'],
+                        }))
+                      }
+                      className={`p-3 text-left rounded-xl border transition-all ${
+                        isSel
+                          ? 'border-black bg-stone-50 ring-1 ring-black shadow-2xs'
+                          : 'border-stone-200 hover:border-stone-300'
+                      }`}
+                    >
+                      <p className="text-xs font-bold text-stone-900">{mode.label}</p>
+                      <p className="text-[10px] text-stone-500 mt-0.5">{mode.desc}</p>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Conditional Options for Pattern */}
+              {themeSettings.pageBackgroundMode === 'pattern' && (
+                <div className="space-y-1.5 pt-1">
+                  <label className="text-[11px] font-bold text-stone-700">Pattern Style</label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { id: 'dots', label: 'Dot Matrix' },
+                      { id: 'grid', label: 'Micro Grid' },
+                      { id: 'topography', label: 'Topography Lines' },
+                      { id: 'noise', label: 'Subtle Grain' },
+                    ].map((pat) => {
+                      const isSel = (themeSettings.pageBackgroundPattern || 'dots') === pat.id;
+                      return (
+                        <button
+                          key={pat.id}
+                          type="button"
+                          onClick={() =>
+                            setThemeSettings((prev) => ({
+                              ...prev,
+                              pageBackgroundPattern: pat.id as CircleThemeSettings['pageBackgroundPattern'],
+                            }))
+                          }
+                          className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-all ${
+                            isSel ? 'bg-stone-900 text-white' : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+                          }`}
+                        >
+                          {pat.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Conditional Options for Custom Wallpaper */}
+              {themeSettings.pageBackgroundMode === 'custom' && (
+                <div className="space-y-1.5 pt-1">
+                  <label className="text-[11px] font-bold text-stone-700">Custom Wallpaper Image URL</label>
+                  <input
+                    type="url"
+                    value={themeSettings.pageBackgroundUrl || ''}
+                    onChange={(e) =>
+                      setThemeSettings((prev) => ({
+                        ...prev,
+                        pageBackgroundUrl: e.target.value.trim() || null,
+                      }))
+                    }
+                    placeholder="https://example.com/wallpaper.jpg"
+                    className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs text-stone-900 placeholder-stone-400 focus:border-black focus:outline-hidden"
+                  />
+                </div>
+              )}
+
+              {/* Sliders for Blur & Opacity (when wallpaper/mesh active) */}
+              {themeSettings.pageBackgroundMode && themeSettings.pageBackgroundMode !== 'none' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-stone-700">Ambient Blur</label>
+                      <span className="text-[11px] font-mono font-bold text-stone-600">
+                        {themeSettings.pageBackgroundBlur ?? 16}px
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0"
+                      max="40"
+                      step="2"
+                      value={themeSettings.pageBackgroundBlur ?? 16}
+                      onChange={(e) =>
+                        setThemeSettings((prev) => ({
+                          ...prev,
+                          pageBackgroundBlur: parseInt(e.target.value, 10),
+                        }))
+                      }
+                      className="w-full accent-black cursor-pointer"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-stone-700">Ambient Opacity</label>
+                      <span className="text-[11px] font-mono font-bold text-stone-600">
+                        {Math.round((themeSettings.pageBackgroundOpacity ?? 0.15) * 100)}%
+                      </span>
+                    </div>
+                    <input
+                      type="range"
+                      min="0.05"
+                      max="0.6"
+                      step="0.05"
+                      value={themeSettings.pageBackgroundOpacity ?? 0.15}
+                      onChange={(e) =>
+                        setThemeSettings((prev) => ({
+                          ...prev,
+                          pageBackgroundOpacity: parseFloat(e.target.value),
+                        }))
+                      }
+                      className="w-full accent-black cursor-pointer"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 4. Card Styling & Corner Radius */}
+            <div className="border-t border-stone-100 pt-5 grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Card Surface Style: Solid vs Frosted Glass */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-stone-800">
+                  Card Surface Appearance
+                </label>
+                <div className="flex gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => setThemeSettings((prev) => ({ ...prev, cardStyle: 'solid' }))}
+                    className={`flex-1 p-3 rounded-xl border text-left transition-all ${
+                      (themeSettings.cardStyle || 'solid') === 'solid'
+                        ? 'border-black bg-stone-50 ring-1 ring-black shadow-2xs font-semibold'
+                        : 'border-stone-200 hover:border-stone-300'
+                    }`}
+                  >
+                    <p className="text-xs font-bold text-stone-900">Solid White</p>
+                    <p className="text-[10px] text-stone-500 mt-0.5">Classic crisp card containers</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setThemeSettings((prev) => ({ ...prev, cardStyle: 'frosted' }))}
+                    className={`flex-1 p-3 rounded-xl border text-left transition-all ${
+                      themeSettings.cardStyle === 'frosted'
+                        ? 'border-black bg-stone-50 ring-1 ring-black shadow-2xs font-semibold'
+                        : 'border-stone-200 hover:border-stone-300'
+                    }`}
+                  >
+                    <p className="text-xs font-bold text-stone-900">Frosted Glass</p>
+                    <p className="text-[10px] text-stone-500 mt-0.5">Translucent with backdrop blur</p>
+                  </button>
+                </div>
+              </div>
+
+              {/* Corner Radius Selection */}
+              <div className="space-y-2">
+                <label className="block text-xs font-bold uppercase tracking-wider text-stone-800">
+                  Corner Shape & Radius
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { id: 'none', label: 'Sharp (0px)' },
+                    { id: 'sm', label: 'Subtle (4px)' },
+                    { id: 'md', label: 'Standard (8px)' },
+                    { id: 'lg', label: 'Rounded (12px)' },
+                    { id: 'full', label: 'Pill / Full' },
+                  ].map((rad) => {
+                    const isSel = (themeSettings.borderRadius || 'md') === rad.id;
+                    return (
+                      <button
+                        key={rad.id}
+                        type="button"
+                        onClick={() =>
+                          setThemeSettings((prev) => ({
+                            ...prev,
+                            borderRadius: rad.id as CircleThemeSettings['borderRadius'],
+                          }))
+                        }
+                        className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all ${
+                          isSel
+                            ? 'bg-black text-white shadow-2xs font-semibold'
+                            : 'bg-stone-100 text-stone-700 hover:bg-stone-200'
+                        }`}
+                      >
+                        {rad.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* 5. Live Interactive Sandbox Preview */}
             <div className="border-t border-stone-100 pt-5 space-y-3">
               <label className="block text-xs font-bold uppercase tracking-wider text-stone-800">
-                Live Community Component Preview
+                5. Live Community Appearance Sandbox
               </label>
-              <div className="rounded-xl border border-stone-200 bg-[#FAF9F6] p-5 space-y-4">
-                <div className="flex items-center justify-between border-b border-stone-200/80 bg-white p-3 rounded-xl shadow-2xs">
-                  <div className="flex items-center gap-2.5">
-                    <div
-                      className="flex h-9 w-9 items-center justify-center text-sm font-bold shadow-2xs"
+
+              {/* Sandbox Container with ambient background layer */}
+              <div className="relative overflow-hidden rounded-2xl border border-stone-200 bg-[#FAF9F6] p-6 space-y-5">
+                {/* Simulated Ambient Layer */}
+                {(() => {
+                  const amb = getPageAmbientBackgroundStyle(themeSettings);
+                  return amb ? (
+                    <div className="pointer-events-none absolute inset-0 z-0" style={amb} aria-hidden="true" />
+                  ) : null;
+                })()}
+
+                {/* Simulated Hero Banner */}
+                {(() => {
+                  const banner = getEffectiveBannerUrl(themeSettings, initialCircle.cover_url);
+                  const overlay = themeSettings.coverOverlayOpacity ?? 0.6;
+                  return (
+                    <div className="relative z-10 overflow-hidden rounded-2xl border border-stone-200/80 bg-stone-900 p-5 text-white shadow-md">
+                      <div
+                        className="absolute inset-0 bg-cover bg-center"
+                        style={{
+                          backgroundImage: banner
+                            ? `url(${banner})`
+                            : 'linear-gradient(135deg, rgba(24,24,27,0.95) 0%, rgba(9,9,11,0.98) 100%)',
+                        }}
+                      />
+                      <div
+                        className="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-950/60 to-transparent"
+                        style={{ opacity: overlay }}
+                      />
+                      <div className="relative z-10 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="flex h-12 w-12 items-center justify-center text-lg font-extrabold shadow-md border border-white/20"
+                            style={{
+                              backgroundColor: themeSettings.primaryColor || '#18181b',
+                              color: getContrastColor(themeSettings.primaryColor || '#18181b'),
+                              borderRadius: getRadiusValue(themeSettings.borderRadius),
+                            }}
+                          >
+                            {initialCircle.name.slice(0, 1).toUpperCase()}
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-extrabold text-white">{initialCircle.name}</h4>
+                            <p className="text-[11px] text-stone-300">Live Custom Theme & Atmosphere</p>
+                          </div>
+                        </div>
+
+                        <span
+                          className="px-4 py-1.5 text-xs font-bold shadow-sm"
+                          style={{
+                            backgroundColor: themeSettings.primaryColor || '#18181b',
+                            color: getContrastColor(themeSettings.primaryColor || '#18181b'),
+                            borderRadius: getRadiusValue(themeSettings.borderRadius),
+                          }}
+                        >
+                          Join Circle
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Simulated Cards (Solid vs Frosted) */}
+                <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div
+                    className={`p-4 transition-all shadow-sm ${
+                      themeSettings.cardStyle === 'frosted'
+                        ? 'border border-white/60 bg-white/80 backdrop-blur-md'
+                        : 'border border-stone-200 bg-white'
+                    }`}
+                    style={{ borderRadius: getRadiusValue(themeSettings.borderRadius) }}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold text-stone-900">Discussion Feed Card</span>
+                      <span
+                        className="px-2 py-0.5 text-[10px] font-bold uppercase"
+                        style={{
+                          backgroundColor: `${themeSettings.accentColor}18`,
+                          color: themeSettings.accentColor || '#2563eb',
+                          borderRadius: getRadiusValue(themeSettings.borderRadius),
+                        }}
+                      >
+                        Featured
+                      </span>
+                    </div>
+                    <p className="text-xs text-stone-600 line-clamp-2">
+                      Cards adopt your chosen surface style (Solid or Frosted Glass) with custom corner curvature.
+                    </p>
+                  </div>
+
+                  <div
+                    className={`p-4 transition-all shadow-sm ${
+                      themeSettings.cardStyle === 'frosted'
+                        ? 'border border-white/60 bg-white/80 backdrop-blur-md'
+                        : 'border border-stone-200 bg-white'
+                    }`}
+                    style={{ borderRadius: getRadiusValue(themeSettings.borderRadius) }}
+                  >
+                    <span className="text-xs font-bold text-stone-900 block mb-1">Active Space Pill</span>
+                    <span
+                      className="inline-block px-3 py-1 text-xs font-semibold"
                       style={{
-                        backgroundColor: themeSettings.primaryColor || '#18181b',
-                        color: getContrastColor(themeSettings.primaryColor || '#18181b'),
+                        backgroundColor: `${themeSettings.primaryColor}15`,
+                        color: themeSettings.primaryColor || '#18181b',
                         borderRadius: getRadiusValue(themeSettings.borderRadius),
                       }}
                     >
-                      {initialCircle.name.slice(0, 1).toUpperCase()}
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-bold text-stone-900">{initialCircle.name}</h4>
-                      <p className="text-[10px] text-stone-500">Live Appearance Preview</p>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    className="px-3 py-1 text-xs font-semibold shadow-2xs cursor-default"
-                    style={{
-                      backgroundColor: themeSettings.primaryColor || '#18181b',
-                      color: getContrastColor(themeSettings.primaryColor || '#18181b'),
-                      borderRadius: getRadiusValue(themeSettings.borderRadius),
-                    }}
-                  >
-                    Join Circle
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <div
-                    className="px-3 py-1 text-xs font-semibold"
-                    style={{
-                      backgroundColor: `${themeSettings.primaryColor}15`,
-                      color: themeSettings.primaryColor || '#18181b',
-                      borderRadius: getRadiusValue(themeSettings.borderRadius),
-                    }}
-                  >
-                    # general-discussion (Active Space)
-                  </div>
-                  <div
-                    className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
-                    style={{
-                      backgroundColor: `${themeSettings.accentColor}18`,
-                      color: themeSettings.accentColor || '#2563eb',
-                      borderRadius: getRadiusValue(themeSettings.borderRadius),
-                    }}
-                  >
-                    Featured Event
+                      # general-announcements
+                    </span>
                   </div>
                 </div>
               </div>
@@ -940,9 +1293,9 @@ export function CircleStudioClient({
                 type="button"
                 onClick={handleSaveTheme}
                 disabled={themeSaving}
-                className="rounded-xl bg-black px-6 py-2 text-xs font-semibold text-white shadow-xs hover:bg-zinc-800 disabled:opacity-40 transition-all active:scale-[0.98]"
+                className="rounded-xl bg-black px-6 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-zinc-800 disabled:opacity-40 transition-all active:scale-[0.98]"
               >
-                {themeSaving ? 'Saving Theme...' : 'Save Theme & Colors'}
+                {themeSaving ? 'Saving Theme...' : 'Save Theme & Atmosphere'}
               </button>
             </div>
           </div>

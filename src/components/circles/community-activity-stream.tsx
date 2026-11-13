@@ -37,6 +37,7 @@ import {
 } from '@/types/domain';
 import { ActivityStreamItem } from '@/features/circles/activity-stream';
 import { DirectMessageDrawer } from '@/components/messages/direct-message-drawer';
+import { getEffectiveBannerUrl } from '@/lib/theme/utils';
 
 export interface CommunityActivityStreamProps {
   circle: Circle;
@@ -280,20 +281,30 @@ export function CommunityActivityStream({
   const memberCount = circle.member_count ?? 1;
   const postCount = items.filter((i) => i.itemType === 'post').length;
 
+  const effectiveBanner = getEffectiveBannerUrl(circle.theme_settings, circle.cover_url);
+  const coverOverlayOpacity = circle.theme_settings?.coverOverlayOpacity ?? 0.6;
+  const isFrosted = circle.theme_settings?.cardStyle === 'frosted';
+  const cardBgClass = isFrosted
+    ? 'border border-white/60 bg-white/80 backdrop-blur-md shadow-sm'
+    : 'border border-stone-200 bg-white shadow-sm';
+
   return (
     <div className="space-y-6">
-      {/* 1. TOP HERO BANNER CARD (REAL DATA ONLY) */}
+      {/* 1. TOP HERO BANNER CARD (CUSTOMIZABLE ARTWORK & OVERLAY) */}
       <section className="relative overflow-hidden rounded-3xl border border-stone-200/80 bg-stone-900 text-white shadow-xl">
         {/* Cover Art / Gradient Overlay */}
         <div
           className="absolute inset-0 bg-cover bg-center transition-all duration-700"
           style={{
-            backgroundImage: circle.cover_url
-              ? `url(${circle.cover_url})`
+            backgroundImage: effectiveBanner
+              ? `url(${effectiveBanner})`
               : 'linear-gradient(135deg, rgba(24,24,27,0.95) 0%, rgba(9,9,11,0.98) 100%)',
           }}
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-950/60 to-transparent" />
+        <div
+          className="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-950/60 to-transparent transition-opacity duration-300"
+          style={{ opacity: coverOverlayOpacity }}
+        />
         <div
           className="pointer-events-none absolute -right-20 -top-20 h-96 w-96 rounded-full opacity-30 blur-3xl"
           style={{ backgroundColor: 'var(--circle-primary, #6366f1)' }}
@@ -503,7 +514,7 @@ export function CommunityActivityStream({
         <aside className="space-y-5 lg:col-span-3">
           {/* Real Upcoming Events Card (only if upcomingEvents exist) */}
           {spotlightEvent && eventDate && (
-            <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+            <section className={`rounded-2xl ${cardBgClass} p-4`}>
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-stone-900">Upcoming Events</h3>
                 <Link
@@ -546,7 +557,7 @@ export function CommunityActivityStream({
 
           {/* Real Trending Topics Card (only if hashtags exist in discussions) */}
           {trendingTopics.length > 0 && (
-            <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+            <section className={`rounded-2xl ${cardBgClass} p-4`}>
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-stone-900">Topics</h3>
                 {selectedTopic && (
@@ -584,7 +595,7 @@ export function CommunityActivityStream({
 
           {/* Real Causes / Crowdfunding Card (only if a real campaign exists) */}
           {featuredCause && (
-            <section className="relative overflow-hidden rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+            <section className={`relative overflow-hidden rounded-2xl ${cardBgClass} p-4`}>
               <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500">
                 Fundraising Campaign
               </span>
@@ -626,7 +637,7 @@ export function CommunityActivityStream({
           )}
 
           {/* About & Community Metadata Card */}
-          <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm space-y-3">
+          <section className={`rounded-2xl ${cardBgClass} p-4 space-y-3`}>
             <h3 className="text-xs font-bold uppercase tracking-wider text-stone-900">About</h3>
             <div className="space-y-2 text-xs text-stone-600">
               <div className="flex items-center justify-between">
@@ -658,7 +669,7 @@ export function CommunityActivityStream({
         <main className="space-y-4 lg:col-span-6">
           {/* Multi-Action Quick Composer Box */}
           {isMember && (
-            <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+            <section className={`rounded-2xl ${cardBgClass} p-4`}>
               <form onSubmit={handleCreateQuickPost} className="space-y-3">
                 <div className="flex items-center gap-3">
                   <Avatar url={currentUser?.avatar_url} name={currentUser?.display_name || 'You'} />
@@ -793,6 +804,7 @@ export function CommunityActivityStream({
                   onRsvp={handleRsvp}
                   rsvpStatus={rsvpStatuses[item.data.id]}
                   rsvpLoading={rsvpLoading[item.data.id]}
+                  cardBgClass={cardBgClass}
                 />
               ))}
             </div>
@@ -802,7 +814,7 @@ export function CommunityActivityStream({
         {/* ================= RIGHT COLUMN (lg:col-span-3) ================= */}
         <aside className="space-y-5 lg:col-span-3">
           {/* Real Community Stats Card */}
-          <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+          <section className={`rounded-2xl ${cardBgClass} p-4`}>
             <div className="mb-3 flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <BarChart2 className="h-4 w-4 text-stone-500" />
@@ -832,7 +844,7 @@ export function CommunityActivityStream({
 
           {/* Real Featured Projects Card (only if projects exist) */}
           {featuredProject && (
-            <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+            <section className={`rounded-2xl ${cardBgClass} p-4`}>
               <div className="mb-3 flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <FolderGit2 className="h-4 w-4 text-amber-500" />
@@ -862,7 +874,7 @@ export function CommunityActivityStream({
 
           {/* Real Featured Courses (only if courses exist) */}
           {featuredCourses.length > 0 && (
-            <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+            <section className={`rounded-2xl ${cardBgClass} p-4`}>
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-stone-900">Courses</h3>
                 <Link
@@ -892,7 +904,7 @@ export function CommunityActivityStream({
 
           {/* Real Featured Marketplace Listings (only if listings exist) */}
           {featuredListings.length > 0 && (
-            <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+            <section className={`rounded-2xl ${cardBgClass} p-4`}>
               <div className="mb-3 flex items-center justify-between">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-stone-900">Marketplace</h3>
                 <Link
@@ -962,6 +974,7 @@ interface ActivityFeedCardProps {
   onRsvp: (eventId: string, status: 'going' | 'interested' | 'declined') => void;
   rsvpStatus?: string;
   rsvpLoading?: boolean;
+  cardBgClass?: string;
 }
 
 function ActivityFeedCard({
@@ -979,6 +992,7 @@ function ActivityFeedCard({
   onRsvp,
   rsvpStatus,
   rsvpLoading,
+  cardBgClass = 'border border-stone-200 bg-white shadow-sm',
 }: ActivityFeedCardProps) {
   const time = new Date(item.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' });
 
@@ -991,7 +1005,7 @@ function ActivityFeedCard({
     const authorUsername = post.author?.username ? `@${post.author.username}` : null;
 
     return (
-      <article className="space-y-3 rounded-2xl border border-stone-200 bg-white p-4 transition-all hover:border-stone-300 shadow-sm">
+      <article className={`space-y-3 rounded-2xl ${cardBgClass} p-4 transition-all hover:border-stone-300`}>
         <div className="flex items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2.5">
             <Avatar url={post.author?.avatar_url} name={authorName} />
@@ -1071,7 +1085,7 @@ function ActivityFeedCard({
     const poll = item.data;
     const hasVoted = Boolean(votedOption);
     return (
-      <article className="space-y-3 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+      <article className={`space-y-3 rounded-2xl ${cardBgClass} p-4`}>
         <div className="flex items-center justify-between">
           <span className="rounded-full bg-purple-100 px-2 py-0.5 text-[10px] font-bold text-purple-700">
             Poll
@@ -1111,7 +1125,7 @@ function ActivityFeedCard({
     const date = new Date(event.starts_at);
     const isGoing = rsvpStatus === 'going';
     return (
-      <article className="space-y-3 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+      <article className={`space-y-3 rounded-2xl ${cardBgClass} p-4`}>
         <div className="flex items-start gap-3">
           <DateBadge date={date} />
           <div className="min-w-0 flex-1">
@@ -1148,7 +1162,7 @@ function ActivityFeedCard({
     const listing = item.data;
     const canMessage = isMember && listing.seller_id !== currentUserId;
     return (
-      <article className="space-y-3 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+      <article className={`space-y-3 rounded-2xl ${cardBgClass} p-4`}>
         <div className="flex items-center justify-between">
           <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
             Marketplace
@@ -1189,7 +1203,7 @@ function ActivityFeedCard({
     const course = item.data;
     const href = `/circles/${circle.slug}/courses/${course.id}`;
     return (
-      <article className="space-y-3 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+      <article className={`space-y-3 rounded-2xl ${cardBgClass} p-4`}>
         <div className="flex items-center justify-between">
           <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">
             Course
@@ -1209,7 +1223,7 @@ function ActivityFeedCard({
   // 6. Projects, Causes, and Resources
   if (item.itemType === 'project' || item.itemType === 'cause' || item.itemType === 'resource') {
     return (
-      <article className="space-y-2 rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+      <article className={`space-y-2 rounded-2xl ${cardBgClass} p-4`}>
         <div className="flex items-center justify-between">
           <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-bold text-stone-700 uppercase">
             {item.itemType}
