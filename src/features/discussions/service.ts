@@ -559,7 +559,24 @@ export async function createComment(actorUserId: string, input: unknown): Promis
       [commentId, postId, circleId, actorUserId, body]
     );
 
-    return { comment: inserted.rows[0], post, circle };
+    const authorRes = await tx.query<{ username: string; display_name: string; avatar_url: string | null }>(
+      `SELECT username, display_name, avatar_url FROM public.profiles WHERE id = $1 LIMIT 1;`,
+      [actorUserId]
+    );
+    const authorProfile = authorRes.rows[0];
+    const enrichedComment: CommentItem = {
+      ...inserted.rows[0],
+      author: authorProfile
+        ? {
+            id: actorUserId,
+            username: authorProfile.username,
+            display_name: authorProfile.display_name,
+            avatar_url: authorProfile.avatar_url,
+          }
+        : undefined,
+    };
+
+    return { comment: enrichedComment, post, circle };
   });
 
   if (outcome.post.author_id !== actorUserId) {

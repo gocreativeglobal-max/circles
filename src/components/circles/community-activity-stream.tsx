@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
+  ArrowUp,
   BadgeCheck,
   BarChart2,
   Calendar,
@@ -30,6 +31,7 @@ import {
   Circle,
   CircleEventItem,
   CircleProjectItem,
+  CommentItem,
   CourseItem,
   FundraisingCampaignItem,
   MarketplaceListingItem,
@@ -121,6 +123,27 @@ function stripImageMarkdown(text: string): string {
   return text.replace(/!\[.*?\]\(((\/api\/uploads\/[^\s)]+)|(https?:\/\/[^\s)]+))\)/g, '').trim();
 }
 
+function formatRelativeTime(dateString: string): string {
+  try {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    if (diffMs < 0) return 'Just now';
+    const diffSec = Math.floor(diffMs / 1000);
+    if (diffSec < 60) return 'Just now';
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m`;
+    const diffHours = Math.floor(diffMin / 60);
+    if (diffHours < 24) return `${diffHours}h`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) return `${diffDays}d`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)}w`;
+    return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  } catch {
+    return dateString;
+  }
+}
+
 export function CommunityActivityStream({
   circle,
   initialItems,
@@ -149,6 +172,10 @@ export function CommunityActivityStream({
   const [rsvpLoading, setRsvpLoading] = useState<Record<string, boolean>>({});
   const [likedPosts, setLikedPosts] = useState<Record<string, boolean>>({});
   const [likeCounts, setLikeCounts] = useState<Record<string, number>>({});
+  const [inlineComments, setInlineComments] = useState<Record<string, CommentItem[]>>({});
+  const [commentCounts, setCommentCounts] = useState<Record<string, number>>({});
+  const [loadingComments, setLoadingComments] = useState<Record<string, boolean>>({});
+  const [submittingComment, setSubmittingComment] = useState<Record<string, boolean>>({});
   const [copiedShare, setCopiedShare] = useState(false);
   const [moreNavOpen, setMoreNavOpen] = useState(false);
 
@@ -236,11 +263,90 @@ export function CommunityActivityStream({
     }
   }
 
-  function handleToggleLike(postId: string, initialCount: number) {
-    const isLiked = likedPosts[postId] ?? false;
-    const current = likeCounts[postId] ?? initialCount;
-    setLikedPosts((prev) => ({ ...prev, [postId]: !isLiked }));
-    setLikeCounts((prev) => ({ ...prev, [postId]: isLiked ? Math.max(0, current - 1) : current + 1 }));
+  async function handleToggleLike(postId: string, initialCount: number, viewerHasLiked: boolean) {
+    if (!currentUserId || !isMember) return;
+    const currentlyLiked = likedPosts[postId] ?? viewerHasLiked;
+    const currentCount = likeCounts[postId] ?? initialCount;
+    const nextLiked = !currentlyLiked;
+    const nextCount = nextLiked ? currentCount + 1 : Math.max(0, currentCount - 1);
+
+    // Optimistic UI update
+    setLikedPosts((prev) => ({ ...prev, [postId]: nextLiked }));
+    setLikeCounts((prev) => ({ ...prev, [postId]: nextCount }));
+
+    try {
+      const res = await fetch(`/api/circles/${circle.id}/posts/${postId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'react', reactionType: 'like' }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (typeof data.reactionCount === 'number') {
+          setLikeCounts((prev) => ({ ...prev, [postId]: data.reactionCount }));
+        }
+        if (typeof data.active === 'boolean') {
+          setLikedPosts((prev) => ({ ...prev, [postId]: data.active }));
+        }
+      } else {
+        // Rollback on non-200
+        setLikedPosts((prev) => ({ ...prev, [postId]: currentlyLiked }));
+        setLikeCounts((prev) => ({ ...prev, [postId]: currentCount }));
+      }
+    } catch (err) {
+      console.error('Failed to toggle like:', err);
+      // Rollback on error
+      setLikedPosts((prev) => ({ ...prev, [postId]: currentlyLiked }));
+      setLikeCounts((prev) => ({ ...prev, [postId]: currentCount }));
+    }
+  }
+
+  async function handleFetchComments(postId: string) {
+    if (loadingComments[postId]) return;
+    setLoadingComments((prev) => ({ ...prev, [postId]: true }));
+    try {
+      const res = await fetch(`/api/circles/${circle.id}/posts/${postId}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data.comments)) {
+          setInlineComments((prev) => ({ ...prev, [postId]: data.comments }));
+          setCommentCounts((prev) => ({ ...prev, [postId]: data.comments.length }));
+        }
+      }
+    } catch (err) {
+      console.error('Failed to fetch post comments:', err);
+    } finally {
+      setLoadingComments((prev) => ({ ...prev, [postId]: false }));
+    }
+  }
+
+  async function handleAddInlineComment(postId: string, text: string) {
+    if (!currentUserId || !isMember || !text.trim() || submittingComment[postId]) return;
+    setSubmittingComment((prev) => ({ ...prev, [postId]: true }));
+    try {
+      const res = await fetch(`/api/circles/${circle.id}/posts/${postId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'comment', body: text.trim() }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.comment) {
+          setInlineComments((prev) => ({
+            ...prev,
+            [postId]: [...(prev[postId] || []), data.comment],
+          }));
+          setCommentCounts((prev) => {
+            const current = prev[postId] ?? 0;
+            return { ...prev, [postId]: current + 1 };
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Failed to add inline comment:', err);
+    } finally {
+      setSubmittingComment((prev) => ({ ...prev, [postId]: false }));
+    }
   }
 
   function handleShareCommunity() {
@@ -839,33 +945,64 @@ export function CommunityActivityStream({
             </div>
           ) : (
             <div className="space-y-4">
-              {visibleItems.map((item) => (
-                <ActivityFeedCard
-                  key={item.id}
-                  item={item}
-                  circle={circle}
-                  currentUserId={currentUserId}
-                  isMember={isMember}
-                  isLiked={likedPosts[item.id] ?? (item.itemType === 'post' ? Boolean(item.data.viewer_has_liked) : false)}
-                  likeCount={
-                    likeCounts[item.id] ?? (item.itemType === 'post' ? item.data.reaction_count ?? 0 : 0)
-                  }
-                  onToggleLike={() =>
-                    handleToggleLike(
-                      item.id,
-                      item.itemType === 'post' ? item.data.reaction_count ?? 0 : 0
-                    )
-                  }
-                  onInquire={handleInquireListing}
-                  onVote={handleVotePoll}
-                  votedOption={votedPolls[item.data.id]}
-                  votingLoading={votingLoading[item.data.id]}
-                  onRsvp={handleRsvp}
-                  rsvpStatus={rsvpStatuses[item.data.id]}
-                  rsvpLoading={rsvpLoading[item.data.id]}
-                  cardBgClass={cardBgClass}
-                />
-              ))}
+              {visibleItems.map((item) => {
+                const isPost = item.itemType === 'post';
+                const postId = isPost ? item.data.id : item.id;
+                const postData = isPost ? item.data : null;
+                const isLiked = isPost
+                  ? (likedPosts[postId] ?? Boolean(postData?.viewer_has_liked))
+                  : false;
+                const likeCount = isPost
+                  ? (likeCounts[postId] ?? (postData?.reaction_count ?? 0))
+                  : 0;
+                const commentCount = isPost
+                  ? (commentCounts[postId] ?? (postData?.comment_count ?? 0))
+                  : 0;
+
+                return (
+                  <ActivityFeedCard
+                    key={item.id}
+                    item={item}
+                    circle={circle}
+                    currentUserId={currentUserId}
+                    currentUser={currentUser}
+                    isMember={isMember}
+                    isLiked={isLiked}
+                    likeCount={likeCount}
+                    commentCount={commentCount}
+                    comments={isPost ? inlineComments[postId] : undefined}
+                    isLoadingComments={isPost ? Boolean(loadingComments[postId]) : false}
+                    isSubmittingComment={isPost ? Boolean(submittingComment[postId]) : false}
+                    onToggleLike={() => {
+                      if (isPost && postData) {
+                        handleToggleLike(
+                          postId,
+                          postData.reaction_count ?? 0,
+                          Boolean(postData?.viewer_has_liked)
+                        );
+                      }
+                    }}
+                    onFetchComments={() => {
+                      if (isPost) {
+                        handleFetchComments(postId);
+                      }
+                    }}
+                    onSubmitComment={
+                      isPost
+                        ? (text: string) => handleAddInlineComment(postId, text)
+                        : undefined
+                    }
+                    onInquire={handleInquireListing}
+                    onVote={handleVotePoll}
+                    votedOption={votedPolls[item.data.id]}
+                    votingLoading={votingLoading[item.data.id]}
+                    onRsvp={handleRsvp}
+                    rsvpStatus={rsvpStatuses[item.data.id]}
+                    rsvpLoading={rsvpLoading[item.data.id]}
+                    cardBgClass={cardBgClass}
+                  />
+                );
+              })}
             </div>
           )}
         </main>
@@ -1022,10 +1159,17 @@ interface ActivityFeedCardProps {
   item: ActivityStreamItem;
   circle: Circle;
   currentUserId?: string | null;
+  currentUser?: UserProfile | null;
   isMember: boolean;
   isLiked: boolean;
   likeCount: number;
+  commentCount: number;
+  comments?: CommentItem[];
+  isLoadingComments?: boolean;
+  isSubmittingComment?: boolean;
   onToggleLike: () => void;
+  onFetchComments?: () => void;
+  onSubmitComment?: (text: string) => Promise<void>;
   onInquire: (listing: MarketplaceListingItem) => void;
   onVote: (pollId: string, optionId: string) => void;
   votedOption?: string;
@@ -1040,10 +1184,17 @@ function ActivityFeedCard({
   item,
   circle,
   currentUserId,
+  currentUser,
   isMember,
   isLiked,
   likeCount,
+  commentCount,
+  comments,
+  isLoadingComments,
+  isSubmittingComment,
   onToggleLike,
+  onFetchComments,
+  onSubmitComment,
   onInquire,
   onVote,
   votedOption,
@@ -1051,112 +1202,334 @@ function ActivityFeedCard({
   onRsvp,
   rsvpStatus,
   rsvpLoading,
-  cardBgClass = 'border border-stone-200 bg-white shadow-sm',
+  cardBgClass = 'border border-stone-200 bg-white shadow-xs',
 }: ActivityFeedCardProps) {
-  const time = new Date(item.timestamp).toLocaleDateString([], { month: 'short', day: 'numeric' });
+  const time = formatRelativeTime(item.timestamp);
+  const [isExpandedText, setIsExpandedText] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const [copiedPost, setCopiedPost] = useState(false);
+  const commentInputRef = useRef<HTMLInputElement>(null);
 
-  // 1. Discussion Posts
+  // 1. Discussion Posts (Facebook/Instagram Hybrid)
   if (item.itemType === 'post') {
     const post = item.data;
     const href = `/circles/${circle.slug}/discussions/${post.id}`;
     const mediaUrls = extractMediaUrls(post.body);
     const cleanBody = stripImageMarkdown(post.body);
     const authorName = post.author?.display_name || 'Member';
-    const authorUsername = post.author?.username ? `@${post.author.username}` : null;
+    const isLongText = cleanBody.length > 220;
+    const showTitle = Boolean(
+      post.title &&
+      post.title.trim() &&
+      post.title.trim().toLowerCase() !== cleanBody.slice(0, 60).toLowerCase() &&
+      !cleanBody.startsWith(post.title.trim())
+    );
+
+    function handleCopyPost() {
+      if (typeof window !== 'undefined') {
+        const url = `${window.location.origin}${href}`;
+        navigator.clipboard.writeText(url);
+        setCopiedPost(true);
+        setTimeout(() => setCopiedPost(false), 2000);
+      }
+    }
+
+    async function handleInlineCommentSubmit(e: React.FormEvent) {
+      e.preventDefault();
+      if (!commentText.trim() || isSubmittingComment || !onSubmitComment) return;
+      const text = commentText.trim();
+      setCommentText('');
+      await onSubmitComment(text);
+    }
 
     return (
-      <article className={`space-y-3 rounded-2xl ${cardBgClass} p-4 transition-all hover:border-stone-300`}>
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <Avatar url={post.author?.avatar_url} name={authorName} />
+      <article className={`overflow-hidden rounded-2xl ${cardBgClass} transition-all hover:border-stone-300`}>
+        {/* Compact Header: Author Avatar + Name > #Space + Relative Time */}
+        <div className="flex items-start justify-between p-4 pb-2.5">
+          <div className="flex items-center gap-3 min-w-0">
+            <Link
+              href={`/circles/${circle.slug}/members/${post.author?.id || post.author_id}`}
+              className="shrink-0 group"
+            >
+              <Avatar url={post.author?.avatar_url} name={authorName} size="lg" />
+            </Link>
             <div className="min-w-0 text-sm">
-              <div className="flex items-center gap-1.5">
-                <span className="font-bold text-stone-900 truncate">{authorName}</span>
+              <div className="flex flex-wrap items-center gap-x-1.5 leading-snug">
+                <Link
+                  href={`/circles/${circle.slug}/members/${post.author?.id || post.author_id}`}
+                  className="font-bold text-stone-900 hover:underline truncate"
+                >
+                  {authorName}
+                </Link>
                 {post.space?.name && (
-                  <span className="text-xs text-stone-400">in #{post.space.name}</span>
+                  <Link
+                    href={`/circles/${circle.slug}/spaces/${post.space.slug}`}
+                    className="text-xs font-medium text-stone-500 hover:text-stone-900 transition-colors"
+                  >
+                    › #{post.space.name}
+                  </Link>
                 )}
               </div>
               <div className="flex items-center gap-1.5 text-xs text-stone-400">
-                {authorUsername && <span>{authorUsername}</span>}
-                {authorUsername && <span>•</span>}
-                <span>{time}</span>
+                <span title={new Date(item.timestamp).toLocaleString()}>{time}</span>
+                <span>•</span>
+                <Globe className="h-3 w-3 text-stone-400" />
               </div>
             </div>
           </div>
-          <button type="button" className="text-stone-400 hover:text-stone-600">
+
+          {/* Three dots / Copy Link */}
+          <button
+            type="button"
+            onClick={handleCopyPost}
+            title="Copy link to post"
+            className="rounded-full p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors"
+          >
             <MoreHorizontal className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Post Content */}
-        <Link href={href} className="block group">
-          {post.title && <h3 className="font-bold text-stone-900 group-hover:underline text-sm">{post.title}</h3>}
-          {cleanBody && (
-            <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-xs leading-relaxed text-stone-700">{cleanBody}</p>
+        {/* Text-First Post Body */}
+        <div className="px-4 pb-3">
+          {showTitle && (
+            <h3 className="font-bold text-stone-950 text-sm mb-1 leading-snug">{post.title}</h3>
           )}
-        </Link>
+          {cleanBody && (
+            <div className="text-[13px] text-stone-800 leading-relaxed whitespace-pre-wrap break-words">
+              {isLongText && !isExpandedText ? (
+                <>
+                  {cleanBody.slice(0, 220)}...{' '}
+                  <button
+                    type="button"
+                    onClick={() => setIsExpandedText(true)}
+                    className="font-semibold text-stone-500 hover:text-stone-900 hover:underline text-xs inline-block ml-0.5"
+                  >
+                    See more
+                  </button>
+                </>
+              ) : (
+                cleanBody
+              )}
+            </div>
+          )}
+        </div>
 
-        {/* Rich Multi-Image Mosaic */}
-        {mediaUrls.length === 1 && (
-          <div className="relative overflow-hidden rounded-xl border border-stone-200 bg-stone-100 max-h-96">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={mediaUrls[0]} alt="Post attachment" className="h-full w-full object-cover" />
-          </div>
-        )}
-        {mediaUrls.length === 2 && (
-          <div className="grid grid-cols-2 gap-2 rounded-xl overflow-hidden max-h-80">
-            {mediaUrls.map((url, idx) => (
-              <div key={idx} className="relative aspect-video overflow-hidden rounded-lg border border-stone-200 bg-stone-100">
+        {/* Media Grid */}
+        {mediaUrls.length > 0 && (
+          <div className="px-4 pb-3">
+            {mediaUrls.length === 1 && (
+              <div className="relative overflow-hidden rounded-xl border border-stone-200/80 bg-stone-100 max-h-[460px]">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={url} alt={`Attachment ${idx + 1}`} className="h-full w-full object-cover" />
+                <img
+                  src={mediaUrls[0]}
+                  alt="Post attachment"
+                  className="w-full h-auto max-h-[460px] object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                  onClick={() => window.open(mediaUrls[0], '_blank')}
+                />
               </div>
-            ))}
-          </div>
-        )}
-        {mediaUrls.length >= 3 && (
-          <div className="grid grid-cols-2 gap-2 rounded-xl overflow-hidden max-h-96">
-            {mediaUrls.slice(0, 4).map((url, idx) => (
-              <div key={idx} className="relative aspect-video overflow-hidden rounded-lg border border-stone-200 bg-stone-100">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={url} alt={`Attachment ${idx + 1}`} className="h-full w-full object-cover" />
+            )}
+            {mediaUrls.length === 2 && (
+              <div className="grid grid-cols-2 gap-1.5 rounded-xl overflow-hidden max-h-[380px]">
+                {mediaUrls.map((url, idx) => (
+                  <div key={idx} className="relative aspect-4/3 overflow-hidden rounded-lg border border-stone-200 bg-stone-100">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={url}
+                      alt={`Attachment ${idx + 1}`}
+                      className="h-full w-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                      onClick={() => window.open(url, '_blank')}
+                    />
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
+            {mediaUrls.length === 3 && (
+              <div className="grid grid-cols-3 gap-1.5 rounded-xl overflow-hidden max-h-[300px]">
+                {mediaUrls.map((url, idx) => (
+                  <div key={idx} className="relative aspect-square overflow-hidden rounded-lg border border-stone-200 bg-stone-100">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={url}
+                      alt={`Attachment ${idx + 1}`}
+                      className="h-full w-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                      onClick={() => window.open(url, '_blank')}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+            {mediaUrls.length >= 4 && (
+              <div className="grid grid-cols-2 gap-1.5 rounded-xl overflow-hidden max-h-[420px]">
+                {mediaUrls.slice(0, 4).map((url, idx) => (
+                  <div key={idx} className="relative aspect-4/3 overflow-hidden rounded-lg border border-stone-200 bg-stone-100">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={url}
+                      alt={`Attachment ${idx + 1}`}
+                      className="h-full w-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
+                      onClick={() => window.open(url, '_blank')}
+                    />
+                    {idx === 3 && mediaUrls.length > 4 && (
+                      <div
+                        onClick={() => window.open(url, '_blank')}
+                        className="absolute inset-0 bg-black/55 backdrop-blur-xs flex items-center justify-center cursor-pointer text-white font-bold text-base"
+                      >
+                        +{mediaUrls.length - 4}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
-        {/* Real Engagement Bar */}
-        <div className="flex items-center justify-between border-t border-stone-100 pt-2 text-stone-500">
+        {/* Engagement Stats Row (Only shown if likeCount > 0 or commentCount > 0) */}
+        {(likeCount > 0 || commentCount > 0) && (
+          <div className="flex items-center justify-between px-4 py-2 text-xs text-stone-500 border-t border-stone-100">
+            <div className="flex items-center gap-1.5">
+              {likeCount > 0 && (
+                <span className="inline-flex items-center gap-1 font-medium text-stone-700">
+                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-white">
+                    <Heart className="h-2.5 w-2.5 fill-white text-white" />
+                  </span>
+                  <span>{likeCount}</span>
+                </span>
+              )}
+            </div>
+            <div>
+              {commentCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!comments && onFetchComments) onFetchComments();
+                  }}
+                  className="hover:underline text-stone-500"
+                >
+                  {commentCount} {commentCount === 1 ? 'comment' : 'comments'}
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* 3-Column Action Buttons: Like, Comment, Share */}
+        <div className="grid grid-cols-3 border-t border-stone-100 px-2 py-1 text-xs">
+          {/* Like */}
           <button
             type="button"
             onClick={onToggleLike}
-            className={`inline-flex items-center gap-1.5 text-xs font-semibold transition-colors ${
-              isLiked ? 'text-rose-500' : 'hover:text-rose-500'
+            className={`inline-flex items-center justify-center gap-1.5 rounded-lg py-2 font-semibold transition-colors ${
+              isLiked
+                ? 'text-rose-600 bg-rose-50/50'
+                : 'text-stone-600 hover:bg-stone-50 hover:text-stone-900'
             }`}
           >
             <Heart className={`h-4 w-4 ${isLiked ? 'fill-rose-500 text-rose-500' : ''}`} />
-            <span>{likeCount}</span>
+            <span>Like</span>
           </button>
 
-          <Link
-            href={href}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold hover:text-indigo-600 transition-colors"
-          >
-            <MessageCircle className="h-4 w-4" />
-            <span>{post.comment_count ?? 0}</span>
-          </Link>
-
+          {/* Comment */}
           <button
             type="button"
             onClick={() => {
-              if (typeof window !== 'undefined') {
-                navigator.clipboard.writeText(`${window.location.origin}${href}`);
-              }
+              if (!comments && onFetchComments) onFetchComments();
+              setTimeout(() => commentInputRef.current?.focus(), 50);
             }}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold hover:text-stone-900 transition-colors"
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg py-2 font-semibold text-stone-600 hover:bg-stone-50 hover:text-stone-900 transition-colors"
+          >
+            <MessageCircle className="h-4 w-4" />
+            <span>Comment</span>
+          </button>
+
+          {/* Share */}
+          <button
+            type="button"
+            onClick={handleCopyPost}
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg py-2 font-semibold text-stone-600 hover:bg-stone-50 hover:text-stone-900 transition-colors"
           >
             <Share2 className="h-4 w-4" />
-            <span>Share</span>
+            <span>{copiedPost ? 'Copied!' : 'Share'}</span>
           </button>
+        </div>
+
+        {/* Inline Comments Section */}
+        <div className="border-t border-stone-100 bg-stone-50/40 px-4 py-3 space-y-2.5">
+          {/* View all comments button */}
+          {commentCount > (comments?.length ?? 0) && (
+            <button
+              type="button"
+              onClick={() => {
+                if (onFetchComments) onFetchComments();
+              }}
+              disabled={isLoadingComments}
+              className="text-xs font-semibold text-stone-500 hover:text-stone-900 hover:underline block"
+            >
+              {isLoadingComments
+                ? 'Loading comments...'
+                : `View all ${commentCount} comments`}
+            </button>
+          )}
+
+          {/* Render Loaded Comments */}
+          {comments && comments.length > 0 && (
+            <div className="space-y-2">
+              {comments.map((comment) => {
+                const commentAuthor = comment.author?.display_name || 'Member';
+                const commentTime = formatRelativeTime(comment.created_at);
+                return (
+                  <div key={comment.id} className="flex items-start gap-2 text-xs">
+                    <Avatar url={comment.author?.avatar_url} name={commentAuthor} size="sm" />
+                    <div className="max-w-[88%] rounded-2xl bg-stone-100/90 px-3 py-2 text-xs">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-stone-900">{commentAuthor}</span>
+                        <span className="text-[10px] text-stone-400">{commentTime}</span>
+                      </div>
+                      <p className="mt-0.5 whitespace-pre-wrap text-stone-800 text-xs leading-relaxed">
+                        {comment.body}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Inline Comment Input Box */}
+          {isMember ? (
+            <form onSubmit={handleInlineCommentSubmit} className="flex items-center gap-2 pt-0.5">
+              <Avatar
+                url={currentUser?.avatar_url}
+                name={currentUser?.display_name || 'You'}
+                size="sm"
+              />
+              <div className="relative flex-1 flex items-center bg-stone-100 rounded-full px-3 py-1.5 focus-within:ring-2 focus-within:ring-stone-400 focus-within:bg-white border border-transparent focus-within:border-stone-300 transition-all">
+                <input
+                  ref={commentInputRef}
+                  type="text"
+                  value={commentText}
+                  onChange={(e) => setCommentText(e.target.value)}
+                  placeholder="Write a comment..."
+                  disabled={isSubmittingComment}
+                  className="w-full bg-transparent text-xs text-stone-950 placeholder-stone-400 focus:outline-none pr-6"
+                />
+                {commentText.trim() && (
+                  <button
+                    type="submit"
+                    disabled={isSubmittingComment}
+                    className="absolute right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-stone-900 text-white hover:bg-black transition-colors disabled:opacity-50"
+                    title="Post comment"
+                  >
+                    <ArrowUp className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            </form>
+          ) : (
+            <p className="text-xs text-stone-400 italic pt-0.5">
+              Join this community to leave a comment.
+            </p>
+          )}
         </div>
       </article>
     );
@@ -1354,12 +1727,38 @@ function DateBadge({ date }: { date: Date }) {
   );
 }
 
-function Avatar({ url, name }: { url?: string | null; name?: string | null }) {
+function Avatar({
+  url,
+  name,
+  size = 'md',
+}: {
+  url?: string | null;
+  name?: string | null;
+  size?: 'sm' | 'md' | 'lg';
+}) {
+  const sizeClasses = {
+    sm: 'h-7 w-7 text-[10px]',
+    md: 'h-9 w-9 text-xs',
+    lg: 'h-10 w-10 text-xs',
+  }[size];
+
+  const initials = (name || 'Member')
+    .split(' ')
+    .filter(Boolean)
+    .map((n) => n[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+
   return (
-    <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-stone-100 border border-stone-200">
+    <div
+      className={`flex ${sizeClasses} shrink-0 items-center justify-center overflow-hidden rounded-full bg-stone-100 border border-stone-200/80 font-bold text-stone-600`}
+    >
       {url ? (
         /* eslint-disable-next-line @next/next/no-img-element */
         <img src={url} alt={name ?? ''} className="h-full w-full object-cover" />
+      ) : initials ? (
+        <span>{initials}</span>
       ) : (
         <User className="h-4 w-4 text-stone-400" />
       )}
