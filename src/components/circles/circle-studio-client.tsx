@@ -693,16 +693,11 @@ export function CircleStudioClient({
           <div className="rounded-2xl border border-stone-200/80 bg-white p-6 shadow-xs space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-base font-bold text-stone-900">
-                    Community Theme, Atmosphere & Backgrounds
-                  </h3>
-                  <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800">
-                    All Communities • 100% Free
-                  </span>
-                </div>
+                <h3 className="text-base font-bold text-stone-900">
+                  Community Brand & Theme
+                </h3>
                 <p className="mt-1 text-xs text-stone-500 leading-relaxed max-w-2xl">
-                  Customize your community brand palette, hero artwork, full-page ambient wallpaper, and frosted card styling.
+                  Customize your community profile avatar, brand colors, hero banner artwork, and canvas atmosphere.
                 </p>
               </div>
             </div>
@@ -1002,12 +997,12 @@ export function CircleStudioClient({
               </div>
             </div>
 
-            {/* 4. Community Canvas Atmosphere (WhatsApp-Style Subtle Doodles) */}
+            {/* 4. Community Canvas Atmosphere */}
             <div className="border-t border-stone-100 pt-5 space-y-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-stone-800">
-                    4. Community Canvas Doodles (WhatsApp Style)
+                    4. Community Canvas Doodles
                   </label>
                   <p className="text-[11px] text-stone-500 mt-0.5">
                     Cozy, subtle hairline community doodles behind discussion feeds. Default is clean off-white canvas without doodles.
@@ -1035,7 +1030,7 @@ export function CircleStudioClient({
               {themeSettings.doodlePatternEnabled && (
                 <div className="space-y-2 pt-2 border-t border-stone-100">
                   <label className="text-[11px] font-bold text-stone-700">Canvas Tone</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-6 gap-2.5">
+                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
                     {CANVAS_TONE_PRESETS.map((tone) => {
                       const isSel = (themeSettings.canvasColor || '#FAF9F6').toLowerCase() === tone.hex.toLowerCase();
                       return (
@@ -1056,18 +1051,14 @@ export function CircleStudioClient({
                           style={{ backgroundColor: tone.hex }}
                         >
                           <div className="flex items-center justify-between mb-1">
-                            <span
-                              className={`h-3 w-3 rounded-full border ${
-                                tone.isDark ? 'border-stone-600 bg-stone-900' : 'border-stone-300 bg-white'
-                              }`}
-                            />
+                            <span className="h-3 w-3 rounded-full border border-stone-300 bg-white" />
                             {isSel && (
-                              <span className={`text-[10px] font-bold ${tone.isDark ? 'text-white' : 'text-stone-900'}`}>
+                              <span className="text-[10px] font-bold text-stone-900">
                                 ✓
                               </span>
                             )}
                           </div>
-                          <p className={`text-xs font-bold ${tone.isDark ? 'text-white' : 'text-stone-900'}`}>
+                          <p className="text-xs font-bold text-stone-900">
                             {tone.name}
                           </p>
                         </button>

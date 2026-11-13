@@ -1,6 +1,6 @@
 /**
  * Circles Community Vector Doodles
- * WhatsApp-style subtle hand-drawn community icons in an infinite seamless repeating tile.
+ * Subtle hand-drawn community icons in an infinite seamless repeating tile.
  */
 
 export interface CanvasTonePreset {
@@ -47,14 +47,6 @@ export const CANVAS_TONE_PRESETS: CanvasTonePreset[] = [
     hex: '#F5F2F8',
     border: '#E5DDEE',
     description: 'Soft creative violet for arts, design and music clubs',
-  },
-  {
-    id: 'charcoal',
-    name: 'Midnight Charcoal',
-    hex: '#18181B',
-    border: '#27272A',
-    description: 'Sophisticated dark mode atmosphere',
-    isDark: true,
   },
 ];
 

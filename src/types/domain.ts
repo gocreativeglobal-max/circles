@@ -59,7 +59,7 @@ export interface CircleThemeSettings {
   coverPreset?: string | null;
   coverOverlayOpacity?: number | null; // 0.1 to 0.9
 
-  // Canvas Atmosphere (WhatsApp-Style Subtle Doodles & Tone)
+  // Canvas Atmosphere (Subtle Doodles & Tone)
   doodlePatternEnabled?: boolean | null;
   canvasColor?: string | null;
 

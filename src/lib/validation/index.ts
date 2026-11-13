@@ -87,7 +87,7 @@ export const circleThemeSettingsSchema = z.object({
   coverPreset: z.string().trim().max(100).nullable().optional(),
   coverOverlayOpacity: z.number().min(0).max(1).nullable().optional(),
 
-  // Canvas Atmosphere (WhatsApp-Style Subtle Doodles & Tone)
+  // Canvas Atmosphere (Subtle Doodles & Tone)
   doodlePatternEnabled: z.boolean().nullable().optional(),
   canvasColor: z.string().trim().max(50).nullable().optional(),
 

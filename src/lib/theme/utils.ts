@@ -173,7 +173,7 @@ export function generateCircleThemeStyles(
 }
 
 /**
- * Returns background styling for the community canvas (WhatsApp-style subtle doodles & pastel tint).
+ * Returns background styling for the community canvas (subtle doodles & pastel tint).
  * By default (doodlePatternEnabled=false), returns clean #FAF9F6 without any background pattern.
  */
 export function getCommunityCanvasStyle(
