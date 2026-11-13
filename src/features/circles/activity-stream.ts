@@ -75,6 +75,8 @@ export interface UnifiedStreamData {
   upcomingEvents: CircleEventItem[];
   featuredListings: MarketplaceListingItem[];
   featuredCourses: CourseItem[];
+  featuredCauses?: FundraisingCampaignItem[];
+  featuredProjects?: CircleProjectItem[];
   counts: {
     posts: number;
     listings: number;
@@ -272,12 +274,16 @@ export async function getCircleActivityStream(
 
   // Filter featured courses
   const featuredCourses = coursesRes.slice(0, 3);
+  const featuredCauses = causesRes.slice(0, 2);
+  const featuredProjects = projectsRes.slice(0, 2);
 
   return {
     items: streamItems,
     upcomingEvents,
     featuredListings,
     featuredCourses,
+    featuredCauses,
+    featuredProjects,
     counts: {
       posts: postsRes.length,
       listings: listingsRes.length,

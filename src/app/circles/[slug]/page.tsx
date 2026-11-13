@@ -31,7 +31,7 @@ export default async function CircleOverviewPage({
 
   const navigation = await getCircleNavigation(user?.id ?? null, circle.id, circle.slug);
 
-  // Fetch unified activity stream (posts, marketplace/housing items, events, polls)
+  // Fetch unified activity stream (posts, marketplace/housing items, events, polls, courses, resources, causes, projects)
   const streamData = canReadContent
     ? await getCircleActivityStream(
         user?.id ?? null,
@@ -43,6 +43,8 @@ export default async function CircleOverviewPage({
         upcomingEvents: [],
         featuredListings: [],
         featuredCourses: [],
+        featuredCauses: [],
+        featuredProjects: [],
         counts: { posts: 0, listings: 0, events: 0, polls: 0, courses: 0, resources: 0, all: 0 },
       };
 
@@ -73,8 +75,11 @@ export default async function CircleOverviewPage({
             upcomingEvents={streamData.upcomingEvents}
             featuredListings={streamData.featuredListings}
             featuredCourses={streamData.featuredCourses}
+            featuredCauses={streamData.featuredCauses}
+            featuredProjects={streamData.featuredProjects}
             enabledCapabilityKeys={navigation.enabledCapabilityKeys}
             currentUserId={user?.id ?? null}
+            currentUser={user}
             isMember={isMember}
           />
         </section>
