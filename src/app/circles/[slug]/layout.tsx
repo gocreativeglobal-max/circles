@@ -45,14 +45,18 @@ export default async function CircleLayout({
         <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <div
-              className="flex h-10 w-10 shrink-0 items-center justify-center text-base font-semibold shadow-xs transition-colors"
+              className="relative flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full text-base font-semibold shadow-xs border border-stone-200 transition-colors"
               style={{
-                backgroundColor: 'var(--circle-primary)',
+                backgroundColor: circle.avatar_url ? undefined : 'var(--circle-primary)',
                 color: 'var(--circle-primary-fg)',
-                borderRadius: 'var(--circle-radius, 0.75rem)',
               }}
             >
-              {circle.name.slice(0, 1).toUpperCase()}
+              {circle.avatar_url ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={circle.avatar_url} alt={circle.name} className="h-full w-full object-cover" />
+              ) : (
+                circle.name.slice(0, 1).toUpperCase()
+              )}
             </div>
             <div className="min-w-0">
               <h1 className="truncate text-base font-semibold text-stone-900 sm:text-lg">

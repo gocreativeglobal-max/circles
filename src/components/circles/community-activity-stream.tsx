@@ -38,6 +38,7 @@ import {
 import { ActivityStreamItem } from '@/features/circles/activity-stream';
 import { DirectMessageDrawer } from '@/components/messages/direct-message-drawer';
 import { getEffectiveBannerUrl } from '@/lib/theme/utils';
+import { ImageUploader } from '@/components/ui/image-uploader';
 
 export interface CommunityActivityStreamProps {
   circle: Circle;
@@ -81,12 +82,43 @@ function formatPrice(listing: MarketplaceListingItem): string {
   return listing.pricing_unit && listing.pricing_unit !== 'fixed' ? `${text}/${listing.pricing_unit}` : text;
 }
 
+function extractMediaUrls(body: string): string[] {
+  if (!body) return [];
+  const urls: string[] = [];
+
+  // 1. Match markdown image links ![alt](url)
+  const mdRegex = /!\[.*?\]\(((\/api\/uploads\/[^\s)]+)|(https?:\/\/[^\s)]+))\)/g;
+  let match: RegExpExecArray | null;
+  while ((match = mdRegex.exec(body)) !== null) {
+    const url = match[1];
+    if (url && !urls.includes(url)) urls.push(url);
+  }
+
+  // 2. Match standalone /api/uploads/[id]
+  const uploadRegex = /(\/api\/uploads\/[0-9a-fA-F-]+)/g;
+  while ((match = uploadRegex.exec(body)) !== null) {
+    const url = match[1];
+    if (url && !urls.includes(url)) urls.push(url);
+  }
+
+  // 3. Match standard image URLs with extensions
+  const extRegex = /(https?:\/\/[^\s<>]+\.(png|jpe?g|webp|gif|svg))/gi;
+  while ((match = extRegex.exec(body)) !== null) {
+    const url = match[1];
+    if (url && !urls.includes(url)) urls.push(url);
+  }
+
+  return urls;
+}
+
 function extractMediaUrl(body: string): string | null {
-  const mdMatch = body.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/);
-  if (mdMatch) return mdMatch[1];
-  const urlMatch = body.match(/https?:\/\/[^\s]+\.(png|jpe?g|webp|gif|svg)/i);
-  if (urlMatch) return urlMatch[0];
-  return null;
+  const all = extractMediaUrls(body);
+  return all.length > 0 ? all[0] : null;
+}
+
+function stripImageMarkdown(text: string): string {
+  if (!text) return '';
+  return text.replace(/!\[.*?\]\(((\/api\/uploads\/[^\s)]+)|(https?:\/\/[^\s)]+))\)/g, '').trim();
 }
 
 export function CommunityActivityStream({
@@ -106,6 +138,8 @@ export function CommunityActivityStream({
   const [activeFilter, setActiveFilter] = useState<StreamFilter>('all');
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [composerText, setComposerText] = useState('');
+  const [postImages, setPostImages] = useState<string[]>([]);
+  const [showPhotoUploader, setShowPhotoUploader] = useState(false);
   const [isSubmittingPost, setIsSubmittingPost] = useState(false);
   const [dmDrawerOpen, setDmDrawerOpen] = useState(false);
   const [activeDmConvoId, setActiveDmConvoId] = useState<string | null>(null);
@@ -163,15 +197,21 @@ export function CommunityActivityStream({
 
   async function handleCreateQuickPost(e: React.FormEvent) {
     e.preventDefault();
-    if (!composerText.trim() || isSubmittingPost || !isMember) return;
+    const hasContent = composerText.trim() || postImages.length > 0;
+    if (!hasContent || isSubmittingPost || !isMember) return;
     setIsSubmittingPost(true);
     try {
+      const imageMarkdown = postImages.map((url) => `\n![attachment](${url})`).join('');
+      const fullBody = `${composerText.trim()}${imageMarkdown}`.trim();
+      const firstLine = composerText.trim().split('\n')[0];
+      const title = firstLine ? firstLine.slice(0, 100) : 'Photo Post';
+
       const res = await fetch(`/api/circles/${circle.id}/discussions`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: composerText.trim().split('\n')[0].slice(0, 100),
-          body: composerText.trim(),
+          title,
+          body: fullBody,
         }),
       });
       if (res.ok) {
@@ -185,6 +225,8 @@ export function CommunityActivityStream({
           };
           setItems((prev) => [newItem, ...prev]);
           setComposerText('');
+          setPostImages([]);
+          setShowPhotoUploader(false);
         }
       }
     } catch (err) {
@@ -313,7 +355,7 @@ export function CommunityActivityStream({
             {/* Real Avatar */}
             <div className="relative shrink-0">
               <div
-                className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-2xl border-2 border-white/20 bg-stone-900 shadow-2xl backdrop-blur-md sm:h-24 sm:w-24"
+                className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-4 border-white/80 bg-stone-900 shadow-2xl backdrop-blur-md sm:h-24 sm:w-24"
                 style={{
                   boxShadow: '0 10px 25px -5px var(--circle-primary, rgba(99,102,241,0.4))',
                 }}
@@ -679,16 +721,36 @@ export function CommunityActivityStream({
                   />
                 </div>
 
+                {/* Photo Upload Area */}
+                {showPhotoUploader && (
+                  <div className="rounded-xl border border-stone-200 bg-stone-50/80 p-3">
+                    <ImageUploader
+                      circleId={circle.id}
+                      value={postImages}
+                      onChange={(val) => setPostImages(Array.isArray(val) ? val : val ? [val] : [])}
+                      multiple={true}
+                      maxFiles={4}
+                      aspectRatio="video"
+                      label="Attach Photos (PNG, JPG, WebP)"
+                      helperText="Attach up to 4 photos. Automatically optimized client-side."
+                    />
+                  </div>
+                )}
+
                 {/* Real Action Buttons for Enabled Capabilities */}
                 <div className="flex flex-wrap items-center justify-between gap-2 border-t border-stone-100 pt-3">
                   <div className="flex flex-wrap items-center gap-1 sm:gap-2">
                     <button
                       type="button"
-                      onClick={() => setComposerText((prev) => (prev ? prev : 'Check out this photo: '))}
-                      className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium text-stone-600 hover:bg-stone-100 transition-colors"
+                      onClick={() => setShowPhotoUploader((prev) => !prev)}
+                      className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors ${
+                        showPhotoUploader || postImages.length > 0
+                          ? 'bg-emerald-50 text-emerald-700 font-semibold'
+                          : 'text-stone-600 hover:bg-stone-100'
+                      }`}
                     >
                       <Camera className="h-3.5 w-3.5 text-emerald-500" />
-                      <span>Photo</span>
+                      <span>{postImages.length > 0 ? `${postImages.length} Photo${postImages.length > 1 ? 's' : ''}` : 'Photo'}</span>
                     </button>
 
                     {(enabledCapabilityKeys.includes('events') ||
@@ -735,7 +797,7 @@ export function CommunityActivityStream({
 
                   <button
                     type="submit"
-                    disabled={!composerText.trim() || isSubmittingPost}
+                    disabled={(!composerText.trim() && postImages.length === 0) || isSubmittingPost}
                     className="inline-flex items-center gap-1.5 rounded-xl px-4 py-1.5 text-xs font-bold shadow-xs transition-all active:scale-95 disabled:opacity-40"
                     style={{
                       backgroundColor: 'var(--circle-primary, #000000)',
@@ -997,7 +1059,8 @@ function ActivityFeedCard({
   if (item.itemType === 'post') {
     const post = item.data;
     const href = `/circles/${circle.slug}/discussions/${post.id}`;
-    const mediaUrl = extractMediaUrl(post.body);
+    const mediaUrls = extractMediaUrls(post.body);
+    const cleanBody = stripImageMarkdown(post.body);
     const authorName = post.author?.display_name || 'Member';
     const authorUsername = post.author?.username ? `@${post.author.username}` : null;
 
@@ -1028,14 +1091,36 @@ function ActivityFeedCard({
         {/* Post Content */}
         <Link href={href} className="block group">
           {post.title && <h3 className="font-bold text-stone-900 group-hover:underline text-sm">{post.title}</h3>}
-          <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-xs leading-relaxed text-stone-700">{post.body}</p>
+          {cleanBody && (
+            <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-xs leading-relaxed text-stone-700">{cleanBody}</p>
+          )}
         </Link>
 
-        {/* Only show image container if the post actually contains a media image */}
-        {mediaUrl && (
-          <div className="relative overflow-hidden rounded-xl border border-stone-200 bg-stone-100 max-h-80">
+        {/* Rich Multi-Image Mosaic */}
+        {mediaUrls.length === 1 && (
+          <div className="relative overflow-hidden rounded-xl border border-stone-200 bg-stone-100 max-h-96">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={mediaUrl} alt="Post attachment" className="h-full w-full object-cover" />
+            <img src={mediaUrls[0]} alt="Post attachment" className="h-full w-full object-cover" />
+          </div>
+        )}
+        {mediaUrls.length === 2 && (
+          <div className="grid grid-cols-2 gap-2 rounded-xl overflow-hidden max-h-80">
+            {mediaUrls.map((url, idx) => (
+              <div key={idx} className="relative aspect-video overflow-hidden rounded-lg border border-stone-200 bg-stone-100">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={url} alt={`Attachment ${idx + 1}`} className="h-full w-full object-cover" />
+              </div>
+            ))}
+          </div>
+        )}
+        {mediaUrls.length >= 3 && (
+          <div className="grid grid-cols-2 gap-2 rounded-xl overflow-hidden max-h-96">
+            {mediaUrls.slice(0, 4).map((url, idx) => (
+              <div key={idx} className="relative aspect-video overflow-hidden rounded-lg border border-stone-200 bg-stone-100">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={url} alt={`Attachment ${idx + 1}`} className="h-full w-full object-cover" />
+              </div>
+            ))}
           </div>
         )}
 
@@ -1121,8 +1206,16 @@ function ActivityFeedCard({
     const event = item.data;
     const date = new Date(event.starts_at);
     const isGoing = rsvpStatus === 'going';
+    const eventCover = event.cover_image_url || extractMediaUrl(event.description || '');
+
     return (
       <article className={`space-y-3 rounded-2xl ${cardBgClass} p-4`}>
+        {eventCover && (
+          <div className="relative overflow-hidden rounded-xl border border-stone-200 bg-stone-100 aspect-[21/9] max-h-48">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={eventCover} alt={event.title} className="h-full w-full object-cover" />
+          </div>
+        )}
         <div className="flex items-start gap-3">
           <DateBadge date={date} />
           <div className="min-w-0 flex-1">
@@ -1149,7 +1242,7 @@ function ActivityFeedCard({
             </button>
           )}
         </div>
-        {event.description && <p className="line-clamp-2 text-xs text-stone-600">{event.description}</p>}
+        {event.description && <p className="line-clamp-2 text-xs text-stone-600">{stripImageMarkdown(event.description)}</p>}
       </article>
     );
   }
@@ -1158,13 +1251,26 @@ function ActivityFeedCard({
   if (item.itemType === 'listing') {
     const listing = item.data;
     const canMessage = isMember && listing.seller_id !== currentUserId;
+    const listingImage = listing.image_urls?.[0];
+
     return (
       <article className={`space-y-3 rounded-2xl ${cardBgClass} p-4`}>
+        {listingImage && (
+          <div className="relative overflow-hidden rounded-xl border border-stone-200 bg-stone-100 aspect-video max-h-60">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={listingImage} alt={listing.title} className="h-full w-full object-cover" />
+            <span className="absolute top-2.5 right-2.5 rounded-lg bg-black/80 px-2.5 py-1 text-xs font-bold text-white shadow-xs backdrop-blur-xs">
+              {formatPrice(listing)}
+            </span>
+          </div>
+        )}
         <div className="flex items-center justify-between">
           <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700">
             Marketplace
           </span>
-          <span className="text-sm font-bold text-stone-900">{formatPrice(listing)}</span>
+          {!listingImage && (
+            <span className="text-sm font-bold text-stone-900">{formatPrice(listing)}</span>
+          )}
         </div>
         <Link href={`/circles/${circle.slug}/marketplace/${listing.id}`} className="block group">
           <h3 className="font-bold text-stone-900 group-hover:underline text-sm">{listing.title}</h3>

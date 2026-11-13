@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { StudioFinancesTab } from './studio-finances-tab';
 import { InviteModal } from './invite-modal';
+import { ImageUploader } from '@/components/ui/image-uploader';
 import { BACHS_ACCEPTED_CURRENCIES } from '@/lib/payments/currencies';
 import {
   THEME_PRESETS,
@@ -83,6 +84,7 @@ export function CircleStudioClient({
     doodlePatternEnabled: Boolean(initialCircle.theme_settings?.doodlePatternEnabled),
     canvasColor: initialCircle.theme_settings?.canvasColor || '#FAF9F6',
   });
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(initialCircle.avatar_url || null);
   const [themeSaving, setThemeSaving] = useState(false);
   const [themeSuccess, setThemeSuccess] = useState(false);
   const [themeError, setThemeError] = useState<string | null>(null);
@@ -96,6 +98,7 @@ export function CircleStudioClient({
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          avatarUrl: avatarUrl || null,
           themeSettings,
         }),
       });
@@ -199,6 +202,7 @@ export function CircleStudioClient({
           description,
           category,
           location: location.trim() || null,
+          avatarUrl: avatarUrl || null,
           visibility,
           membershipPolicy,
         }),
@@ -717,10 +721,67 @@ export function CircleStudioClient({
               </div>
             )}
 
-            {/* 1. Quick Theme Presets */}
+            {/* 1. Community Profile Picture & Logo */}
+            <div className="border-t border-stone-100 pt-5 space-y-4">
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-wider text-stone-800">
+                  1. Community Profile Picture & Avatar
+                </label>
+                <p className="text-[11px] text-stone-500 mt-0.5">
+                  Your community logo or profile picture, displayed in the circular header and discovery cards.
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5 rounded-2xl border border-stone-200/80 bg-stone-50/50 p-4">
+                {/* Circular Avatar Preview */}
+                <div className="relative shrink-0">
+                  <div
+                    className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border-2 border-stone-200 bg-white shadow-md"
+                    style={{
+                      backgroundColor: avatarUrl ? undefined : (themeSettings.primaryColor || '#18181b'),
+                    }}
+                  >
+                    {avatarUrl ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={avatarUrl} alt={initialCircle.name} className="h-full w-full object-cover" />
+                    ) : (
+                      <span
+                        className="text-2xl font-black"
+                        style={{ color: getContrastColor(themeSettings.primaryColor || '#18181b') }}
+                      >
+                        {initialCircle.name.slice(0, 1).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* File Upload with URL Fallback */}
+                <div className="flex-1 w-full space-y-2">
+                  <ImageUploader
+                    circleId={initialCircle.id}
+                    value={avatarUrl || ''}
+                    onChange={(url) => setAvatarUrl(typeof url === 'string' ? (url || null) : null)}
+                    aspectRatio="square"
+                    label="Upload Community Picture (PNG, JPG, WebP)"
+                    helperText="Square image recommended. Rendered as a circular profile avatar."
+                  />
+                  {avatarUrl && (
+                    <button
+                      type="button"
+                      onClick={() => setAvatarUrl(null)}
+                      className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 underline"
+                    >
+                      Remove custom photo & use letter initial
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* 2. Quick Theme Presets */}
             <div className="border-t border-stone-100 pt-5 space-y-3">
               <label className="block text-xs font-bold uppercase tracking-wider text-stone-700">
-                1. Brand Color Presets
+                2. Brand Color Presets
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
                 {THEME_PRESETS.map((preset) => {
@@ -849,12 +910,12 @@ export function CircleStudioClient({
               </div>
             </div>
 
-            {/* 2. Hero Banner Artwork & Overlay */}
+            {/* 3. Hero Banner Artwork & Overlay */}
             <div className="border-t border-stone-100 pt-5 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-stone-800">
-                    2. Hero Banner Artwork & Atmospheric Overlay
+                    3. Hero Banner Artwork & Atmospheric Overlay
                   </label>
                   <p className="text-[11px] text-stone-500 mt-0.5">
                     Select a curated artwork style or provide a custom high-resolution image URL.
@@ -941,12 +1002,12 @@ export function CircleStudioClient({
               </div>
             </div>
 
-            {/* 3. Community Canvas Atmosphere (WhatsApp-Style Subtle Doodles) */}
+            {/* 4. Community Canvas Atmosphere (WhatsApp-Style Subtle Doodles) */}
             <div className="border-t border-stone-100 pt-5 space-y-4">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-wider text-stone-800">
-                    3. Community Canvas Doodles (WhatsApp Style)
+                    4. Community Canvas Doodles (WhatsApp Style)
                   </label>
                   <p className="text-[11px] text-stone-500 mt-0.5">
                     Cozy, subtle hairline community doodles behind discussion feeds. Default is clean off-white canvas without doodles.
@@ -1020,10 +1081,10 @@ export function CircleStudioClient({
               )}
             </div>
 
-            {/* 4. Live Interactive Sandbox Preview */}
+            {/* 5. Live Interactive Sandbox Preview */}
             <div className="border-t border-stone-100 pt-5 space-y-3">
               <label className="block text-xs font-bold uppercase tracking-wider text-stone-800">
-                4. Live Community Appearance Sandbox
+                5. Live Community Appearance Sandbox
               </label>
 
               {/* Sandbox Container */}
@@ -1052,13 +1113,18 @@ export function CircleStudioClient({
                       <div className="relative z-10 flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <div
-                            className="flex h-12 w-12 items-center justify-center rounded-xl text-lg font-extrabold shadow-md border border-white/20"
+                            className="relative flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full text-lg font-extrabold shadow-md border-2 border-white/40"
                             style={{
-                              backgroundColor: themeSettings.primaryColor || '#18181b',
+                              backgroundColor: avatarUrl ? undefined : (themeSettings.primaryColor || '#18181b'),
                               color: getContrastColor(themeSettings.primaryColor || '#18181b'),
                             }}
                           >
-                            {initialCircle.name.slice(0, 1).toUpperCase()}
+                            {avatarUrl ? (
+                              /* eslint-disable-next-line @next/next/no-img-element */
+                              <img src={avatarUrl} alt={initialCircle.name} className="h-full w-full object-cover" />
+                            ) : (
+                              initialCircle.name.slice(0, 1).toUpperCase()
+                            )}
                           </div>
                           <div>
                             <h4 className="text-sm font-extrabold text-white">{initialCircle.name}</h4>
