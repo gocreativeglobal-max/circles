@@ -1060,6 +1060,13 @@ export function CoursesCatalog({
                   courseTitle={title}
                   disabled={loading}
                 />
+
+                {/* Course Requirements & Prerequisites */}
+                <CourseRequirementsEditor
+                  value={requirements}
+                  onChange={setRequirements}
+                  disabled={loading}
+                />
               </div>
 
               <div className="mt-6 flex items-center justify-end gap-2 border-t border-stone-100 pt-4">

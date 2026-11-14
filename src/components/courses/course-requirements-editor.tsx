@@ -6,7 +6,6 @@ import {
   Trash2,
   ArrowUp,
   ArrowDown,
-  CheckCircle2,
   AlertCircle,
   Wrench,
 } from 'lucide-react';

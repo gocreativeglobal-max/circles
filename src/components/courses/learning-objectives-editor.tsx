@@ -8,7 +8,6 @@ import {
   ArrowDown,
   ListChecks,
   AlertCircle,
-  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
