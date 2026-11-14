@@ -31,7 +31,11 @@ import {
   CourseReviewItem,
   LearningPathEnrollmentItem,
   CourseLiveAttendanceSummary,
+  CourseWorkflowSettings,
+  CourseWorkflowLogItem,
 } from '@/types/domain';
+import { createNotification } from '@/features/notifications/service';
+import { sendTransactionalEmail } from '@/lib/email';
 import {
   CapabilityDisabledError,
   ConflictError,
@@ -71,6 +75,7 @@ export const createCourseSchema = z.object({
   status: z.enum(['draft', 'published', 'archived']).default('published'),
   learningObjectives: z.array(z.string().trim()).nullable().optional(),
   requirements: z.array(z.string().trim()).nullable().optional(),
+  workflowSettings: z.record(z.unknown()).optional(),
 });
 
 export const updateCourseSchema = z.object({
@@ -104,7 +109,86 @@ export const updateCourseSchema = z.object({
   status: z.enum(['draft', 'published', 'archived']).optional(),
   learningObjectives: z.array(z.string().trim()).nullable().optional(),
   requirements: z.array(z.string().trim()).nullable().optional(),
+  workflowSettings: z.record(z.unknown()).optional(),
 });
+
+export const DEFAULT_COURSE_WORKFLOW_SETTINGS: CourseWorkflowSettings = {
+  liveSessionReminders: {
+    enabled24h: true,
+    enabled15m: true,
+  },
+  replayAlerts: {
+    enabled: true,
+  },
+  assignmentDeadlines: {
+    enabled24h: true,
+    enabled3h: true,
+    enabledGracePeriod: true,
+  },
+  assignmentFeedback: {
+    enabled: true,
+  },
+  weeklyRhythm: {
+    enabledMondayKickoff: true,
+    mondayKickoffTime: '09:00',
+    enabledFridayScorecard: true,
+    fridayScorecardTime: '16:00',
+  },
+};
+
+export function parseWorkflowSettings(raw: unknown): CourseWorkflowSettings {
+  if (!raw) return { ...DEFAULT_COURSE_WORKFLOW_SETTINGS };
+  let obj: Record<string, unknown> = {};
+  if (typeof raw === 'string') {
+    try {
+      obj = JSON.parse(raw);
+    } catch {
+      return { ...DEFAULT_COURSE_WORKFLOW_SETTINGS };
+    }
+  } else if (typeof raw === 'object' && raw !== null) {
+    obj = raw as Record<string, unknown>;
+  }
+
+  const live = (obj.liveSessionReminders && typeof obj.liveSessionReminders === 'object'
+    ? (obj.liveSessionReminders as Record<string, unknown>)
+    : {}) as Record<string, unknown>;
+  const replay = (obj.replayAlerts && typeof obj.replayAlerts === 'object'
+    ? (obj.replayAlerts as Record<string, unknown>)
+    : {}) as Record<string, unknown>;
+  const assignment = (obj.assignmentDeadlines && typeof obj.assignmentDeadlines === 'object'
+    ? (obj.assignmentDeadlines as Record<string, unknown>)
+    : {}) as Record<string, unknown>;
+  const feedback = (obj.assignmentFeedback && typeof obj.assignmentFeedback === 'object'
+    ? (obj.assignmentFeedback as Record<string, unknown>)
+    : {}) as Record<string, unknown>;
+  const rhythm = (obj.weeklyRhythm && typeof obj.weeklyRhythm === 'object'
+    ? (obj.weeklyRhythm as Record<string, unknown>)
+    : {}) as Record<string, unknown>;
+
+  return {
+    liveSessionReminders: {
+      enabled24h: typeof live.enabled24h === 'boolean' ? live.enabled24h : DEFAULT_COURSE_WORKFLOW_SETTINGS.liveSessionReminders!.enabled24h,
+      enabled15m: typeof live.enabled15m === 'boolean' ? live.enabled15m : DEFAULT_COURSE_WORKFLOW_SETTINGS.liveSessionReminders!.enabled15m,
+    },
+    replayAlerts: {
+      enabled: typeof replay.enabled === 'boolean' ? replay.enabled : DEFAULT_COURSE_WORKFLOW_SETTINGS.replayAlerts!.enabled,
+    },
+    assignmentDeadlines: {
+      enabled24h: typeof assignment.enabled24h === 'boolean' ? assignment.enabled24h : DEFAULT_COURSE_WORKFLOW_SETTINGS.assignmentDeadlines!.enabled24h,
+      enabled3h: typeof assignment.enabled3h === 'boolean' ? assignment.enabled3h : DEFAULT_COURSE_WORKFLOW_SETTINGS.assignmentDeadlines!.enabled3h,
+      enabledGracePeriod: typeof assignment.enabledGracePeriod === 'boolean' ? assignment.enabledGracePeriod : DEFAULT_COURSE_WORKFLOW_SETTINGS.assignmentDeadlines!.enabledGracePeriod,
+    },
+    assignmentFeedback: {
+      enabled: typeof feedback.enabled === 'boolean' ? feedback.enabled : DEFAULT_COURSE_WORKFLOW_SETTINGS.assignmentFeedback!.enabled,
+    },
+    weeklyRhythm: {
+      enabledMondayKickoff: typeof rhythm.enabledMondayKickoff === 'boolean' ? rhythm.enabledMondayKickoff : DEFAULT_COURSE_WORKFLOW_SETTINGS.weeklyRhythm!.enabledMondayKickoff,
+      mondayKickoffTime: typeof rhythm.mondayKickoffTime === 'string' ? rhythm.mondayKickoffTime : DEFAULT_COURSE_WORKFLOW_SETTINGS.weeklyRhythm!.mondayKickoffTime,
+      enabledFridayScorecard: typeof rhythm.enabledFridayScorecard === 'boolean' ? rhythm.enabledFridayScorecard : DEFAULT_COURSE_WORKFLOW_SETTINGS.weeklyRhythm!.enabledFridayScorecard,
+      fridayScorecardTime: typeof rhythm.fridayScorecardTime === 'string' ? rhythm.fridayScorecardTime : DEFAULT_COURSE_WORKFLOW_SETTINGS.weeklyRhythm!.fridayScorecardTime,
+    },
+  };
+}
 
 export const createModuleSchema = z.object({
   circleId: z.string().uuid(),
@@ -357,6 +441,7 @@ export async function listCourses(
               }
             })()
           : [],
+        workflow_settings: parseWorkflowSettings(row.workflow_settings),
         created_at: row.created_at,
         updated_at: row.updated_at,
         instructor: {
@@ -840,6 +925,7 @@ export async function getCourseWithCurriculum(
             }
           })()
         : [],
+      workflow_settings: parseWorkflowSettings(course.workflow_settings),
       estimated_duration_hours: Number(course.estimated_duration_hours),
       viewer_can_access: viewerCanAccess,
       viewer_level: viewerLevel,
@@ -956,8 +1042,8 @@ export async function createCourse(
            max_seats,
            pacing_format, schedule_type, cohort_start_date, cohort_end_date,
            require_sequential_completion, access_rule, min_level_required, status,
-           learning_objectives, requirements
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
+           learning_objectives, requirements, workflow_settings
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
          RETURNING *;`,
         [
           courseId,
@@ -984,6 +1070,7 @@ export async function createCourse(
           parsed.status,
           JSON.stringify((parsed.learningObjectives || []).map((s) => s.trim()).filter(Boolean)),
           JSON.stringify((parsed.requirements || []).map((s) => s.trim()).filter(Boolean)),
+          JSON.stringify(parseWorkflowSettings(parsed.workflowSettings)),
         ]
       );
       course = res.rows[0];
@@ -1006,8 +1093,8 @@ export async function createCourse(
              max_seats,
              pacing_format, schedule_type, cohort_start_date, cohort_end_date,
              require_sequential_completion, access_rule, min_level_required, status,
-             learning_objectives, requirements
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
+             learning_objectives, requirements, workflow_settings
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
            RETURNING *;`,
           [
             courseId,
@@ -1034,6 +1121,7 @@ export async function createCourse(
             parsed.status,
             JSON.stringify((parsed.learningObjectives || []).map((s) => s.trim()).filter(Boolean)),
             JSON.stringify((parsed.requirements || []).map((s) => s.trim()).filter(Boolean)),
+            JSON.stringify(parseWorkflowSettings(parsed.workflowSettings)),
           ]
         );
         course = fallbackRes.rows[0];
@@ -1046,6 +1134,7 @@ export async function createCourse(
       throw new ValidationError('Failed to create course.');
     }
 
+    course.workflow_settings = parseWorkflowSettings(course.workflow_settings);
     return course;
   });
 }
@@ -1118,6 +1207,7 @@ export async function updateCourse(
          learning_objectives = CASE WHEN $28::boolean THEN $29::jsonb ELSE learning_objectives END,
          max_seats = CASE WHEN $30::boolean THEN $31::integer ELSE max_seats END,
          requirements = CASE WHEN $32::boolean THEN $33::jsonb ELSE requirements END,
+         workflow_settings = CASE WHEN $34::boolean THEN $35::jsonb ELSE workflow_settings END,
          updated_at = NOW()
        WHERE id = $1 AND circle_id = $2
        RETURNING *;`,
@@ -1159,6 +1249,8 @@ export async function updateCourse(
         parsed.requirements
           ? JSON.stringify(parsed.requirements.map((s) => s.trim()).filter(Boolean))
           : '[]',
+        parsed.workflowSettings !== undefined,
+        parsed.workflowSettings ? JSON.stringify(parseWorkflowSettings(parsed.workflowSettings)) : '{}',
       ]
     );
 
@@ -1188,6 +1280,7 @@ export async function updateCourse(
             }
           })()
         : [];
+      updated.workflow_settings = parseWorkflowSettings(updated.workflow_settings);
     }
     return updated;
   });
@@ -1506,7 +1599,7 @@ export async function updateLesson(
 ): Promise<CourseLessonItem> {
   const parsed = updateLessonSchema.parse(input);
 
-  return withRlsTransaction(actorUserId, async (tx) => {
+  const { updatedLesson, courseId } = await withRlsTransaction(actorUserId, async (tx) => {
     const lessonRes = await tx.query<{ course_id: string }>(
       `SELECT course_id FROM public.course_lessons WHERE id = $1 AND circle_id = $2 LIMIT 1;`,
       [lessonId, circleId]
@@ -1573,8 +1666,26 @@ export async function updateLesson(
       ]
     );
 
-    return res.rows[0];
+    const updatedLesson = res.rows[0];
+    return { updatedLesson, courseId: lessonRes.rows[0].course_id };
   });
+
+  if (parsed.replayUrl && parsed.replayUrl.trim().length > 0 && updatedLesson) {
+    try {
+      await dispatchSessionReplayAlert(
+        circleId,
+        courseId,
+        lessonId,
+        parsed.replayUrl.trim(),
+        updatedLesson.title,
+        actorUserId
+      );
+    } catch {
+      // Best-effort replay alert
+    }
+  }
+
+  return updatedLesson;
 }
 
 /**
@@ -2006,6 +2117,23 @@ export async function reviewAssignmentSubmission(
       );
     } catch {
       // XP reward is best-effort idempotent
+    }
+  }
+
+  // Dispatch automated feedback notification & email to student
+  if (result.studentId) {
+    try {
+      await dispatchAssignmentFeedbackReminder(
+        parsed.circleId,
+        parsed.courseId,
+        result.submission.assignment_id,
+        result.studentId,
+        parsed.gradeScore ?? null,
+        parsed.instructorFeedback ?? null,
+        actorUserId
+      );
+    } catch {
+      // Best-effort workflow notification
     }
   }
 
@@ -3789,4 +3917,854 @@ export async function getCourseLiveAttendanceSummary(
       })),
     };
   });
+}
+
+// ============================================================================
+// COURSE WORKFLOWS & AUTOMATED REMINDERS
+// ============================================================================
+
+/**
+ * Renders an accessible, responsive HTML email for course workflow notifications.
+ */
+function renderCourseEmailHtml(opts: {
+  circleName: string;
+  courseTitle: string;
+  badgeText: string;
+  heading: string;
+  bodyText: string;
+  primaryActionLabel?: string;
+  primaryActionUrl?: string;
+  secondaryInfo?: string;
+}): string {
+  const ctaButton =
+    opts.primaryActionUrl && opts.primaryActionLabel
+      ? `<div style="margin: 24px 0;">
+           <a href="${opts.primaryActionUrl}" style="background-color: #1c1917; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 10px; font-weight: 600; font-size: 14px; display: inline-block;">
+             ${opts.primaryActionLabel} &rarr;
+           </a>
+         </div>`
+      : '';
+
+  const secondaryBlock = opts.secondaryInfo
+    ? `<div style="margin-top: 18px; padding: 12px 16px; background-color: #f5f5f4; border-radius: 8px; border: 1px solid #e7e5e4; font-size: 12px; color: #44403c; line-height: 1.5;">
+         ${opts.secondaryInfo}
+       </div>`
+    : '';
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${opts.heading}</title>
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #fafaf9; margin: 0; padding: 32px 16px; color: #1c1917;">
+  <div style="max-width: 560px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; border: 1px solid #e7e5e4; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);">
+    <div style="background-color: #1c1917; padding: 20px 24px; color: #ffffff;">
+      <span style="display: inline-block; background-color: rgba(255, 255, 255, 0.15); color: #f5f5f4; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 4px 10px; border-radius: 9999px; margin-bottom: 8px;">
+        ${opts.badgeText}
+      </span>
+      <h1 style="margin: 0; font-size: 16px; font-weight: 700; color: #ffffff;">
+        ${opts.circleName} &bull; ${opts.courseTitle}
+      </h1>
+    </div>
+    <div style="padding: 28px 24px;">
+      <h2 style="margin: 0 0 12px 0; font-size: 18px; font-weight: 700; color: #1c1917;">
+        ${opts.heading}
+      </h2>
+      <p style="margin: 0 0 16px 0; font-size: 14px; line-height: 1.6; color: #44403c;">
+        ${opts.bodyText}
+      </p>
+      ${ctaButton}
+      ${secondaryBlock}
+    </div>
+    <div style="padding: 16px 24px; background-color: #f5f5f4; border-top: 1px solid #e7e5e4; font-size: 11px; color: #78716c; text-align: center;">
+      You received this notification because you are enrolled in <strong>${opts.courseTitle}</strong> on Circles.
+    </div>
+  </div>
+</body>
+</html>
+  `.trim();
+}
+
+/**
+ * Retrieves course workflow settings for a given course.
+ */
+export async function getCourseWorkflowSettings(
+  actorUserId: string,
+  circleId: string,
+  courseId: string
+): Promise<CourseWorkflowSettings> {
+  return withRlsTransaction(actorUserId, async (tx) => {
+    const res = await tx.query<{ workflow_settings: unknown }>(
+      `SELECT workflow_settings FROM public.courses WHERE id = $1 AND circle_id = $2 LIMIT 1;`,
+      [courseId, circleId]
+    );
+    if (!res.rows[0]) throw new NotFoundError('Course not found.');
+    return parseWorkflowSettings(res.rows[0].workflow_settings);
+  });
+}
+
+/**
+ * Updates course workflow settings (requires staff or instructor permissions).
+ */
+export async function updateCourseWorkflowSettings(
+  actorUserId: string,
+  circleId: string,
+  courseId: string,
+  settings: Partial<CourseWorkflowSettings>
+): Promise<CourseWorkflowSettings> {
+  return withRlsTransaction(actorUserId, async (tx) => {
+    const courseRes = await tx.query<{ instructor_id: string; workflow_settings: unknown }>(
+      `SELECT instructor_id, workflow_settings FROM public.courses WHERE id = $1 AND circle_id = $2 LIMIT 1;`,
+      [courseId, circleId]
+    );
+    const course = courseRes.rows[0];
+    if (!course) throw new NotFoundError('Course not found.');
+
+    const memRes = await tx.query<{ role: CircleRole }>(
+      `SELECT role FROM public.circle_memberships WHERE circle_id = $1 AND user_id = $2 LIMIT 1;`,
+      [circleId, actorUserId]
+    );
+    const role = memRes.rows[0]?.role;
+    const isStaff = role === 'owner' || role === 'admin' || role === 'moderator';
+    if (!isStaff && course.instructor_id !== actorUserId) {
+      throw new ForbiddenError('Only the instructor or staff can configure course workflows.');
+    }
+
+    const current = parseWorkflowSettings(course.workflow_settings);
+    const merged: CourseWorkflowSettings = {
+      liveSessionReminders: {
+        ...current.liveSessionReminders!,
+        ...(settings.liveSessionReminders || {}),
+      },
+      replayAlerts: {
+        ...current.replayAlerts!,
+        ...(settings.replayAlerts || {}),
+      },
+      assignmentDeadlines: {
+        ...current.assignmentDeadlines!,
+        ...(settings.assignmentDeadlines || {}),
+      },
+      assignmentFeedback: {
+        ...current.assignmentFeedback!,
+        ...(settings.assignmentFeedback || {}),
+      },
+      weeklyRhythm: {
+        ...current.weeklyRhythm!,
+        ...(settings.weeklyRhythm || {}),
+      },
+    };
+
+    const res = await tx.query<{ workflow_settings: unknown }>(
+      `UPDATE public.courses
+       SET workflow_settings = $3::jsonb, updated_at = NOW()
+       WHERE id = $1 AND circle_id = $2
+       RETURNING workflow_settings;`,
+      [courseId, circleId, JSON.stringify(merged)]
+    );
+
+    return parseWorkflowSettings(res.rows[0]?.workflow_settings);
+  });
+}
+
+/**
+ * Retrieves workflow execution delivery logs for audit and visibility in the Course Studio.
+ */
+export async function getCourseWorkflowLogs(
+  actorUserId: string,
+  circleId: string,
+  courseId: string,
+  limit = 40
+): Promise<CourseWorkflowLogItem[]> {
+  return withRlsTransaction(actorUserId, async (tx) => {
+    const res = await tx.query<{
+      id: string;
+      circle_id: string;
+      course_id: string;
+      recipient_id: string;
+      workflow_type: string;
+      entity_id: string | null;
+      channel: 'in_app' | 'email' | 'both';
+      status: 'delivered' | 'failed' | 'skipped';
+      metadata: Record<string, unknown> | null;
+      delivered_at: string;
+      username: string | null;
+      display_name: string | null;
+      avatar_url: string | null;
+    }>(
+      `SELECT
+         cwl.id, cwl.circle_id, cwl.course_id, cwl.recipient_id,
+         cwl.workflow_type, cwl.entity_id, cwl.channel, cwl.status,
+         cwl.metadata, cwl.delivered_at::text,
+         p.username, p.display_name, p.avatar_url
+       FROM public.course_workflow_logs cwl
+       JOIN public.profiles p ON p.id = cwl.recipient_id
+       WHERE cwl.circle_id = $1 AND cwl.course_id = $2
+       ORDER BY cwl.delivered_at DESC
+       LIMIT $3;`,
+      [circleId, courseId, Math.min(limit, 100)]
+    );
+
+    return res.rows.map((row) => ({
+      id: row.id,
+      circle_id: row.circle_id,
+      course_id: row.course_id,
+      recipient_id: row.recipient_id,
+      workflow_type: row.workflow_type,
+      entity_id: row.entity_id,
+      channel: row.channel,
+      status: row.status,
+      metadata: row.metadata || {},
+      delivered_at: row.delivered_at,
+      recipient: {
+        id: row.recipient_id,
+        username: row.username || 'member',
+        display_name: row.display_name || 'Member',
+        avatar_url: row.avatar_url,
+      },
+    }));
+  });
+}
+
+/**
+ * Dispatches an automated feedback notification to a student when their assignment is reviewed.
+ */
+export async function dispatchAssignmentFeedbackReminder(
+  circleId: string,
+  courseId: string,
+  assignmentId: string,
+  studentId: string,
+  gradeScore: number | null,
+  feedbackNotes: string | null,
+  actorUserId?: string
+): Promise<void> {
+  const data = await withServiceRoleTransaction(async (tx) => {
+    const courseRes = await tx.query<{ title: string; workflow_settings: unknown }>(
+      `SELECT title, workflow_settings FROM public.courses WHERE id = $1 AND circle_id = $2 LIMIT 1;`,
+      [courseId, circleId]
+    );
+    if (!courseRes.rows[0]) return null;
+
+    const course = courseRes.rows[0];
+    const settings = parseWorkflowSettings(course.workflow_settings);
+    if (settings.assignmentFeedback?.enabled === false) return null;
+
+    const assignRes = await tx.query<{ title: string; lesson_id: string }>(
+      `SELECT title, lesson_id FROM public.course_assignments WHERE id = $1 LIMIT 1;`,
+      [assignmentId]
+    );
+    const assignTitle = assignRes.rows[0]?.title || 'Assignment';
+    const lessonId = assignRes.rows[0]?.lesson_id || '';
+
+    const circleRes = await tx.query<{ name: string; slug: string }>(
+      `SELECT name, slug FROM public.circles WHERE id = $1 LIMIT 1;`,
+      [circleId]
+    );
+    const circle = circleRes.rows[0];
+    const circleSlug = circle?.slug || circleId;
+
+    return { assignTitle, lessonId, circleSlug };
+  });
+
+  if (!data) return;
+
+  const title = `Assignment Reviewed: "${data.assignTitle}"`;
+  const scoreText = gradeScore !== null ? ` (Grade: ${gradeScore}/100)` : '';
+  const body = `Your submission for "${data.assignTitle}" has been graded${scoreText}. Feedback: "${feedbackNotes || 'Great job!'}"`;
+  const linkUrl = `/circles/${data.circleSlug}/courses/${courseId}/learn?lesson=${data.lessonId}`;
+  const idempotencyKey = `wf:feedback:${courseId}:${assignmentId}:${studentId}`;
+
+  await createNotification({
+    recipientId: studentId,
+    actorId: actorUserId ?? null,
+    circleId,
+    eventType: 'assignment_feedback',
+    title,
+    body,
+    linkUrl,
+    idempotencyKey,
+    sendEmail: true,
+  });
+
+  await withServiceRoleTransaction(async (tx) => {
+    await tx.query(
+      `INSERT INTO public.course_workflow_logs (
+         circle_id, course_id, recipient_id, workflow_type, entity_id, channel, status, metadata
+       ) VALUES ($1, $2, $3, 'assignment_feedback', $4, 'both', 'delivered', $5)
+       ON CONFLICT (course_id, recipient_id, workflow_type, entity_id) DO NOTHING;`,
+      [
+        circleId,
+        courseId,
+        studentId,
+        assignmentId,
+        JSON.stringify({ gradeScore, assignTitle: data.assignTitle }),
+      ]
+    );
+  });
+}
+
+/**
+ * Dispatches a session replay alert to enrolled students when an instructor uploads a recording.
+ */
+export async function dispatchSessionReplayAlert(
+  circleId: string,
+  courseId: string,
+  lessonId: string,
+  _replayUrl: string,
+  lessonTitle: string,
+  actorUserId?: string
+): Promise<{ deliveredCount: number }> {
+  const data = await withServiceRoleTransaction(async (tx) => {
+    const courseRes = await tx.query<{ title: string; workflow_settings: unknown }>(
+      `SELECT title, workflow_settings FROM public.courses WHERE id = $1 AND circle_id = $2 LIMIT 1;`,
+      [courseId, circleId]
+    );
+    if (!courseRes.rows[0]) return null;
+
+    const course = courseRes.rows[0];
+    const settings = parseWorkflowSettings(course.workflow_settings);
+    if (settings.replayAlerts?.enabled === false) return null;
+
+    const circleRes = await tx.query<{ name: string; slug: string }>(
+      `SELECT name, slug FROM public.circles WHERE id = $1 LIMIT 1;`,
+      [circleId]
+    );
+    const circle = circleRes.rows[0];
+    const circleSlug = circle?.slug || circleId;
+
+    const enrollments = await tx.query<{ student_id: string }>(
+      `SELECT student_id FROM public.course_enrollments WHERE course_id = $1 AND circle_id = $2;`,
+      [courseId, circleId]
+    );
+
+    return {
+      courseTitle: course.title,
+      circleSlug,
+      studentIds: enrollments.rows.map((r) => r.student_id),
+    };
+  });
+
+  if (!data || data.studentIds.length === 0) return { deliveredCount: 0 };
+
+  let deliveredCount = 0;
+  const title = `New Session Replay: ${lessonTitle}`;
+  const body = `The recording and discussion notes for "${lessonTitle}" in ${data.courseTitle} are now live in the course player.`;
+  const linkUrl = `/circles/${data.circleSlug}/courses/${courseId}/learn?lesson=${lessonId}`;
+
+  for (const studentId of data.studentIds) {
+    const idempotencyKey = `wf:replay:${courseId}:${lessonId}:${studentId}`;
+
+    try {
+      await createNotification({
+        recipientId: studentId,
+        actorId: actorUserId ?? null,
+        circleId,
+        eventType: 'course_reminder',
+        title,
+        body,
+        linkUrl,
+        idempotencyKey,
+        sendEmail: true,
+      });
+
+      await withServiceRoleTransaction(async (tx) => {
+        await tx.query(
+          `INSERT INTO public.course_workflow_logs (
+             circle_id, course_id, recipient_id, workflow_type, entity_id, channel, status, metadata
+           ) VALUES ($1, $2, $3, 'session_replay', $4, 'both', 'delivered', $5)
+           ON CONFLICT (course_id, recipient_id, workflow_type, entity_id) DO NOTHING;`,
+          [
+            circleId,
+            courseId,
+            studentId,
+            lessonId,
+            JSON.stringify({ lessonTitle }),
+          ]
+        );
+      });
+      deliveredCount++;
+    } catch {
+      // Individual delivery failures shouldn't abort batch
+    }
+  }
+
+  return { deliveredCount };
+}
+
+/**
+ * Evaluates and dispatches upcoming live cohort reminders (24h & 15m), assignment deadlines
+ * (24h & 3h non-submitters), grace periods, and weekly kickoff/scorecard digests.
+ */
+export async function dispatchCourseWorkflowReminders(
+  circleId: string,
+  courseId: string
+): Promise<{
+  liveSession24hSent: number;
+  liveSession15mSent: number;
+  assignment24hSent: number;
+  assignment3hSent: number;
+  assignmentGracePeriodSent: number;
+  mondayKickoffSent: number;
+  fridayScorecardSent: number;
+}> {
+  const prepared = await withServiceRoleTransaction(async (tx) => {
+    const courseRes = await tx.query<{
+      id: string;
+      title: string;
+      course_format: string;
+      cohort_meeting_url: string | null;
+      cohort_schedule_description: string | null;
+      cohort_start_date: string | null;
+      cohort_end_date: string | null;
+      workflow_settings: unknown;
+    }>(
+      `SELECT id, title, course_format, cohort_meeting_url, cohort_schedule_description,
+              cohort_start_date, cohort_end_date, workflow_settings
+       FROM public.courses WHERE id = $1 AND circle_id = $2 LIMIT 1;`,
+      [courseId, circleId]
+    );
+    if (!courseRes.rows[0]) {
+      throw new NotFoundError('Course not found.');
+    }
+
+    const course = courseRes.rows[0];
+    const settings = parseWorkflowSettings(course.workflow_settings);
+
+    const circleRes = await tx.query<{ name: string; slug: string }>(
+      `SELECT name, slug FROM public.circles WHERE id = $1 LIMIT 1;`,
+      [circleId]
+    );
+    const circle = circleRes.rows[0];
+    const circleSlug = circle?.slug || circleId;
+
+    const enrollmentsRes = await tx.query<{
+      student_id: string;
+      completed_lessons_count: string;
+    }>(
+      `SELECT
+         e.student_id,
+         COUNT(clc.lesson_id)::text as completed_lessons_count
+       FROM public.course_enrollments e
+       LEFT JOIN public.course_lesson_completions clc ON clc.course_id = e.course_id AND clc.user_id = e.student_id
+       WHERE e.course_id = $1 AND e.circle_id = $2
+       GROUP BY e.student_id;`,
+      [courseId, circleId]
+    );
+    const students = enrollmentsRes.rows;
+
+    const totalLessonsRes = await tx.query<{ count: string }>(
+      `SELECT COUNT(*)::text as count FROM public.course_lessons WHERE course_id = $1 AND circle_id = $2;`,
+      [courseId, circleId]
+    );
+    const totalLessons = parseInt(totalLessonsRes.rows[0]?.count || '0', 10);
+
+    const assignmentsRes = await tx.query<{
+      id: string;
+      title: string;
+      lesson_id: string;
+      due_date: string;
+      hours_until_due: number;
+    }>(
+      `SELECT id, title, lesson_id, due_date::text,
+              ROUND(EXTRACT(EPOCH FROM (due_date - NOW())) / 3600)::integer as hours_until_due
+       FROM public.course_assignments
+       WHERE course_id = $1 AND circle_id = $2 AND due_date IS NOT NULL;`,
+      [courseId, circleId]
+    );
+
+    const assignmentsWithNonSubmitters: Array<{
+      id: string;
+      title: string;
+      lesson_id: string;
+      due_date: string;
+      hours_until_due: number;
+      nonSubmitterIds: string[];
+    }> = [];
+
+    for (const a of assignmentsRes.rows) {
+      const nonSubmittersRes = await tx.query<{ student_id: string }>(
+        `SELECT e.student_id
+         FROM public.course_enrollments e
+         WHERE e.course_id = $1 AND e.circle_id = $2
+           AND NOT EXISTS (
+             SELECT 1 FROM public.course_assignment_submissions s
+             WHERE s.assignment_id = $3 AND s.student_id = e.student_id
+           );`,
+        [courseId, circleId, a.id]
+      );
+      assignmentsWithNonSubmitters.push({
+        ...a,
+        nonSubmitterIds: nonSubmittersRes.rows.map((r) => r.student_id),
+      });
+    }
+
+    const logsRes = await tx.query<{ workflow_type: string; recipient_id: string; entity_id: string }>(
+      `SELECT workflow_type, recipient_id, entity_id FROM public.course_workflow_logs WHERE course_id = $1;`,
+      [courseId]
+    );
+    const existingLogsSet = new Set<string>();
+    for (const log of logsRes.rows) {
+      existingLogsSet.add(`${log.workflow_type}:${log.recipient_id}:${log.entity_id}`);
+    }
+
+    return {
+      course,
+      settings,
+      circleSlug,
+      students,
+      totalLessons,
+      assignments: assignmentsWithNonSubmitters,
+      existingLogsSet,
+    };
+  });
+
+  const { course, settings, circleSlug, students, totalLessons, assignments, existingLogsSet } = prepared;
+
+  const stats = {
+    liveSession24hSent: 0,
+    liveSession15mSent: 0,
+    assignment24hSent: 0,
+    assignment3hSent: 0,
+    assignmentGracePeriodSent: 0,
+    mondayKickoffSent: 0,
+    fridayScorecardSent: 0,
+  };
+
+  const todayDateKey = new Date().toISOString().slice(0, 10);
+  const currentDayOfWeek = new Date().getDay(); // 0 = Sun, 1 = Mon, ..., 5 = Fri
+
+  interface PendingReminder {
+    statKey: keyof typeof stats;
+    workflowType: string;
+    entityId: string;
+    studentId: string;
+    idempotencyKey: string;
+    title: string;
+    body: string;
+    linkUrl: string;
+  }
+
+  const queue: PendingReminder[] = [];
+
+  // 1. Live Cohort Reminders (24h & 15m)
+  if (course.course_format === 'live_cohort') {
+    const meetUrl = course.cohort_meeting_url || `/circles/${circleSlug}/courses/${course.id}/live-join`;
+
+    // 24h reminder
+    if (settings.liveSessionReminders?.enabled24h) {
+      for (const s of students) {
+        const logKey = `live_session_24h:${s.student_id}:${todayDateKey}`;
+        if (!existingLogsSet.has(logKey)) {
+          queue.push({
+            statKey: 'liveSession24hSent',
+            workflowType: 'live_session_24h',
+            entityId: todayDateKey,
+            studentId: s.student_id,
+            idempotencyKey: `wf:cohort24h:${course.id}:${todayDateKey}:${s.student_id}`,
+            title: `📅 Tomorrow: Live Workshop for ${course.title}`,
+            body: `Get ready for tomorrow's live interactive cohort session. Check schedule & syllabus before joining.`,
+            linkUrl: `/circles/${circleSlug}/courses/${course.id}`,
+          });
+        }
+      }
+    }
+
+    // 15m Urgent reminder
+    if (settings.liveSessionReminders?.enabled15m) {
+      for (const s of students) {
+        const logKey = `live_session_15m:${s.student_id}:${todayDateKey}`;
+        if (!existingLogsSet.has(logKey)) {
+          queue.push({
+            statKey: 'liveSession15mSent',
+            workflowType: 'live_session_15m',
+            entityId: todayDateKey,
+            studentId: s.student_id,
+            idempotencyKey: `wf:cohort15m:${course.id}:${todayDateKey}:${s.student_id}`,
+            title: `🚨 Starting in 15 mins: Join ${course.title} live!`,
+            body: `Click here to join the live session on ${course.cohort_meeting_url ? 'video conference' : 'circles'}.`,
+            linkUrl: meetUrl,
+          });
+        }
+      }
+    }
+  }
+
+  // 2. Assignment Deadline Reminders (Only for students who have NOT submitted!)
+  for (const a of assignments) {
+    // A. 24h Reminder (due in 0 to 24 hours)
+    if (settings.assignmentDeadlines?.enabled24h && a.hours_until_due >= 0 && a.hours_until_due <= 24) {
+      for (const studentId of a.nonSubmitterIds) {
+        const logKey = `assignment_deadline_24h:${studentId}:${a.id}`;
+        if (!existingLogsSet.has(logKey)) {
+          queue.push({
+            statKey: 'assignment24hSent',
+            workflowType: 'assignment_deadline_24h',
+            entityId: a.id,
+            studentId,
+            idempotencyKey: `wf:assign24h:${course.id}:${a.id}:${studentId}`,
+            title: `📝 24 Hours Left: Submit "${a.title}"`,
+            body: `Friendly reminder that "${a.title}" is due soon. Submit your homework or project for instructor review.`,
+            linkUrl: `/circles/${circleSlug}/courses/${course.id}/learn?lesson=${a.lesson_id}`,
+          });
+        }
+      }
+    }
+
+    // B. 3h Final Countdown (due in 0 to 3 hours)
+    if (settings.assignmentDeadlines?.enabled3h && a.hours_until_due >= 0 && a.hours_until_due <= 3) {
+      for (const studentId of a.nonSubmitterIds) {
+        const logKey = `assignment_deadline_3h:${studentId}:${a.id}`;
+        if (!existingLogsSet.has(logKey)) {
+          queue.push({
+            statKey: 'assignment3hSent',
+            workflowType: 'assignment_deadline_3h',
+            entityId: a.id,
+            studentId,
+            idempotencyKey: `wf:assign3h:${course.id}:${a.id}:${studentId}`,
+            title: `⏳ 3 Hours Left: Submit "${a.title}"`,
+            body: `Final countdown! 3 hours left before the deadline for "${a.title}". 1-click to turn in your work.`,
+            linkUrl: `/circles/${circleSlug}/courses/${course.id}/learn?lesson=${a.lesson_id}`,
+          });
+        }
+      }
+    }
+
+    // C. Grace period alert (due date passed within last 48 hours, not submitted)
+    if (settings.assignmentDeadlines?.enabledGracePeriod && a.hours_until_due < 0 && a.hours_until_due >= -48) {
+      for (const studentId of a.nonSubmitterIds) {
+        const logKey = `assignment_grace_period:${studentId}:${a.id}`;
+        if (!existingLogsSet.has(logKey)) {
+          queue.push({
+            statKey: 'assignmentGracePeriodSent',
+            workflowType: 'assignment_grace_period',
+            entityId: a.id,
+            studentId,
+            idempotencyKey: `wf:grace:${course.id}:${a.id}:${studentId}`,
+            title: `⚠️ Missed Deadline: "${a.title}" (Grace Period Active)`,
+            body: `The deadline passed, but you can still submit for late review and partial XP! Click here to submit.`,
+            linkUrl: `/circles/${circleSlug}/courses/${course.id}/learn?lesson=${a.lesson_id}`,
+          });
+        }
+      }
+    }
+  }
+
+  // 3. Weekly Rhythm: Monday Kickoff
+  if (settings.weeklyRhythm?.enabledMondayKickoff && currentDayOfWeek === 1) {
+    for (const s of students) {
+      const logKey = `monday_kickoff:${s.student_id}:${todayDateKey}`;
+      if (!existingLogsSet.has(logKey)) {
+        queue.push({
+          statKey: 'mondayKickoffSent',
+          workflowType: 'monday_kickoff',
+          entityId: todayDateKey,
+          studentId: s.student_id,
+          idempotencyKey: `wf:monday:${course.id}:${todayDateKey}:${s.student_id}`,
+          title: `🚀 Week Ahead in ${course.title}`,
+          body: `Welcome to a new week of learning! Check this week's live workshops and upcoming assignments.`,
+          linkUrl: `/circles/${circleSlug}/courses/${course.id}`,
+        });
+      }
+    }
+  }
+
+  // 4. Weekly Rhythm: Friday Scorecard
+  if (settings.weeklyRhythm?.enabledFridayScorecard && currentDayOfWeek === 5) {
+    for (const s of students) {
+      const logKey = `friday_scorecard:${s.student_id}:${todayDateKey}`;
+      if (!existingLogsSet.has(logKey)) {
+        const completed = parseInt(s.completed_lessons_count || '0', 10);
+        const progressPercent = totalLessons > 0 ? Math.round((completed / totalLessons) * 100) : 0;
+        queue.push({
+          statKey: 'fridayScorecardSent',
+          workflowType: 'friday_scorecard',
+          entityId: todayDateKey,
+          studentId: s.student_id,
+          idempotencyKey: `wf:friday:${course.id}:${todayDateKey}:${s.student_id}`,
+          title: `📊 Friday Scorecard: ${course.title}`,
+          body: `You've completed ${completed}/${totalLessons} lessons (${progressPercent}%). Spend 20 minutes this weekend to stay on track!`,
+          linkUrl: `/circles/${circleSlug}/courses/${course.id}/learn`,
+        });
+      }
+    }
+  }
+
+  // Dispatch notifications outside of transaction to avoid nested lockups
+  for (const item of queue) {
+    try {
+      await createNotification({
+        recipientId: item.studentId,
+        circleId,
+        eventType: 'course_reminder',
+        title: item.title,
+        body: item.body,
+        linkUrl: item.linkUrl,
+        idempotencyKey: item.idempotencyKey,
+        sendEmail: true,
+      });
+
+      await withServiceRoleTransaction(async (tx) => {
+        await tx.query(
+          `INSERT INTO public.course_workflow_logs (
+             circle_id, course_id, recipient_id, workflow_type, entity_id, channel, status
+           ) VALUES ($1, $2, $3, $4, $5, 'both', 'delivered')
+           ON CONFLICT (course_id, recipient_id, workflow_type, entity_id) DO NOTHING;`,
+          [circleId, course.id, item.studentId, item.workflowType, item.entityId]
+        );
+      });
+
+      stats[item.statKey]++;
+    } catch {
+      // Best effort per reminder
+    }
+  }
+
+  return stats;
+}
+
+/**
+ * Sends a test preview email & notification to the instructor for a chosen workflow reminder.
+ */
+export async function sendTestWorkflowReminder(
+  actorUserId: string,
+  circleId: string,
+  courseId: string,
+  workflowType: string
+): Promise<{ success: boolean; previewTitle: string; previewBody: string }> {
+  const data = await withServiceRoleTransaction(async (tx) => {
+    const courseRes = await tx.query<{ title: string; cohort_meeting_url: string | null }>(
+      `SELECT title, cohort_meeting_url FROM public.courses WHERE id = $1 AND circle_id = $2 LIMIT 1;`,
+      [courseId, circleId]
+    );
+    const course = courseRes.rows[0];
+    if (!course) throw new NotFoundError('Course not found.');
+
+    const circleRes = await tx.query<{ name: string; slug: string }>(
+      `SELECT name, slug FROM public.circles WHERE id = $1 LIMIT 1;`,
+      [circleId]
+    );
+    const circle = circleRes.rows[0];
+    const circleName = circle?.name || 'Community';
+    const circleSlug = circle?.slug || circleId;
+
+    const profileRes = await tx.query<{ email: string }>(
+      `SELECT email FROM public.profiles WHERE id = $1 LIMIT 1;`,
+      [actorUserId]
+    );
+    const recipientEmail = profileRes.rows[0]?.email;
+
+    return {
+      courseTitle: course.title,
+      cohortMeetingUrl: course.cohort_meeting_url,
+      circleName,
+      circleSlug,
+      recipientEmail,
+    };
+  });
+
+  let previewTitle = `[TEST PREVIEW] Course Reminder: ${data.courseTitle}`;
+  let previewBody = `This is a test preview of your automated course reminder.`;
+  let linkUrl = `/circles/${data.circleSlug}/courses/${courseId}`;
+  let primaryActionLabel = 'Open Course';
+
+  if (workflowType === 'live_session_24h') {
+    previewTitle = `[TEST] 📅 Tomorrow: Live Cohort Workshop for ${data.courseTitle}`;
+    previewBody = `Prepare for tomorrow's live interactive cohort session. Check your prep materials and schedule before class.`;
+    linkUrl = data.cohortMeetingUrl || `/circles/${data.circleSlug}/courses/${courseId}/live-join`;
+    primaryActionLabel = 'Join Live Workshop';
+  } else if (workflowType === 'live_session_15m') {
+    previewTitle = `[TEST] 🚨 Starting in 15 mins: Join ${data.courseTitle} live!`;
+    previewBody = `Your live cohort class is starting right now! Click below to join the meeting room immediately.`;
+    linkUrl = data.cohortMeetingUrl || `/circles/${data.circleSlug}/courses/${courseId}/live-join`;
+    primaryActionLabel = 'Join Meeting Now';
+  } else if (workflowType === 'session_replay') {
+    previewTitle = `[TEST] 📹 New Session Replay: Module 1 Masterclass`;
+    previewBody = `The recording and notes from yesterday's live workshop are now published in the course player.`;
+    linkUrl = `/circles/${data.circleSlug}/courses/${courseId}/learn`;
+    primaryActionLabel = 'Watch Session Replay';
+  } else if (workflowType === 'assignment_deadline_24h') {
+    previewTitle = `[TEST] 📝 24 Hours Left: Submit "Final Capstone Project"`;
+    previewBody = `Friendly reminder: The capstone project is due tomorrow at 11:59 PM. Submit your work to earn XP and receive instructor feedback.`;
+    linkUrl = `/circles/${data.circleSlug}/courses/${courseId}/learn`;
+    primaryActionLabel = 'Submit Assignment';
+  } else if (workflowType === 'assignment_deadline_3h') {
+    previewTitle = `[TEST] ⏳ Final Countdown: 3 Hours Left to Submit Project`;
+    previewBody = `3 hours left before the submission window closes! 1-click to turn in your work.`;
+    linkUrl = `/circles/${data.circleSlug}/courses/${courseId}/learn`;
+    primaryActionLabel = 'Submit Assignment';
+  } else if (workflowType === 'assignment_feedback') {
+    previewTitle = `[TEST] 🎉 Assignment Reviewed: "Final Capstone Project" (Score: 95/100)`;
+    previewBody = `Your instructor reviewed your submission: "Outstanding architecture and well-documented RLS policies. Approved!"`;
+    linkUrl = `/circles/${data.circleSlug}/courses/${courseId}/learn`;
+    primaryActionLabel = 'View Grade & Feedback';
+  } else if (workflowType === 'monday_kickoff') {
+    previewTitle = `[TEST] 🚀 Week Ahead in ${data.courseTitle}`;
+    previewBody = `Welcome to this week's cohort rhythm! You have 2 live workshops scheduled and 1 milestone assignment due Friday.`;
+    linkUrl = `/circles/${data.circleSlug}/courses/${courseId}`;
+    primaryActionLabel = 'View Syllabus';
+  } else if (workflowType === 'friday_scorecard') {
+    previewTitle = `[TEST] 📊 Friday Scorecard: ${data.courseTitle}`;
+    previewBody = `Weekly Progress: You completed 3 of 4 lessons this week (75%). Catch up over the weekend to stay on track!`;
+    linkUrl = `/circles/${data.circleSlug}/courses/${courseId}/learn`;
+    primaryActionLabel = 'Resume Learning';
+  }
+
+  const testIdempotencyKey = `wf:test:${courseId}:${workflowType}:${Date.now()}`;
+
+  // Send in-app notification
+  await createNotification({
+    recipientId: actorUserId,
+    actorId: actorUserId,
+    circleId,
+    eventType: 'course_reminder',
+    title: previewTitle,
+    body: previewBody,
+    linkUrl,
+    idempotencyKey: testIdempotencyKey,
+    sendEmail: true,
+  });
+
+  // Also send rich HTML email directly
+  if (data.recipientEmail) {
+    const emailHtml = renderCourseEmailHtml({
+      circleName: data.circleName,
+      courseTitle: data.courseTitle,
+      badgeText: 'Test Preview',
+      heading: previewTitle,
+      bodyText: previewBody,
+      primaryActionLabel,
+      primaryActionUrl: linkUrl.startsWith('http') ? linkUrl : `https://circles.example.com${linkUrl}`,
+      secondaryInfo: `This was sent from the Course Studio Workflows tab to verify your reminder templates.`,
+    });
+    await sendTransactionalEmail({
+      to: data.recipientEmail,
+      subject: previewTitle,
+      html: emailHtml,
+      text: `${previewTitle}\n\n${previewBody}\n\n${linkUrl}`,
+    });
+  }
+
+  // Record test in logs
+  await withServiceRoleTransaction(async (tx) => {
+    await tx.query(
+      `INSERT INTO public.course_workflow_logs (
+         circle_id, course_id, recipient_id, workflow_type, entity_id, channel, status, metadata
+       ) VALUES ($1, $2, $3, $4, 'test_preview', 'both', 'delivered', $5);`,
+      [
+        circleId,
+        courseId,
+        actorUserId,
+        workflowType,
+        JSON.stringify({ isTest: true, previewTitle }),
+      ]
+    );
+  });
+
+  return {
+    success: true,
+    previewTitle,
+    previewBody,
+  };
 }

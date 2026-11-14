@@ -26,6 +26,11 @@ import {
   updateLesson,
   recordLiveAttendance,
   getCourseLiveAttendanceSummary,
+  getCourseWorkflowSettings,
+  updateCourseWorkflowSettings,
+  getCourseWorkflowLogs,
+  dispatchCourseWorkflowReminders,
+  sendTestWorkflowReminder,
 } from '@/features/courses/service';
 import { withRlsTransaction } from '@/lib/db/postgres';
 import { CapabilityDisabledError, ConflictError, ForbiddenError, NotFoundError } from '@/lib/errors';
@@ -1127,5 +1132,164 @@ describe('Courses, LMS Curriculum & Student Learning Progress Integration Suite'
     expect(catalogCohort?.max_seats).toBe(2);
     expect(catalogCohort?.seats_remaining).toBe(0);
     expect(catalogCohort?.enrolled_students_count).toBe(2);
+  });
+
+  it('enforces course workflows, live cohort 24h & 15m reminders, assignment deadline targeting for non-submitters, feedback alerts, and delivery logging', async () => {
+    const { user: instructor } = await registerUser({
+      email: 'workflow.instructor@test.com',
+      password: 'Password123!',
+      displayName: 'Workflow Instructor',
+      username: 'wf_instructor',
+    });
+
+    const { user: studentA } = await registerUser({
+      email: 'workflow.student.a@test.com',
+      password: 'Password123!',
+      displayName: 'Alice Student',
+      username: 'wf_alice',
+    });
+
+    const { user: studentB } = await registerUser({
+      email: 'workflow.student.b@test.com',
+      password: 'Password123!',
+      displayName: 'Bob Student',
+      username: 'wf_bob',
+    });
+
+    const circle = await createCircle(instructor.id, {
+      name: 'Automations Academy',
+      slug: 'automations-academy',
+      description: 'Testing course automated reminders and workflows',
+      visibility: 'public',
+    });
+
+    await updateCircleCapability(instructor.id, circle.id, 'learning_resources', true);
+    await joinPublicCircle(studentA.id, circle.id);
+    await joinPublicCircle(studentB.id, circle.id);
+
+    // 1. Create a live cohort course
+    const course = await createCourse(instructor.id, {
+      circleId: circle.id,
+      title: 'Fullstack Mastery Cohort',
+      slug: 'fullstack-mastery-cohort',
+      description: 'Interactive cohort with automated workshop reminders and deadline alerts.',
+      courseFormat: 'live_cohort',
+      cohortMeetingUrl: 'https://meet.google.com/abc-defg-hij',
+      cohortScheduleDescription: 'Mondays & Thursdays at 6:00 PM UTC',
+      cohortStartDate: new Date(Date.now() + 86400000).toISOString(),
+      cohortEndDate: new Date(Date.now() + 86400000 * 30).toISOString(),
+      accessRule: 'open',
+      learningObjectives: ['Master automations', 'Build cohort LMS'],
+      requirements: ['TypeScript familiarity'],
+    });
+
+    // 2. Add module, lesson, and assignment with a due date in 12 hours
+    const mod = await createModule(instructor.id, {
+      circleId: circle.id,
+      courseId: course.id,
+      title: 'Module 1: Foundations',
+    });
+
+    const lesson = await createLesson(instructor.id, {
+      circleId: circle.id,
+      courseId: course.id,
+      moduleId: mod.id,
+      title: 'Lesson 1: System Design',
+      slug: 'lesson-1-system-design',
+    });
+
+    const dueDate = new Date(Date.now() + 12 * 3600 * 1000).toISOString();
+    const assignment = await createCourseAssignment(instructor.id, {
+      circleId: circle.id,
+      courseId: course.id,
+      lessonId: lesson.id,
+      title: 'Architecture Blueprint',
+      promptBody: 'Submit your architectural diagram in markdown.',
+      dueDate,
+    });
+
+    // 3. Verify workflow settings default retrieval & updates
+    const initialSettings = await getCourseWorkflowSettings(instructor.id, circle.id, course.id);
+    expect(initialSettings.liveSessionReminders?.enabled24h).toBe(true);
+    expect(initialSettings.liveSessionReminders?.enabled15m).toBe(true);
+    expect(initialSettings.assignmentDeadlines?.enabled24h).toBe(true);
+    expect(initialSettings.assignmentFeedback?.enabled).toBe(true);
+
+    const updatedSettings = await updateCourseWorkflowSettings(instructor.id, circle.id, course.id, {
+      assignmentDeadlines: {
+        enabled24h: true,
+        enabled3h: true,
+        enabledGracePeriod: true,
+      },
+    });
+    expect(updatedSettings.assignmentDeadlines?.enabled3h).toBe(true);
+
+    // 4. Enroll students
+    await enrollInCourse(studentA.id, circle.id, course.id);
+    await enrollInCourse(studentB.id, circle.id, course.id);
+
+    // 5. Test sending test preview reminders
+    const testLive = await sendTestWorkflowReminder(
+      instructor.id,
+      circle.id,
+      course.id,
+      'live_session_24h'
+    );
+    expect(testLive.success).toBe(true);
+    expect(testLive.previewTitle).toContain('Live Cohort Workshop');
+
+    const testAssign = await sendTestWorkflowReminder(
+      instructor.id,
+      circle.id,
+      course.id,
+      'assignment_deadline_24h'
+    );
+    expect(testAssign.success).toBe(true);
+    expect(testAssign.previewTitle).toContain('24 Hours Left');
+
+    // 6. Student A submits the assignment, Student B has NOT submitted
+    const subA = await submitAssignment(studentA.id, {
+      circleId: circle.id,
+      courseId: course.id,
+      lessonId: lesson.id,
+      assignmentId: assignment.id,
+      submissionBody: 'Here is my architecture blueprint with PostgreSQL RLS and Next.js.',
+    });
+    expect(subA.status).toBe('submitted');
+
+    // 7. Dispatch reminders - Student B receives assignment deadline reminder, Student A does NOT get spammed
+    const dispatchStats = await dispatchCourseWorkflowReminders(circle.id, course.id);
+    expect(dispatchStats.liveSession24hSent).toBeGreaterThanOrEqual(2);
+    expect(dispatchStats.liveSession15mSent).toBeGreaterThanOrEqual(2);
+    expect(dispatchStats.assignment24hSent).toBe(1); // Only Student B who has not submitted!
+
+    // Dispatching again is idempotent and sends 0 duplicates
+    const secondDispatch = await dispatchCourseWorkflowReminders(circle.id, course.id);
+    expect(secondDispatch.assignment24hSent).toBe(0);
+    expect(secondDispatch.liveSession24hSent).toBe(0);
+
+    // 8. Instructor reviews Student A's submission -> automatically dispatches feedback reminder
+    const reviewed = await reviewAssignmentSubmission(instructor.id, {
+      circleId: circle.id,
+      courseId: course.id,
+      submissionId: subA.id,
+      status: 'approved',
+      gradeScore: 98,
+      instructorFeedback: 'Brilliant work Alice! Clean modular monolith design.',
+    });
+    expect(reviewed.status).toBe('approved');
+    expect(reviewed.grade_score).toBe(98);
+
+    // 9. Verify workflow delivery logs
+    const logs = await getCourseWorkflowLogs(instructor.id, circle.id, course.id, 50);
+    expect(logs.length).toBeGreaterThan(0);
+
+    const feedbackLog = logs.find((l) => l.workflow_type === 'assignment_feedback');
+    expect(feedbackLog).toBeDefined();
+    expect(feedbackLog?.recipient_id).toBe(studentA.id);
+
+    const assignmentLog = logs.find((l) => l.workflow_type === 'assignment_deadline_24h');
+    expect(assignmentLog).toBeDefined();
+    expect(assignmentLog?.recipient_id).toBe(studentB.id);
   });
 });

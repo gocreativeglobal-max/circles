@@ -279,6 +279,8 @@ export interface NotificationItem {
     | 'challenge_reward'
     | 'governance_update'
     | 'direct_message'
+    | 'course_reminder'
+    | 'assignment_feedback'
     | 'system';
   title: string;
   body: string;
@@ -1207,6 +1209,55 @@ export interface CourseItem {
   prerequisites?: CoursePrerequisiteItem[];
   live_attendance_count_today?: number;
   has_attended_live_today?: boolean;
+  workflow_settings?: CourseWorkflowSettings;
+}
+
+export interface CourseLiveSessionReminderSettings {
+  enabled24h: boolean;
+  enabled15m: boolean;
+}
+
+export interface CourseReplayAlertSettings {
+  enabled: boolean;
+}
+
+export interface CourseAssignmentDeadlineSettings {
+  enabled24h: boolean;
+  enabled3h: boolean;
+  enabledGracePeriod: boolean;
+}
+
+export interface CourseAssignmentFeedbackSettings {
+  enabled: boolean;
+}
+
+export interface CourseWeeklyRhythmSettings {
+  enabledMondayKickoff: boolean;
+  mondayKickoffTime: string;
+  enabledFridayScorecard: boolean;
+  fridayScorecardTime: string;
+}
+
+export interface CourseWorkflowSettings {
+  liveSessionReminders?: CourseLiveSessionReminderSettings;
+  replayAlerts?: CourseReplayAlertSettings;
+  assignmentDeadlines?: CourseAssignmentDeadlineSettings;
+  assignmentFeedback?: CourseAssignmentFeedbackSettings;
+  weeklyRhythm?: CourseWeeklyRhythmSettings;
+}
+
+export interface CourseWorkflowLogItem {
+  id: string;
+  circle_id: string;
+  course_id: string;
+  recipient_id: string;
+  workflow_type: string;
+  entity_id: string | null;
+  channel: 'in_app' | 'email' | 'both';
+  status: 'delivered' | 'failed' | 'skipped';
+  metadata?: Record<string, unknown>;
+  delivered_at: string;
+  recipient?: Pick<UserProfile, 'id' | 'username' | 'display_name' | 'avatar_url'>;
 }
 
 export interface CourseLiveAttendanceItem {

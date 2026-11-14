@@ -45,6 +45,7 @@ import { detectMeetingPlatform } from '@/lib/courses/cohort-helpers';
 import { ClassSchedulePicker } from './class-schedule-picker';
 import { LearningObjectivesEditor } from './learning-objectives-editor';
 import { CourseRequirementsEditor } from './course-requirements-editor';
+import { CourseWorkflowsManager } from './course-workflows-manager';
 import {
   BACHS_ACCEPTED_CURRENCIES,
   formatBachsAmount,
@@ -2423,34 +2424,12 @@ export function CourseStudioClient({
         {/* TAB 8: WORKFLOWS */}
         {/* ==================================================================== */}
         {activeTab === 'workflows' && (
-          <div className="max-w-2xl rounded-2xl border border-stone-200 bg-white p-6 shadow-2xs">
-            <h2 className="text-base font-bold text-stone-900">Automation Workflows</h2>
-            <p className="text-xs text-stone-500 mt-0.5">
-              Trigger automated notifications, badges, or direct messages based on student milestones.
-            </p>
-
-            <div className="mt-6 space-y-4">
-              <div className="flex items-center justify-between rounded-xl border border-stone-200 p-4">
-                <div>
-                  <h4 className="text-xs font-bold text-stone-900">Welcome on Enrollment</h4>
-                  <p className="text-[11px] text-stone-500 mt-0.5">
-                    Send an automated welcoming direct message when a member enrolls.
-                  </p>
-                </div>
-                <input type="checkbox" defaultChecked className="rounded" />
-              </div>
-
-              <div className="flex items-center justify-between rounded-xl border border-stone-200 p-4">
-                <div>
-                  <h4 className="text-xs font-bold text-stone-900">Certificate & Badge on Completion</h4>
-                  <p className="text-[11px] text-stone-500 mt-0.5">
-                    Award course completion XP points and notify community chat.
-                  </p>
-                </div>
-                <input type="checkbox" defaultChecked className="rounded" />
-              </div>
-            </div>
-          </div>
+          <CourseWorkflowsManager
+            circleId={circleId}
+            circleSlug={circleSlug}
+            course={course}
+            isStaff={Boolean(_isStaff)}
+          />
         )}
       </main>
 
