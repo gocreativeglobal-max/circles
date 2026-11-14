@@ -32,6 +32,7 @@ import {
   Settings,
   Video,
   ExternalLink,
+  Wrench,
 } from 'lucide-react';
 import {
   CourseItem,
@@ -1912,6 +1913,23 @@ export function CoursePlayer({
                           </div>
                         ))}
                       </div>
+                    </div>
+                  )}
+
+                  {course.requirements && course.requirements.length > 0 && (
+                    <div className="rounded-xl border border-stone-100 bg-stone-50/70 p-4 space-y-2.5">
+                      <h4 className="text-xs font-bold text-stone-800 uppercase tracking-wider flex items-center gap-1.5">
+                        <Wrench className="h-3.5 w-3.5 text-stone-700" />
+                        <span>Prerequisites & Requirements</span>
+                      </h4>
+                      <ul className="space-y-1.5 text-xs text-stone-600">
+                        {course.requirements.map((req, i) => (
+                          <li key={i} className="flex items-start gap-2">
+                            <span className="h-1.5 w-1.5 rounded-full bg-stone-900 mt-1.5 shrink-0" />
+                            <span>{req}</span>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   )}
 

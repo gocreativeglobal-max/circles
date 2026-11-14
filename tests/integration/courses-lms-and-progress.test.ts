@@ -106,9 +106,19 @@ describe('Courses, LMS Curriculum & Student Learning Progress Integration Suite'
       description: 'Comprehensive curriculum from scratch to production.',
       difficultyLevel: 'intermediate',
       estimatedDurationHours: 12.5,
+      learningObjectives: ['Architect scalable systems', 'Master Next.js App Router'],
+      requirements: ['Basic JavaScript knowledge', 'Node.js v18+ installed'],
     });
     expect(course.id).toBeDefined();
     expect(course.title).toBe('Full-Stack Modern Web Development');
+    expect(course.learning_objectives).toEqual([
+      'Architect scalable systems',
+      'Master Next.js App Router',
+    ]);
+    expect(course.requirements).toEqual([
+      'Basic JavaScript knowledge',
+      'Node.js v18+ installed',
+    ]);
 
     // 4. Instructor creates Modules
     const module1 = await createModule(owner.id, {

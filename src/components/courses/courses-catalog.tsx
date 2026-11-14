@@ -34,6 +34,7 @@ import {
 } from '@/lib/courses/cohort-helpers';
 import { ClassSchedulePicker, ClassScheduleDaysStrip } from './class-schedule-picker';
 import { LearningObjectivesEditor } from './learning-objectives-editor';
+import { CourseRequirementsEditor } from './course-requirements-editor';
 
 export function CoursesCatalog({
   circleId,
@@ -85,7 +86,8 @@ export function CoursesCatalog({
     'open' | 'members_only' | 'min_level' | 'staff_only'
   >('open');
   const [minLevelRequired, setMinLevelRequired] = useState(2);
-  const [learningObjectives, setLearningObjectives] = useState<string[]>([]);
+  const [learningObjectives, setLearningObjectives] = useState<string[]>(['']);
+  const [requirements, setRequirements] = useState<string[]>(['']);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -137,6 +139,19 @@ export function CoursesCatalog({
   async function handleCreateCourse(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    const validObjectives = learningObjectives.map((s) => s.trim()).filter(Boolean);
+    if (validObjectives.length === 0) {
+      setError('Please provide at least one learning outcome ("What You Will Learn").');
+      return;
+    }
+
+    const validRequirements = requirements.map((s) => s.trim()).filter(Boolean);
+    if (validRequirements.length === 0) {
+      setError('Please provide at least one course requirement or prerequisite.');
+      return;
+    }
+
     setLoading(true);
     try {
       const cleanSlug = (slug.trim() || title.trim())
@@ -172,7 +187,8 @@ export function CoursesCatalog({
           requireSequentialCompletion: pacingFormat === 'structured',
           accessRule,
           minLevelRequired: accessRule === 'min_level' ? Number(minLevelRequired) : 1,
-          learningObjectives: learningObjectives.map((s) => s.trim()).filter(Boolean),
+          learningObjectives: validObjectives,
+          requirements: validRequirements,
         }),
       });
       const data = await res.json();
@@ -184,7 +200,8 @@ export function CoursesCatalog({
       setIsSlugManual(false);
       setDescription('');
       setThumbnailUrl('');
-      setLearningObjectives([]);
+      setLearningObjectives(['']);
+      setRequirements(['']);
       setCourseFormat('video_on_demand');
       setCohortMeetingUrl('');
       setCohortScheduleDescription('');

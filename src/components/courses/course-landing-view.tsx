@@ -30,6 +30,7 @@ import {
   Settings,
   Video,
   ExternalLink,
+  Wrench,
 } from 'lucide-react';
 import {
   CourseItem,
@@ -45,7 +46,6 @@ import {
   calculateLiveSessionStatus,
 } from '@/lib/courses/cohort-helpers';
 import { ClassScheduleDaysStrip } from './class-schedule-picker';
-import { generateDefaultObjectives } from './learning-objectives-editor';
 
 export interface CourseLandingViewProps {
   circleId: string;
@@ -181,13 +181,21 @@ export function CourseLandingView({
     [course.title, course.description, course.cohort_start_date, course.cohort_end_date, course.cohort_meeting_url]
   );
 
-  // Learning Objectives (synthesize if not explicitly set)
+  // Learning Objectives (user-filled only, no auto-generated defaults)
   const learningObjectives = useMemo(() => {
     if (course.learning_objectives && course.learning_objectives.length > 0) {
-      return course.learning_objectives;
+      return course.learning_objectives.filter((s) => s.trim().length > 0);
     }
-    return generateDefaultObjectives(course.title);
-  }, [course.learning_objectives, course.title]);
+    return [];
+  }, [course.learning_objectives]);
+
+  // Course Requirements & Prerequisites (user-filled)
+  const requirements = useMemo(() => {
+    if (course.requirements && course.requirements.length > 0) {
+      return course.requirements.filter((r) => r.trim().length > 0);
+    }
+    return [];
+  }, [course.requirements]);
 
   const allSectionsExpanded = useMemo(() => {
     if (!course.modules || course.modules.length === 0) return false;
@@ -440,23 +448,46 @@ export function CourseLandingView({
           {/* ================================================================ */}
           <div className="lg:col-span-8 space-y-8">
             {/* -------------------------------------------------------------- */}
-            {/* A. "WHAT YOU'LL LEARN" HIGHLIGHT BOX                           */}
+            {/* A. "WHAT YOU'LL LEARN" HIGHLIGHT BOX (User-Filled)             */}
             {/* -------------------------------------------------------------- */}
-            <section className="rounded-2xl border border-stone-200/90 bg-stone-50/70 p-6 shadow-xs">
-              <div className="flex items-center gap-2 mb-4">
-                <Sparkles className="h-5 w-5 text-stone-900" />
-                <h2 className="text-lg font-bold text-stone-900">What you&apos;ll learn</h2>
-              </div>
+            {learningObjectives.length > 0 && (
+              <section className="rounded-2xl border border-stone-200/90 bg-stone-50/70 p-6 shadow-xs">
+                <div className="flex items-center gap-2 mb-4">
+                  <Sparkles className="h-5 w-5 text-stone-900" />
+                  <h2 className="text-lg font-bold text-stone-900">What you&apos;ll learn</h2>
+                </div>
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {learningObjectives.map((obj, i) => (
-                  <div key={i} className="flex items-start gap-2.5 text-xs sm:text-sm text-stone-700">
-                    <Check className="h-4 w-4 shrink-0 text-black font-bold mt-0.5" />
-                    <span className="leading-relaxed">{obj}</span>
-                  </div>
-                ))}
-              </div>
-            </section>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  {learningObjectives.map((obj, i) => (
+                    <div key={i} className="flex items-start gap-2.5 text-xs sm:text-sm text-stone-700">
+                      <Check className="h-4 w-4 shrink-0 text-black font-bold mt-0.5" />
+                      <span className="leading-relaxed">{obj}</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* -------------------------------------------------------------- */}
+            {/* B. COURSE REQUIREMENTS & PREREQUISITES (User-Filled)           */}
+            {/* -------------------------------------------------------------- */}
+            {requirements.length > 0 && (
+              <section className="rounded-2xl border border-stone-200/90 bg-white p-6 shadow-xs space-y-4">
+                <div className="flex items-center gap-2">
+                  <Wrench className="h-5 w-5 text-stone-900" />
+                  <h2 className="text-lg font-bold text-stone-900">Requirements & Prerequisites</h2>
+                </div>
+
+                <ul className="space-y-2.5 text-xs sm:text-sm text-stone-700">
+                  {requirements.map((req, i) => (
+                    <li key={i} className="flex items-start gap-2.5">
+                      <span className="h-1.5 w-1.5 rounded-full bg-stone-900 mt-2 shrink-0" />
+                      <span className="leading-relaxed font-medium">{req}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
 
             {/* -------------------------------------------------------------- */}
             {/* LIVE COHORT WORKSHOP HUB (If format is live_cohort)            */}

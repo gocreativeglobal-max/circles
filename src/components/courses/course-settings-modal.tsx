@@ -22,6 +22,7 @@ import { ImageUploader } from '@/components/ui/image-uploader';
 import { detectMeetingPlatform } from '@/lib/courses/cohort-helpers';
 import { ClassSchedulePicker } from './class-schedule-picker';
 import { LearningObjectivesEditor } from './learning-objectives-editor';
+import { CourseRequirementsEditor } from './course-requirements-editor';
 
 interface CourseSettingsModalProps {
   circleId: string;
@@ -84,6 +85,9 @@ export function CourseSettingsModal({
   const [learningObjectives, setLearningObjectives] = useState<string[]>(
     course.learning_objectives || []
   );
+  const [requirements, setRequirements] = useState<string[]>(
+    course.requirements || []
+  );
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -135,6 +139,7 @@ export function CourseSettingsModal({
     setMinLevelRequired(course.min_level_required ?? 2);
     setStatus(course.status || 'published');
     setLearningObjectives(course.learning_objectives || []);
+    setRequirements(course.requirements || []);
     setError(null);
   }, [course]);
 
@@ -184,6 +189,18 @@ export function CourseSettingsModal({
       return;
     }
 
+    const cleanObjectives = learningObjectives.map((s) => s.trim()).filter(Boolean);
+    if (cleanObjectives.length === 0) {
+      setError('Please provide at least one learning outcome ("What You\'ll Learn").');
+      return;
+    }
+
+    const cleanRequirements = requirements.map((s) => s.trim()).filter(Boolean);
+    if (cleanRequirements.length === 0) {
+      setError('Please provide at least one course requirement or prerequisite.');
+      return;
+    }
+
     setSaving(true);
     try {
       const payload = {
@@ -203,7 +220,8 @@ export function CourseSettingsModal({
         accessRule,
         minLevelRequired: accessRule === 'min_level' ? Number(minLevelRequired) : 1,
         status,
-        learningObjectives: learningObjectives.map((s) => s.trim()).filter(Boolean),
+        learningObjectives: cleanObjectives,
+        requirements: cleanRequirements,
       };
 
       const res = await fetch(`/api/circles/${circleId}/courses/${course.id}`, {
@@ -567,6 +585,13 @@ export function CourseSettingsModal({
             value={learningObjectives}
             onChange={setLearningObjectives}
             courseTitle={title}
+            disabled={saving || isDeleting}
+          />
+
+          {/* Course Requirements & Prerequisites */}
+          <CourseRequirementsEditor
+            value={requirements}
+            onChange={setRequirements}
             disabled={saving || isDeleting}
           />
 

@@ -44,6 +44,7 @@ import { compressImage } from '@/lib/media/compressor';
 import { detectMeetingPlatform } from '@/lib/courses/cohort-helpers';
 import { ClassSchedulePicker } from './class-schedule-picker';
 import { LearningObjectivesEditor } from './learning-objectives-editor';
+import { CourseRequirementsEditor } from './course-requirements-editor';
 import {
   BACHS_ACCEPTED_CURRENCIES,
   formatBachsAmount,
@@ -121,6 +122,9 @@ export function CourseStudioClient({
   const [custDuration, setCustDuration] = useState(String(initialCourse.estimated_duration_hours || 2));
   const [custObjectives, setCustObjectives] = useState<string[]>(
     initialCourse.learning_objectives || []
+  );
+  const [custRequirements, setCustRequirements] = useState<string[]>(
+    initialCourse.requirements || []
   );
 
   // Options & Pacing Tab state
@@ -597,6 +601,19 @@ export function CourseStudioClient({
   // --- Handlers: Customize Tab Save ---
   async function handleSaveCustomize(e: React.FormEvent) {
     e.preventDefault();
+
+    const cleanObjectives = custObjectives.map((s) => s.trim()).filter(Boolean);
+    if (cleanObjectives.length === 0) {
+      showFeedback('error', 'Please add at least one learning outcome ("What You\'ll Learn").');
+      return;
+    }
+
+    const cleanRequirements = custRequirements.map((s) => s.trim()).filter(Boolean);
+    if (cleanRequirements.length === 0) {
+      showFeedback('error', 'Please add at least one course requirement or prerequisite.');
+      return;
+    }
+
     setIsSaving(true);
     try {
       const res = await fetch(`/api/circles/${circleId}/courses/${course.id}`, {
@@ -609,7 +626,8 @@ export function CourseStudioClient({
           thumbnailUrl: custThumbnail.trim() || null,
           difficultyLevel: custDifficulty,
           estimatedDurationHours: parseFloat(custDuration) || 0,
-          learningObjectives: custObjectives.map((s) => s.trim()).filter(Boolean),
+          learningObjectives: cleanObjectives,
+          requirements: cleanRequirements,
         }),
       });
       const data = await res.json();
@@ -622,7 +640,8 @@ export function CourseStudioClient({
         thumbnail_url: custThumbnail.trim() || null,
         difficulty_level: custDifficulty,
         estimated_duration_hours: parseFloat(custDuration) || 0,
-        learning_objectives: custObjectives,
+        learning_objectives: cleanObjectives,
+        requirements: cleanRequirements,
       }));
       showFeedback('success', 'Course details updated.');
     } catch (err) {
@@ -1548,6 +1567,13 @@ export function CourseStudioClient({
                 value={custObjectives}
                 onChange={setCustObjectives}
                 courseTitle={custTitle}
+                disabled={isSaving}
+              />
+
+              {/* Course Requirements & Prerequisites */}
+              <CourseRequirementsEditor
+                value={custRequirements}
+                onChange={setCustRequirements}
                 disabled={isSaving}
               />
 

@@ -1201,6 +1201,7 @@ export interface CourseItem {
   instructor_average_rating?: number;
   instructor_ratings_count?: number;
   learning_objectives?: string[];
+  requirements?: string[];
   published_version?: number;
   validation_issues?: string[];
   prerequisites?: CoursePrerequisiteItem[];

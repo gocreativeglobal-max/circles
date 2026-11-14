@@ -70,6 +70,7 @@ export const createCourseSchema = z.object({
   minLevelRequired: z.number().int().min(1).default(1),
   status: z.enum(['draft', 'published', 'archived']).default('published'),
   learningObjectives: z.array(z.string().trim()).nullable().optional(),
+  requirements: z.array(z.string().trim()).nullable().optional(),
 });
 
 export const updateCourseSchema = z.object({
@@ -102,6 +103,7 @@ export const updateCourseSchema = z.object({
   minLevelRequired: z.number().int().min(1).optional(),
   status: z.enum(['draft', 'published', 'archived']).optional(),
   learningObjectives: z.array(z.string().trim()).nullable().optional(),
+  requirements: z.array(z.string().trim()).nullable().optional(),
 });
 
 export const createModuleSchema = z.object({
@@ -337,6 +339,18 @@ export async function listCourses(
           ? (() => {
               try {
                 const parsed = JSON.parse(row.learning_objectives);
+                return Array.isArray(parsed) ? parsed : [];
+              } catch {
+                return [];
+              }
+            })()
+          : [],
+        requirements: Array.isArray(row.requirements)
+          ? row.requirements
+          : typeof row.requirements === 'string'
+          ? (() => {
+              try {
+                const parsed = JSON.parse(row.requirements);
                 return Array.isArray(parsed) ? parsed : [];
               } catch {
                 return [];
@@ -814,6 +828,18 @@ export async function getCourseWithCurriculum(
             }
           })()
         : [],
+      requirements: Array.isArray(course.requirements)
+        ? course.requirements
+        : typeof course.requirements === 'string'
+        ? (() => {
+            try {
+              const parsed = JSON.parse(course.requirements);
+              return Array.isArray(parsed) ? parsed : [];
+            } catch {
+              return [];
+            }
+          })()
+        : [],
       estimated_duration_hours: Number(course.estimated_duration_hours),
       viewer_can_access: viewerCanAccess,
       viewer_level: viewerLevel,
@@ -930,8 +956,8 @@ export async function createCourse(
            max_seats,
            pacing_format, schedule_type, cohort_start_date, cohort_end_date,
            require_sequential_completion, access_rule, min_level_required, status,
-           learning_objectives
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+           learning_objectives, requirements
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
          RETURNING *;`,
         [
           courseId,
@@ -957,6 +983,7 @@ export async function createCourse(
           parsed.minLevelRequired,
           parsed.status,
           JSON.stringify((parsed.learningObjectives || []).map((s) => s.trim()).filter(Boolean)),
+          JSON.stringify((parsed.requirements || []).map((s) => s.trim()).filter(Boolean)),
         ]
       );
       course = res.rows[0];
@@ -979,8 +1006,8 @@ export async function createCourse(
              max_seats,
              pacing_format, schedule_type, cohort_start_date, cohort_end_date,
              require_sequential_completion, access_rule, min_level_required, status,
-             learning_objectives
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+             learning_objectives, requirements
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
            RETURNING *;`,
           [
             courseId,
@@ -1006,6 +1033,7 @@ export async function createCourse(
             parsed.minLevelRequired,
             parsed.status,
             JSON.stringify((parsed.learningObjectives || []).map((s) => s.trim()).filter(Boolean)),
+            JSON.stringify((parsed.requirements || []).map((s) => s.trim()).filter(Boolean)),
           ]
         );
         course = fallbackRes.rows[0];
@@ -1089,6 +1117,7 @@ export async function updateCourse(
          challenge_duration_days = CASE WHEN $26::boolean THEN $27::integer ELSE challenge_duration_days END,
          learning_objectives = CASE WHEN $28::boolean THEN $29::jsonb ELSE learning_objectives END,
          max_seats = CASE WHEN $30::boolean THEN $31::integer ELSE max_seats END,
+         requirements = CASE WHEN $32::boolean THEN $33::jsonb ELSE requirements END,
          updated_at = NOW()
        WHERE id = $1 AND circle_id = $2
        RETURNING *;`,
@@ -1126,6 +1155,10 @@ export async function updateCourse(
           : '[]',
         parsed.maxSeats !== undefined,
         parsed.maxSeats ?? null,
+        parsed.requirements !== undefined,
+        parsed.requirements
+          ? JSON.stringify(parsed.requirements.map((s) => s.trim()).filter(Boolean))
+          : '[]',
       ]
     );
 
@@ -1137,6 +1170,18 @@ export async function updateCourse(
         ? (() => {
             try {
               const p = JSON.parse(updated.learning_objectives);
+              return Array.isArray(p) ? p : [];
+            } catch {
+              return [];
+            }
+          })()
+        : [];
+      updated.requirements = Array.isArray(updated.requirements)
+        ? updated.requirements
+        : typeof updated.requirements === 'string'
+        ? (() => {
+            try {
+              const p = JSON.parse(updated.requirements);
               return Array.isArray(p) ? p : [];
             } catch {
               return [];
