@@ -47,8 +47,38 @@ import { LessonBlockBuilder } from './lesson-block-builder';
 import { CourseSettingsModal } from './course-settings-modal';
 import { CourseLandingView } from './course-landing-view';
 import { formatBachsAmount } from '@/lib/payments/currencies';
-import { detectMeetingPlatform, calculateLiveSessionStatus } from '@/lib/courses/cohort-helpers';
+import {
+  detectMeetingPlatform,
+  calculateLiveSessionStatus,
+  generateGoogleCalendarUrl,
+  generateIcsFileContent,
+} from '@/lib/courses/cohort-helpers';
 import { ClassScheduleDaysStrip } from './class-schedule-picker';
+
+function downloadCohortIcsFile(
+  title: string,
+  description?: string | null,
+  startDate?: string | null,
+  endDate?: string | null,
+  meetingUrl?: string | null
+) {
+  const ics = generateIcsFileContent({
+    title,
+    description: description || undefined,
+    startDate: startDate || undefined,
+    endDate: endDate || undefined,
+    meetingUrl: meetingUrl || undefined,
+  });
+  const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-schedule.ics`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
 
 export function CoursePlayer({
   circleId,
@@ -772,6 +802,48 @@ export function CoursePlayer({
         </div>
       </div>
 
+      {course.course_format === 'live_cohort' && (
+        <div className="flex items-center justify-between gap-1.5 rounded-xl border border-stone-200 bg-stone-50/80 px-2.5 py-1.5 text-xs">
+          <span className="text-[11px] font-semibold text-stone-700 flex items-center gap-1.5">
+            <Calendar className="h-3.5 w-3.5 text-stone-500" />
+            <span>Calendar:</span>
+          </span>
+          <div className="flex items-center gap-1.5">
+            <a
+              href={generateGoogleCalendarUrl({
+                title: course.title,
+                description: course.cohort_schedule_description,
+                startDate: course.cohort_start_date,
+                endDate: course.cohort_end_date,
+                meetingUrl: course.cohort_meeting_url,
+              })}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-md bg-white border border-stone-200 px-2 py-0.5 text-[10px] font-semibold text-stone-800 hover:bg-stone-100 transition-colors shadow-2xs"
+              title="Add to Google Calendar"
+            >
+              Google
+            </a>
+            <button
+              type="button"
+              onClick={() =>
+                downloadCohortIcsFile(
+                  course.title,
+                  course.cohort_schedule_description,
+                  course.cohort_start_date,
+                  course.cohort_end_date,
+                  course.cohort_meeting_url
+                )
+              }
+              className="rounded-md bg-white border border-stone-200 px-2 py-0.5 text-[10px] font-semibold text-stone-800 hover:bg-stone-100 transition-colors shadow-2xs"
+              title="Download iCal (.ics) for Apple Calendar & Outlook"
+            >
+              Apple / iCal
+            </button>
+          </div>
+        </div>
+      )}
+
       {!course.modules || course.modules.length === 0 ? (
         <div className="rounded-xl border border-dashed border-stone-200 p-6 text-center text-xs text-stone-500">
           No modules in this course yet.
@@ -897,6 +969,18 @@ export function CoursePlayer({
                               }`}
                             >
                               Preview
+                            </span>
+                          )}
+                          {lesson.replay_url && (
+                            <span
+                              className={`rounded px-1.5 py-0.2 text-[9px] font-semibold flex items-center gap-1 ${
+                                isActive
+                                  ? 'bg-emerald-500/30 text-emerald-200'
+                                  : 'bg-emerald-100 text-emerald-800'
+                              }`}
+                            >
+                              <Video className="h-2.5 w-2.5" />
+                              <span>Replay</span>
                             </span>
                           )}
                           {isPaywalled && !hasCoursePaywallAccess && !lesson.is_free_preview && (
@@ -1217,6 +1301,13 @@ export function CoursePlayer({
               scheduleDescription: course.cohort_schedule_description,
             });
             const relayUrl = `/api/circles/${circleId}/courses/${course.id}/live-join`;
+            const gcalUrl = generateGoogleCalendarUrl({
+              title: course.title,
+              description: course.cohort_schedule_description,
+              startDate: course.cohort_start_date,
+              endDate: course.cohort_end_date,
+              meetingUrl: course.cohort_meeting_url,
+            });
             return (
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-950 via-stone-900 to-black p-4 sm:p-5 text-white shadow-sm">
                 <div className="flex items-center gap-3.5">
@@ -1268,8 +1359,39 @@ export function CoursePlayer({
                   </div>
                 </div>
 
-                {course.cohort_meeting_url && (
-                  <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
+                <div className="flex items-center gap-2.5 shrink-0 self-start sm:self-auto flex-wrap">
+                  {/* 1-Click Student Dashboard Calendar Sync */}
+                  <div className="flex items-center gap-1.5 rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-xs backdrop-blur-xs">
+                    <Calendar className="h-3.5 w-3.5 text-blue-300 shrink-0" />
+                    <span className="text-[11px] text-stone-200 font-medium">Sync:</span>
+                    <a
+                      href={gcalUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded bg-white/20 hover:bg-white/30 px-2 py-0.5 text-[10px] font-bold text-white transition-colors"
+                      title="Add cohort schedule to Google Calendar"
+                    >
+                      Google
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        downloadCohortIcsFile(
+                          course.title,
+                          course.cohort_schedule_description,
+                          course.cohort_start_date,
+                          course.cohort_end_date,
+                          course.cohort_meeting_url
+                        )
+                      }
+                      className="rounded bg-white/20 hover:bg-white/30 px-2 py-0.5 text-[10px] font-bold text-white transition-colors"
+                      title="Download iCal (.ics) file for Apple Calendar & Outlook"
+                    >
+                      Apple / iCal
+                    </button>
+                  </div>
+
+                  {course.cohort_meeting_url && (
                     <a
                       href={relayUrl}
                       target="_blank"
@@ -1292,8 +1414,8 @@ export function CoursePlayer({
                       </span>
                       <ExternalLink className="h-3 w-3 opacity-80" />
                     </a>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
             );
           })()}
@@ -1530,6 +1652,109 @@ export function CoursePlayer({
                   </p>
                 </div>
               )}
+
+              {/* Dedicated Session Replay Slot (for live cohort workshops or recorded lessons) */}
+              {activeLesson.replay_url ? (
+                <div className="rounded-2xl border border-blue-200 bg-stone-950 p-4 sm:p-5 text-white space-y-3.5 shadow-sm">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-stone-800 pb-3">
+                    <div className="flex items-center gap-2">
+                      <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-white font-bold">
+                        <Video className="h-4 w-4" />
+                      </span>
+                      <div>
+                        <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                          <span>Live Session Replay & Recording</span>
+                          <span className="rounded bg-emerald-500/20 text-emerald-300 px-2 py-0.5 text-[10px] font-mono font-semibold border border-emerald-500/30">
+                            Available Now
+                          </span>
+                        </h3>
+                        <p className="text-[11px] text-stone-400">
+                          Missed the live workshop or want to review? Watch the full session recording below.
+                        </p>
+                      </div>
+                    </div>
+                    <a
+                      href={activeLesson.replay_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 font-medium shrink-0 self-start sm:self-auto"
+                    >
+                      <span>Open Recording</span>
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
+                  </div>
+
+                  {/* Responsive Replay Player Embed */}
+                  <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black border border-stone-800">
+                    {(() => {
+                      const lower = activeLesson.replay_url.toLowerCase();
+                      if (lower.includes('youtube.com') || lower.includes('youtu.be')) {
+                        const ytId = activeLesson.replay_url.includes('youtu.be/')
+                          ? activeLesson.replay_url.split('youtu.be/')[1]?.split('?')[0]
+                          : new URL(activeLesson.replay_url).searchParams.get('v');
+                        return (
+                          <iframe
+                            src={`https://www.youtube.com/embed/${ytId}?rel=0`}
+                            className="h-full w-full"
+                            allowFullScreen
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                          />
+                        );
+                      }
+                      if (lower.includes('vimeo.com')) {
+                        const vimeoId = activeLesson.replay_url.split('/').pop()?.split('?')[0];
+                        return (
+                          <iframe
+                            src={`https://player.vimeo.com/video/${vimeoId}`}
+                            className="h-full w-full"
+                            allowFullScreen
+                          />
+                        );
+                      }
+                      if (lower.includes('loom.com')) {
+                        const loomId = activeLesson.replay_url.split('/').pop()?.split('?')[0];
+                        return (
+                          <iframe
+                            src={`https://www.loom.com/embed/${loomId}`}
+                            className="h-full w-full"
+                            allowFullScreen
+                          />
+                        );
+                      }
+                      return (
+                        <video
+                          src={activeLesson.replay_url}
+                          controls
+                          className="h-full w-full"
+                          controlsList="nodownload"
+                        >
+                          Your browser does not support HTML5 video playback.
+                        </video>
+                      );
+                    })()}
+                  </div>
+                </div>
+              ) : course.course_format === 'live_cohort' ? (
+                <div className="rounded-2xl border border-stone-200 bg-stone-50/80 p-4 flex items-center justify-between gap-3 text-xs text-stone-600">
+                  <div className="flex items-center gap-2.5">
+                    <Clock className="h-4 w-4 text-stone-400 shrink-0" />
+                    <span>
+                      Live workshop session. The full recording replay will be posted here by the instructor after the live call.
+                    </span>
+                  </div>
+                  {course.cohort_meeting_url && (
+                    <a
+                      href={`/api/circles/${circleId}/courses/${course.id}/live-join`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 shrink-0 rounded-lg bg-black text-white px-3 py-1.5 text-xs font-semibold hover:bg-stone-800"
+                    >
+                      <Video className="h-3.5 w-3.5" />
+                      <span>Join Live Room</span>
+                    </a>
+                  )}
+                </div>
+              ) : null}
 
               {/* Lesson Featured Cover Image */}
               {activeLesson.thumbnail_url && !activeLesson.video_url && (

@@ -879,6 +879,7 @@ export interface CourseLessonItem {
   sort_order: number;
   live_event_id?: string | null;
   is_live_session?: boolean;
+  replay_url?: string | null;
   content_blocks?: LessonContentBlock[];
   draft_content_blocks?: LessonContentBlock[] | null;
   learning_objectives?: string[];
@@ -1166,6 +1167,8 @@ export interface CourseItem {
   cohort_meeting_url?: string | null;
   cohort_schedule_description?: string | null;
   challenge_duration_days?: number | null;
+  max_seats?: number | null;
+  seats_remaining?: number | null;
   pacing_format?: 'self_paced' | 'structured' | 'scheduled';
   schedule_type?: 'relative_drip' | 'calendar_date';
   cohort_start_date?: string | null;

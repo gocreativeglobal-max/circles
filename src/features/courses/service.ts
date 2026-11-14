@@ -60,10 +60,11 @@ export const createCourseSchema = z.object({
   cohortMeetingUrl: z.string().trim().max(1000).nullable().optional(),
   cohortScheduleDescription: z.string().trim().max(500).nullable().optional(),
   challengeDurationDays: z.number().int().min(1).max(365).nullable().optional(),
+  maxSeats: z.number().int().min(1).max(100000).nullable().optional(),
   pacingFormat: z.enum(['self_paced', 'structured', 'scheduled']).default('self_paced'),
   scheduleType: z.enum(['relative_drip', 'calendar_date']).default('relative_drip'),
-  cohortStartDate: z.string().datetime().nullable().optional(),
-  cohortEndDate: z.string().datetime().nullable().optional(),
+  cohortStartDate: z.string().trim().nullable().optional(),
+  cohortEndDate: z.string().trim().nullable().optional(),
   requireSequentialCompletion: z.boolean().default(false),
   accessRule: z.enum(['open', 'members_only', 'paywall', 'min_level', 'staff_only']).default('open'),
   minLevelRequired: z.number().int().min(1).default(1),
@@ -91,10 +92,11 @@ export const updateCourseSchema = z.object({
   cohortMeetingUrl: z.string().trim().max(1000).nullable().optional(),
   cohortScheduleDescription: z.string().trim().max(500).nullable().optional(),
   challengeDurationDays: z.number().int().min(1).max(365).nullable().optional(),
+  maxSeats: z.number().int().min(1).max(100000).nullable().optional(),
   pacingFormat: z.enum(['self_paced', 'structured', 'scheduled']).optional(),
   scheduleType: z.enum(['relative_drip', 'calendar_date']).optional(),
-  cohortStartDate: z.string().datetime().nullable().optional(),
-  cohortEndDate: z.string().datetime().nullable().optional(),
+  cohortStartDate: z.string().trim().nullable().optional(),
+  cohortEndDate: z.string().trim().nullable().optional(),
   requireSequentialCompletion: z.boolean().optional(),
   accessRule: z.enum(['open', 'members_only', 'paywall', 'min_level', 'staff_only']).optional(),
   minLevelRequired: z.number().int().min(1).optional(),
@@ -143,6 +145,7 @@ export const createLessonSchema = z.object({
   isFreePreview: z.boolean().default(false),
   liveEventId: z.string().uuid().nullable().optional(),
   isLiveSession: z.boolean().default(false),
+  replayUrl: z.string().trim().max(1000).nullable().optional(),
   status: z.enum(['draft', 'published', 'archived']).default('published'),
   sortOrder: z.number().int().min(0).default(0),
 });
@@ -166,6 +169,7 @@ export const updateLessonSchema = z.object({
   isFreePreview: z.boolean().optional(),
   liveEventId: z.string().uuid().nullable().optional(),
   isLiveSession: z.boolean().optional(),
+  replayUrl: z.string().trim().max(1000).nullable().optional(),
   status: z.enum(['draft', 'published', 'archived']).optional(),
   sortOrder: z.number().int().min(0).optional(),
 });
@@ -281,11 +285,25 @@ export async function listCourses(
       }
     }
 
+    const enrollCountMap: Record<string, number> = {};
+    const countRes = await tx.query<{ course_id: string; count: number }>(
+      `SELECT c.id AS course_id, public.get_course_enrolled_count(c.id, c.circle_id) AS count
+       FROM public.courses c
+       WHERE c.circle_id = $1;`,
+      [circleId]
+    ).catch(() => ({ rows: [] }));
+    for (const row of countRes.rows) {
+      enrollCountMap[row.course_id] = Number(row.count || 0);
+    }
+
     return coursesRes.rows.map((row) => {
       const totalLessons = parseInt(row.total_lessons_count || '0', 10);
       const completedLessons = actorUserId ? completionMap[row.id] || 0 : 0;
       const progressPercentage =
         totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+      const enrolledCount = enrollCountMap[row.id] || 0;
+      const maxSeats = row.max_seats ? Number(row.max_seats) : null;
+      const seatsRemaining = maxSeats ? Math.max(0, maxSeats - enrolledCount) : null;
 
       return {
         id: row.id,
@@ -303,6 +321,8 @@ export async function listCourses(
         cohort_meeting_url: row.cohort_meeting_url ?? null,
         cohort_schedule_description: row.cohort_schedule_description ?? null,
         challenge_duration_days: row.challenge_duration_days ? Number(row.challenge_duration_days) : null,
+        max_seats: maxSeats,
+        seats_remaining: seatsRemaining,
         pacing_format: row.pacing_format ?? 'self_paced',
         schedule_type: row.schedule_type ?? 'relative_drip',
         cohort_start_date: row.cohort_start_date ?? null,
@@ -335,6 +355,7 @@ export async function listCourses(
         completed_lessons_count: completedLessons,
         progress_percentage: progressPercentage,
         is_enrolled: completedLessons > 0 || enrollmentSet.has(row.id),
+        enrolled_students_count: enrolledCount,
       };
     });
   });
@@ -614,6 +635,7 @@ export async function getCourseWithCurriculum(
             ...lesson,
             content_body: '',
             video_url: null,
+            replay_url: null,
             attachment_url: null,
             attachment_name: null,
             content_blocks: [],
@@ -810,6 +832,8 @@ export async function getCourseWithCurriculum(
       cohort_meeting_url: course.cohort_meeting_url ?? null,
       cohort_schedule_description: course.cohort_schedule_description ?? null,
       challenge_duration_days: course.challenge_duration_days ? Number(course.challenge_duration_days) : null,
+      max_seats: course.max_seats ? Number(course.max_seats) : null,
+      seats_remaining: course.max_seats ? Math.max(0, Number(course.max_seats) - enrolledStudentsCount) : null,
       pacing_format: course.pacing_format ?? 'self_paced',
       schedule_type: course.schedule_type ?? 'relative_drip',
       cohort_start_date: course.cohort_start_date ?? null,
@@ -903,10 +927,11 @@ export async function createCourse(
            id, circle_id, instructor_id, title, slug, description,
            thumbnail_url, difficulty_level, estimated_duration_hours,
            course_format, cohort_meeting_url, cohort_schedule_description, challenge_duration_days,
+           max_seats,
            pacing_format, schedule_type, cohort_start_date, cohort_end_date,
            require_sequential_completion, access_rule, min_level_required, status,
            learning_objectives
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
          RETURNING *;`,
         [
           courseId,
@@ -922,10 +947,11 @@ export async function createCourse(
           parsed.cohortMeetingUrl || null,
           parsed.cohortScheduleDescription || null,
           parsed.challengeDurationDays ?? null,
+          parsed.maxSeats ?? null,
           parsed.pacingFormat,
           parsed.scheduleType,
-          parsed.cohortStartDate ? new Date(parsed.cohortStartDate).toISOString() : null,
-          parsed.cohortEndDate ? new Date(parsed.cohortEndDate).toISOString() : null,
+          parsed.cohortStartDate && parsed.cohortStartDate.trim() ? new Date(parsed.cohortStartDate).toISOString() : null,
+          parsed.cohortEndDate && parsed.cohortEndDate.trim() ? new Date(parsed.cohortEndDate).toISOString() : null,
           parsed.requireSequentialCompletion,
           parsed.accessRule,
           parsed.minLevelRequired,
@@ -950,10 +976,11 @@ export async function createCourse(
              id, circle_id, instructor_id, title, slug, description,
              thumbnail_url, difficulty_level, estimated_duration_hours,
              course_format, cohort_meeting_url, cohort_schedule_description, challenge_duration_days,
+             max_seats,
              pacing_format, schedule_type, cohort_start_date, cohort_end_date,
              require_sequential_completion, access_rule, min_level_required, status,
              learning_objectives
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
            RETURNING *;`,
           [
             courseId,
@@ -969,10 +996,11 @@ export async function createCourse(
             parsed.cohortMeetingUrl || null,
             parsed.cohortScheduleDescription || null,
             parsed.challengeDurationDays ?? null,
+            parsed.maxSeats ?? null,
             parsed.pacingFormat,
             parsed.scheduleType,
-            parsed.cohortStartDate ? new Date(parsed.cohortStartDate).toISOString() : null,
-            parsed.cohortEndDate ? new Date(parsed.cohortEndDate).toISOString() : null,
+            parsed.cohortStartDate && parsed.cohortStartDate.trim() ? new Date(parsed.cohortStartDate).toISOString() : null,
+            parsed.cohortEndDate && parsed.cohortEndDate.trim() ? new Date(parsed.cohortEndDate).toISOString() : null,
             parsed.requireSequentialCompletion,
             parsed.accessRule,
             parsed.minLevelRequired,
@@ -1060,6 +1088,7 @@ export async function updateCourse(
          cohort_schedule_description = CASE WHEN $24::boolean THEN $25 ELSE cohort_schedule_description END,
          challenge_duration_days = CASE WHEN $26::boolean THEN $27::integer ELSE challenge_duration_days END,
          learning_objectives = CASE WHEN $28::boolean THEN $29::jsonb ELSE learning_objectives END,
+         max_seats = CASE WHEN $30::boolean THEN $31::integer ELSE max_seats END,
          updated_at = NOW()
        WHERE id = $1 AND circle_id = $2
        RETURNING *;`,
@@ -1077,9 +1106,9 @@ export async function updateCourse(
         parsed.pacingFormat ?? null,
         parsed.scheduleType ?? null,
         parsed.cohortStartDate !== undefined,
-        parsed.cohortStartDate ?? null,
+        parsed.cohortStartDate && parsed.cohortStartDate.trim() ? new Date(parsed.cohortStartDate).toISOString() : null,
         parsed.cohortEndDate !== undefined,
-        parsed.cohortEndDate ?? null,
+        parsed.cohortEndDate && parsed.cohortEndDate.trim() ? new Date(parsed.cohortEndDate).toISOString() : null,
         parsed.requireSequentialCompletion !== undefined ? parsed.requireSequentialCompletion : null,
         parsed.status ?? null,
         parsed.accessRule ?? null,
@@ -1095,6 +1124,8 @@ export async function updateCourse(
         parsed.learningObjectives
           ? JSON.stringify(parsed.learningObjectives.map((s) => s.trim()).filter(Boolean))
           : '[]',
+        parsed.maxSeats !== undefined,
+        parsed.maxSeats ?? null,
       ]
     );
 
@@ -1278,8 +1309,8 @@ export async function createLesson(
       `INSERT INTO public.course_lessons (
          id, module_id, course_id, circle_id, title, slug, description,
          content_body, thumbnail_url, video_url, duration_minutes, attachment_url,
-         attachment_name, is_free_preview, live_event_id, is_live_session, status, sort_order
-       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+         attachment_name, is_free_preview, live_event_id, is_live_session, replay_url, status, sort_order
+       ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
        RETURNING *;`,
       [
         lessonId,
@@ -1298,6 +1329,7 @@ export async function createLesson(
         parsed.isFreePreview,
         parsed.liveEventId || null,
         parsed.isLiveSession || false,
+        parsed.replayUrl || null,
         parsed.status,
         parsed.sortOrder,
       ]
@@ -1466,8 +1498,9 @@ export async function updateLesson(
          attachment_url = CASE WHEN $12::boolean THEN $13 ELSE attachment_url END,
          attachment_name = CASE WHEN $14::boolean THEN $15 ELSE attachment_name END,
          is_free_preview = COALESCE($16, is_free_preview),
-         status = COALESCE($17, status),
-         sort_order = COALESCE($18, sort_order),
+         replay_url = CASE WHEN $17::boolean THEN $18 ELSE replay_url END,
+         status = COALESCE($19, status),
+         sort_order = COALESCE($20, sort_order),
          updated_at = NOW()
        WHERE id = $1 AND circle_id = $2
        RETURNING *;`,
@@ -1488,6 +1521,8 @@ export async function updateLesson(
         parsed.attachmentName !== undefined,
         parsed.attachmentName ?? null,
         parsed.isFreePreview !== undefined ? parsed.isFreePreview : null,
+        parsed.replayUrl !== undefined,
+        parsed.replayUrl ?? null,
         parsed.status ?? null,
         parsed.sortOrder ?? null,
       ]
@@ -2085,8 +2120,8 @@ export async function enrollInCourse(
       throw new ForbiddenError('Only active Circle members can enroll in courses.');
     }
 
-    const courseRes = await tx.query<{ access_rule: string; min_level_required: number }>(
-      `SELECT access_rule, min_level_required FROM public.courses WHERE id = $1 AND circle_id = $2 LIMIT 1;`,
+    const courseRes = await tx.query<{ access_rule: string; min_level_required: number; max_seats: number | null }>(
+      `SELECT access_rule, min_level_required, max_seats FROM public.courses WHERE id = $1 AND circle_id = $2 LIMIT 1;`,
       [courseId, circleId]
     );
     const course = courseRes.rows[0];
@@ -2096,6 +2131,29 @@ export async function enrollInCourse(
       membership.role === 'owner' ||
       membership.role === 'admin' ||
       membership.role === 'moderator';
+
+    // Idempotency: Return existing enrollment immediately if already enrolled
+    const existingEnrollmentRes = await tx.query<CourseEnrollmentItem>(
+      `SELECT * FROM public.course_enrollments WHERE course_id = $1 AND student_id = $2 LIMIT 1;`,
+      [courseId, actorUserId]
+    );
+    if (existingEnrollmentRes.rows.length > 0) {
+      return existingEnrollmentRes.rows[0];
+    }
+
+    // Seat limit enforcement for live cohorts
+    if (course.max_seats && course.max_seats > 0) {
+      const countRes = await tx.query<{ count: number }>(
+        `SELECT public.get_course_enrolled_count($1, $2) as count;`,
+        [courseId, circleId]
+      );
+      const enrolledCount = Number(countRes.rows[0]?.count || 0);
+      if (enrolledCount >= course.max_seats) {
+        throw new ForbiddenError(
+          `This live cohort has reached maximum capacity (${course.max_seats} seats filled). Enrollment is now closed.`
+        );
+      }
+    }
 
     if (course.access_rule === 'staff_only' && !isStaff) {
       throw new ForbiddenError('This course is reserved for staff members only.');
@@ -3266,6 +3324,31 @@ export async function purchaseCoursePaywall(
     );
     const plan = planRes.rows[0];
     if (!plan) throw new NotFoundError('Paywall plan not found for this course.');
+
+    // Check seat limits for cohort courses
+    const courseRes = await tx.query<{ max_seats: number | null }>(
+      `SELECT max_seats FROM public.courses WHERE id = $1 AND circle_id = $2 LIMIT 1;`,
+      [courseId, circleId]
+    );
+    const maxSeats = courseRes.rows[0]?.max_seats;
+    if (maxSeats && maxSeats > 0) {
+      const alreadyEnrolledRes = await tx.query<{ id: string }>(
+        `SELECT id FROM public.course_enrollments WHERE course_id = $1 AND student_id = $2 LIMIT 1;`,
+        [courseId, actorUserId]
+      );
+      if (alreadyEnrolledRes.rows.length === 0) {
+        const countRes = await tx.query<{ count: number }>(
+          `SELECT public.get_course_enrolled_count($1, $2) as count;`,
+          [courseId, circleId]
+        );
+        const enrolledCount = Number(countRes.rows[0]?.count || 0);
+        if (enrolledCount >= maxSeats) {
+          throw new ForbiddenError(
+            `This live cohort has reached maximum capacity (${maxSeats} seats filled). Enrollment is now closed.`
+          );
+        }
+      }
+    }
 
     // 3. Ensure user is a member of the Circle (create active membership if not already)
     const memRes = await tx.query<{ id: string }>(

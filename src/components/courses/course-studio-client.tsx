@@ -28,6 +28,7 @@ import {
   Upload,
   X,
   Video,
+  Calendar,
 } from 'lucide-react';
 import {
   CourseItem,
@@ -103,6 +104,7 @@ export function CourseStudioClient({
   const [lessonThumbnailUrl, setLessonThumbnailUrl] = useState('');
   const [isUploadingLessonImage, setIsUploadingLessonImage] = useState(false);
   const [lessonIsFreePreview, setLessonIsFreePreview] = useState(false);
+  const [lessonReplayUrl, setLessonReplayUrl] = useState('');
   const [lessonStatus, setLessonStatus] = useState<'draft' | 'published'>('published');
 
   // Rich Block Builder state
@@ -131,6 +133,15 @@ export function CourseStudioClient({
   const detectedPlatform = detectMeetingPlatform(cohortMeetingUrl);
   const [cohortScheduleDescription, setCohortScheduleDescription] = useState(
     initialCourse.cohort_schedule_description || ''
+  );
+  const [cohortStartDate, setCohortStartDate] = useState(
+    initialCourse.cohort_start_date ? initialCourse.cohort_start_date.slice(0, 16) : ''
+  );
+  const [cohortEndDate, setCohortEndDate] = useState(
+    initialCourse.cohort_end_date ? initialCourse.cohort_end_date.slice(0, 16) : ''
+  );
+  const [maxSeats, setMaxSeats] = useState(
+    initialCourse.max_seats ? String(initialCourse.max_seats) : ''
   );
   const [challengeDurationDays] = useState(
     initialCourse.challenge_duration_days ? String(initialCourse.challenge_duration_days) : '30'
@@ -333,6 +344,7 @@ export function CourseStudioClient({
     setLessonThumbnailUrl('');
     setLessonDuration('15');
     setLessonIsFreePreview(false);
+    setLessonReplayUrl('');
     setLessonStatus('published');
     setShowLessonModal(true);
   }
@@ -347,6 +359,7 @@ export function CourseStudioClient({
     setLessonThumbnailUrl(lesson.thumbnail_url || '');
     setLessonDuration(String(lesson.duration_minutes || 15));
     setLessonIsFreePreview(Boolean(lesson.is_free_preview));
+    setLessonReplayUrl(lesson.replay_url || '');
     setLessonStatus(lesson.status === 'draft' ? 'draft' : 'published');
     setShowLessonModal(true);
   }
@@ -421,6 +434,7 @@ export function CourseStudioClient({
             thumbnailUrl: lessonThumbnailUrl.trim() || null,
             durationMinutes: parseInt(lessonDuration, 10) || 0,
             isFreePreview: lessonIsFreePreview,
+            replayUrl: lessonReplayUrl.trim() || null,
             status: lessonStatus,
           }),
         });
@@ -450,6 +464,7 @@ export function CourseStudioClient({
             thumbnailUrl: lessonThumbnailUrl.trim() || null,
             durationMinutes: parseInt(lessonDuration, 10) || 0,
             isFreePreview: lessonIsFreePreview,
+            replayUrl: lessonReplayUrl.trim() || null,
             status: lessonStatus,
             sortOrder,
           }),
@@ -629,6 +644,9 @@ export function CourseStudioClient({
           courseFormat,
           cohortMeetingUrl: courseFormat === 'live_cohort' && cohortMeetingUrl.trim() ? cohortMeetingUrl.trim() : null,
           cohortScheduleDescription: courseFormat === 'live_cohort' && cohortScheduleDescription.trim() ? cohortScheduleDescription.trim() : null,
+          cohortStartDate: courseFormat === 'live_cohort' && cohortStartDate ? new Date(cohortStartDate).toISOString() : null,
+          cohortEndDate: courseFormat === 'live_cohort' && cohortEndDate ? new Date(cohortEndDate).toISOString() : null,
+          maxSeats: courseFormat === 'live_cohort' && maxSeats ? parseInt(maxSeats, 10) : null,
           challengeDurationDays: courseFormat === 'action_challenge' ? parseInt(challengeDurationDays, 10) || 30 : null,
           pacingFormat,
           requireSequentialCompletion: requireSequential,
@@ -641,6 +659,9 @@ export function CourseStudioClient({
         course_format: courseFormat,
         cohort_meeting_url: cohortMeetingUrl,
         cohort_schedule_description: cohortScheduleDescription,
+        cohort_start_date: cohortStartDate ? new Date(cohortStartDate).toISOString() : null,
+        cohort_end_date: cohortEndDate ? new Date(cohortEndDate).toISOString() : null,
+        max_seats: maxSeats ? parseInt(maxSeats, 10) : null,
         challenge_duration_days: parseInt(challengeDurationDays, 10) || 30,
         pacing_format: pacingFormat,
         require_sequential_completion: requireSequential,
@@ -1316,6 +1337,12 @@ export function CourseStudioClient({
                                       {lesson.is_free_preview && (
                                         <span className="rounded-full bg-blue-50 px-2 py-0.2 text-[9px] font-semibold text-blue-800 border border-blue-200">
                                           Preview
+                                        </span>
+                                      )}
+                                      {lesson.replay_url && (
+                                        <span className="rounded-full bg-emerald-50 px-2 py-0.2 text-[9px] font-semibold text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                                          <Video className="h-2.5 w-2.5 text-emerald-600" />
+                                          <span>Replay</span>
                                         </span>
                                       )}
                                     </div>
@@ -2137,6 +2164,53 @@ export function CourseStudioClient({
                       label="Class Schedule & Weekly Days"
                       helperText="Select the days of the week when live workshops take place."
                     />
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                      <div>
+                        <label className="text-[11px] font-semibold text-stone-700 flex items-center gap-1.5">
+                          <Calendar className="h-3.5 w-3.5 text-stone-500" />
+                          <span>Cohort Start Date & Time</span>
+                        </label>
+                        <input
+                          type="datetime-local"
+                          value={cohortStartDate}
+                          onChange={(e) => setCohortStartDate(e.target.value)}
+                          className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[11px] font-semibold text-stone-700 flex items-center gap-1.5">
+                          <Calendar className="h-3.5 w-3.5 text-stone-500" />
+                          <span>Cohort End Date & Time</span>
+                        </label>
+                        <input
+                          type="datetime-local"
+                          value={cohortEndDate}
+                          onChange={(e) => setCohortEndDate(e.target.value)}
+                          className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="pt-1">
+                      <label className="text-[11px] font-semibold text-stone-700 flex items-center gap-1.5">
+                        <Users className="h-3.5 w-3.5 text-stone-500" />
+                        <span>Maximum Seat Capacity (Cohort Size Limit)</span>
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="100000"
+                        placeholder="e.g. 25 (leave empty for unlimited)"
+                        value={maxSeats}
+                        onChange={(e) => setMaxSeats(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
+                      />
+                      <p className="mt-1 text-[10px] text-stone-500">
+                        Once all spots are filled, the enrollment card will show &quot;Sold Out&quot; and close further signups.
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
@@ -2552,6 +2626,22 @@ export function CourseStudioClient({
                   onChange={(e) => setLessonDescription(e.target.value)}
                   className="mt-1 w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs text-stone-900 focus:border-black focus:outline-none"
                 />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-stone-800">
+                  Session Replay / Recording URL (Optional)
+                </label>
+                <input
+                  type="url"
+                  placeholder="e.g. Zoom recording, YouTube Unlisted, Vimeo, Loom, or MP4 URL"
+                  value={lessonReplayUrl}
+                  onChange={(e) => setLessonReplayUrl(e.target.value)}
+                  className="mt-1 w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs text-stone-900 focus:border-black focus:outline-none"
+                />
+                <p className="mt-1 text-[10px] text-stone-500">
+                  Enrolled students who missed the live workshop will be able to watch this session recording.
+                </p>
               </div>
 
               <div>

@@ -19,13 +19,19 @@ import {
   CheckCircle2,
   ArrowRight,
   Video,
+  Calendar,
 } from 'lucide-react';
 import { CourseItem, CourseDeliveryFormat, LeaderboardEntry, MemberXpSummary } from '@/types/domain';
 import { Button } from '@/components/ui/button';
 import { ImageUploader } from '@/components/ui/image-uploader';
 import { LearningPathsView } from './learning-paths-view';
 import { CourseSettingsModal } from './course-settings-modal';
-import { detectMeetingPlatform } from '@/lib/courses/cohort-helpers';
+import {
+  detectMeetingPlatform,
+  formatCohortDateRange,
+  generateGoogleCalendarUrl,
+  generateIcsFileContent,
+} from '@/lib/courses/cohort-helpers';
 import { ClassSchedulePicker, ClassScheduleDaysStrip } from './class-schedule-picker';
 import { LearningObjectivesEditor } from './learning-objectives-editor';
 
@@ -65,6 +71,7 @@ export function CoursesCatalog({
   const [scheduleType, setScheduleType] = useState<'relative_drip' | 'calendar_date'>('relative_drip');
   const [cohortStartDate, setCohortStartDate] = useState('');
   const [cohortEndDate, setCohortEndDate] = useState('');
+  const [maxSeats, setMaxSeats] = useState('');
   const [thumbnailUrl, setThumbnailUrl] = useState('');
   const [title, setTitle] = useState('');
   const [slug, setSlug] = useState('');
@@ -151,14 +158,15 @@ export function CoursesCatalog({
           cohortMeetingUrl: courseFormat === 'live_cohort' && cohortMeetingUrl.trim() ? cohortMeetingUrl.trim() : null,
           cohortScheduleDescription: courseFormat === 'live_cohort' && cohortScheduleDescription.trim() ? cohortScheduleDescription.trim() : null,
           challengeDurationDays: courseFormat === 'action_challenge' ? parseInt(challengeDurationDays, 10) || 30 : null,
+          maxSeats: courseFormat === 'live_cohort' && maxSeats ? parseInt(maxSeats, 10) : null,
           pacingFormat,
           scheduleType: pacingFormat === 'scheduled' ? scheduleType : 'relative_drip',
           cohortStartDate:
-            pacingFormat === 'scheduled' && scheduleType === 'calendar_date' && cohortStartDate
+            (courseFormat === 'live_cohort' || (pacingFormat === 'scheduled' && scheduleType === 'calendar_date')) && cohortStartDate
               ? new Date(cohortStartDate).toISOString()
               : null,
           cohortEndDate:
-            pacingFormat === 'scheduled' && scheduleType === 'calendar_date' && cohortEndDate
+            (courseFormat === 'live_cohort' || (pacingFormat === 'scheduled' && scheduleType === 'calendar_date')) && cohortEndDate
               ? new Date(cohortEndDate).toISOString()
               : null,
           requireSequentialCompletion: pacingFormat === 'structured',
@@ -185,6 +193,7 @@ export function CoursesCatalog({
       setScheduleType('relative_drip');
       setCohortStartDate('');
       setCohortEndDate('');
+      setMaxSeats('');
       setAccessRule('open');
       setMinLevelRequired(2);
       setShowCreate(false);
@@ -466,13 +475,83 @@ export function CoursesCatalog({
                         {course.description || 'No description provided.'}
                       </p>
 
-                      {course.course_format === 'live_cohort' && course.cohort_schedule_description && (
+                      {course.course_format === 'live_cohort' && (
                         <div className="mt-2.5 space-y-1.5 rounded-xl bg-blue-50/80 border border-blue-100 p-2 text-[11px] font-medium text-blue-900">
-                          <div className="flex items-center gap-1.5">
-                            <Video className="h-3 w-3 text-blue-600 shrink-0" />
-                            <span className="truncate">{course.cohort_schedule_description}</span>
+                          {course.cohort_schedule_description && (
+                            <div className="flex items-center gap-1.5">
+                              <Video className="h-3 w-3 text-blue-600 shrink-0" />
+                              <span className="truncate">{course.cohort_schedule_description}</span>
+                            </div>
+                          )}
+                          {course.cohort_schedule_description && (
+                            <ClassScheduleDaysStrip scheduleDescription={course.cohort_schedule_description} />
+                          )}
+                          <div className="flex items-center justify-between text-[10px] text-blue-900/80 pt-1 border-t border-blue-100/70">
+                            <span>
+                              {formatCohortDateRange(course.cohort_start_date, course.cohort_end_date) || 'Live Interactive Cohort'}
+                            </span>
+                            {course.max_seats ? (
+                              <span
+                                className={`font-mono font-bold ${
+                                  course.seats_remaining === 0 ? 'text-red-600' : 'text-blue-950'
+                                }`}
+                              >
+                                {course.seats_remaining === 0
+                                  ? 'SOLD OUT'
+                                  : `${course.seats_remaining} spots left`}
+                              </span>
+                            ) : null}
                           </div>
-                          <ClassScheduleDaysStrip scheduleDescription={course.cohort_schedule_description} />
+                          {course.is_enrolled && (
+                            <div className="flex items-center justify-between gap-1.5 pt-1.5 border-t border-blue-200/70 text-[10px]">
+                              <span className="font-semibold text-blue-950 flex items-center gap-1">
+                                <Calendar className="h-3 w-3 text-blue-600" />
+                                Calendar Sync:
+                              </span>
+                              <div className="flex items-center gap-1">
+                                <a
+                                  href={generateGoogleCalendarUrl({
+                                    title: course.title,
+                                    description: course.cohort_schedule_description,
+                                    startDate: course.cohort_start_date,
+                                    endDate: course.cohort_end_date,
+                                    meetingUrl: course.cohort_meeting_url,
+                                  })}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="rounded bg-white px-2 py-0.5 font-bold text-blue-900 border border-blue-200 hover:bg-blue-50 transition-colors shadow-2xs"
+                                  title="Add to Google Calendar"
+                                >
+                                  Google
+                                </a>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const ics = generateIcsFileContent({
+                                      title: course.title,
+                                      description: course.cohort_schedule_description,
+                                      startDate: course.cohort_start_date,
+                                      endDate: course.cohort_end_date,
+                                      meetingUrl: course.cohort_meeting_url,
+                                    });
+                                    const blob = new Blob([ics], { type: 'text/calendar;charset=utf-8' });
+                                    const url = URL.createObjectURL(blob);
+                                    const a = document.createElement('a');
+                                    a.href = url;
+                                    a.download = `${course.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-schedule.ics`;
+                                    document.body.appendChild(a);
+                                    a.click();
+                                    document.body.removeChild(a);
+                                    URL.revokeObjectURL(url);
+                                  }}
+                                  className="rounded bg-white px-2 py-0.5 font-bold text-blue-900 border border-blue-200 hover:bg-blue-50 transition-colors shadow-2xs"
+                                  title="Download Apple / iCal file"
+                                >
+                                  Apple / iCal
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -784,6 +863,25 @@ export function CoursesCatalog({
                           className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
                         />
                       </div>
+                    </div>
+
+                    {/* Maximum Seat Capacity */}
+                    <div className="border-t border-stone-100 pt-3">
+                      <label className="block text-[11px] font-semibold text-stone-700">
+                        Maximum Seat Capacity (Cohort Size Limit)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="100000"
+                        placeholder="e.g. 25 (leave empty for unlimited seats)"
+                        value={maxSeats}
+                        onChange={(e) => setMaxSeats(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
+                      />
+                      <p className="mt-1 text-[10px] text-stone-500">
+                        Once capacity is reached, the cohort enrollment card automatically closes further signups.
+                      </p>
                     </div>
                   </div>
                 )}

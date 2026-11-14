@@ -23,6 +23,7 @@ import {
   submitCourseReview,
   toggleLessonCompletion,
   updateCourse,
+  updateLesson,
   recordLiveAttendance,
   getCourseLiveAttendanceSummary,
 } from '@/features/courses/service';
@@ -986,5 +987,135 @@ describe('Courses, LMS Curriculum & Student Learning Progress Integration Suite'
 
     // 5. Deleting non-existent course -> NotFoundError
     await expect(deleteCourse(owner.id, circle.id, course.id)).rejects.toThrow(NotFoundError);
+  });
+
+  it('enforces live cohort schedule dates, seat limits, and lesson session replays', async () => {
+    const suffix = Date.now();
+    const instructor = (
+      await registerUser({
+        email: `cohort-instructor-${suffix}@example.com`,
+        username: `cohort_inst_${suffix}`,
+        displayName: 'Cohort Instructor',
+        password: 'Password123!',
+      })
+    ).user;
+
+    const studentA = (
+      await registerUser({
+        email: `student-a-${suffix}@example.com`,
+        username: `student_a_${suffix}`,
+        displayName: 'Student Alpha',
+        password: 'Password123!',
+      })
+    ).user;
+
+    const studentB = (
+      await registerUser({
+        email: `student-b-${suffix}@example.com`,
+        username: `student_b_${suffix}`,
+        displayName: 'Student Beta',
+        password: 'Password123!',
+      })
+    ).user;
+
+    const studentC = (
+      await registerUser({
+        email: `student-c-${suffix}@example.com`,
+        username: `student_c_${suffix}`,
+        displayName: 'Student Gamma',
+        password: 'Password123!',
+      })
+    ).user;
+
+    const circle = await createCircle(instructor.id, {
+      name: `Interactive Cohort Community ${suffix}`,
+      slug: `cohort-comm-${suffix}`,
+      description: 'Testing live interactive cohort mechanics',
+      visibility: 'public',
+    });
+
+    await updateCircleCapability(instructor.id, circle.id, 'learning_resources', true);
+
+    // Add students to circle
+    await joinPublicCircle(studentA.id, circle.id);
+    await joinPublicCircle(studentB.id, circle.id);
+    await joinPublicCircle(studentC.id, circle.id);
+
+    const startDate = new Date(Date.now() + 86400000 * 2).toISOString();
+    const endDate = new Date(Date.now() + 86400000 * 30).toISOString();
+
+    // 1. Create a live cohort capped at 2 seats
+    const cohort = await createCourse(instructor.id, {
+      circleId: circle.id,
+      title: 'Spring 2027 Founder Masterclass',
+      slug: 'spring-2027-founder-masterclass',
+      description: 'Intimate, live interactive cohort for 2 selected founders.',
+      courseFormat: 'live_cohort',
+      cohortMeetingUrl: 'https://zoom.us/j/1122334455',
+      cohortScheduleDescription: 'Wednesdays & Saturdays, 5:00 PM UTC',
+      cohortStartDate: startDate,
+      cohortEndDate: endDate,
+      maxSeats: 2,
+      accessRule: 'open',
+    });
+
+    expect(cohort.course_format).toBe('live_cohort');
+    expect(cohort.max_seats).toBe(2);
+    expect(cohort.cohort_start_date).toBeDefined();
+
+    // 2. Add module and lesson with a session replay URL
+    const module = await createModule(instructor.id, {
+      circleId: circle.id,
+      courseId: cohort.id,
+      title: 'Week 1: Zero to One Validation',
+    });
+
+    const lesson = await createLesson(instructor.id, {
+      circleId: circle.id,
+      courseId: cohort.id,
+      moduleId: module.id,
+      title: 'Workshop 1: Customer Interviews & ICP',
+      slug: 'workshop-1-customer-interviews',
+      replayUrl: 'https://vimeo.com/123456789',
+    });
+
+    expect(lesson.replay_url).toBe('https://vimeo.com/123456789');
+
+    // Update replay URL
+    const updatedLesson = await updateLesson(instructor.id, circle.id, lesson.id, {
+      replayUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    });
+    expect(updatedLesson.replay_url).toBe('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+
+    // 3. First student enrolls (seat 1 of 2 taken)
+    await enrollInCourse(studentA.id, circle.id, cohort.id);
+
+    let details = await getCourseWithCurriculum(studentA.id, circle.id, cohort.id);
+    expect(details.enrolled_students_count).toBe(1);
+    expect(details.max_seats).toBe(2);
+    expect(details.seats_remaining).toBe(1);
+
+    // 4. Second student enrolls (seat 2 of 2 taken -> Sold Out)
+    await enrollInCourse(studentB.id, circle.id, cohort.id);
+
+    details = await getCourseWithCurriculum(instructor.id, circle.id, cohort.id);
+    expect(details.enrolled_students_count).toBe(2);
+    expect(details.seats_remaining).toBe(0);
+
+    // 5. Third student attempts to enroll -> ForbiddenError (Sold out)
+    await expect(enrollInCourse(studentC.id, circle.id, cohort.id)).rejects.toThrow(
+      /reached maximum capacity/
+    );
+
+    // 6. Already-enrolled student re-calling enrollInCourse is idempotent
+    const reEnroll = await enrollInCourse(studentA.id, circle.id, cohort.id);
+    expect(reEnroll).toBeDefined();
+
+    // 7. Verify catalog reports seats_remaining accurately
+    const catalog = await listCourses(studentC.id, circle.id);
+    const catalogCohort = catalog.find((c) => c.id === cohort.id);
+    expect(catalogCohort?.max_seats).toBe(2);
+    expect(catalogCohort?.seats_remaining).toBe(0);
+    expect(catalogCohort?.enrolled_students_count).toBe(2);
   });
 });

@@ -13,6 +13,8 @@ import {
   Video,
   Play,
   Trash2,
+  Calendar,
+  Users,
 } from 'lucide-react';
 import { CourseItem, CourseDeliveryFormat } from '@/types/domain';
 import { Button } from '@/components/ui/button';
@@ -51,6 +53,15 @@ export function CourseSettingsModal({
   );
   const [cohortScheduleDescription, setCohortScheduleDescription] = useState(
     course.cohort_schedule_description || ''
+  );
+  const [cohortStartDate, setCohortStartDate] = useState(
+    course.cohort_start_date ? course.cohort_start_date.slice(0, 16) : ''
+  );
+  const [cohortEndDate, setCohortEndDate] = useState(
+    course.cohort_end_date ? course.cohort_end_date.slice(0, 16) : ''
+  );
+  const [maxSeats, setMaxSeats] = useState(
+    course.max_seats ? String(course.max_seats) : ''
   );
   const [challengeDurationDays, setChallengeDurationDays] = useState(
     course.challenge_duration_days ? String(course.challenge_duration_days) : '30'
@@ -110,6 +121,9 @@ export function CourseSettingsModal({
     setCourseFormat(course.course_format || 'video_on_demand');
     setCohortMeetingUrl(course.cohort_meeting_url || '');
     setCohortScheduleDescription(course.cohort_schedule_description || '');
+    setCohortStartDate(course.cohort_start_date ? course.cohort_start_date.slice(0, 16) : '');
+    setCohortEndDate(course.cohort_end_date ? course.cohort_end_date.slice(0, 16) : '');
+    setMaxSeats(course.max_seats ? String(course.max_seats) : '');
     setChallengeDurationDays(
       course.challenge_duration_days ? String(course.challenge_duration_days) : '30'
     );
@@ -182,6 +196,9 @@ export function CourseSettingsModal({
         courseFormat,
         cohortMeetingUrl: courseFormat === 'live_cohort' && cohortMeetingUrl.trim() ? cohortMeetingUrl.trim() : null,
         cohortScheduleDescription: courseFormat === 'live_cohort' && cohortScheduleDescription.trim() ? cohortScheduleDescription.trim() : null,
+        cohortStartDate: courseFormat === 'live_cohort' && cohortStartDate ? new Date(cohortStartDate).toISOString() : null,
+        cohortEndDate: courseFormat === 'live_cohort' && cohortEndDate ? new Date(cohortEndDate).toISOString() : null,
+        maxSeats: courseFormat === 'live_cohort' && maxSeats ? parseInt(maxSeats, 10) : null,
         challengeDurationDays: courseFormat === 'action_challenge' ? parseInt(challengeDurationDays, 10) || 30 : null,
         accessRule,
         minLevelRequired: accessRule === 'min_level' ? Number(minLevelRequired) : 1,
@@ -394,6 +411,53 @@ export function CourseSettingsModal({
                   label="Class Schedule & Weekly Days"
                   helperText="Select the days of the week when live workshops take place."
                 />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="text-[11px] font-semibold text-stone-700 flex items-center gap-1.5">
+                      <Calendar className="h-3.5 w-3.5 text-stone-500" />
+                      <span>Cohort Start Date & Time</span>
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={cohortStartDate}
+                      onChange={(e) => setCohortStartDate(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-[11px] font-semibold text-stone-700 flex items-center gap-1.5">
+                      <Calendar className="h-3.5 w-3.5 text-stone-500" />
+                      <span>Cohort End Date & Time</span>
+                    </label>
+                    <input
+                      type="datetime-local"
+                      value={cohortEndDate}
+                      onChange={(e) => setCohortEndDate(e.target.value)}
+                      className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-1">
+                  <label className="text-[11px] font-semibold text-stone-700 flex items-center gap-1.5">
+                    <Users className="h-3.5 w-3.5 text-stone-500" />
+                    <span>Maximum Seat Capacity (Cohort Size Limit)</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="100000"
+                    placeholder="e.g. 25 (leave empty for unlimited)"
+                    value={maxSeats}
+                    onChange={(e) => setMaxSeats(e.target.value)}
+                    className="mt-1 w-full rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs text-stone-900 focus:border-stone-900 focus:outline-hidden"
+                  />
+                  <p className="mt-1 text-[10px] text-stone-500">
+                    Once all spots are filled, the enrollment card will show &quot;Sold Out&quot; and close further signups.
+                  </p>
+                </div>
               </div>
             )}
           </div>

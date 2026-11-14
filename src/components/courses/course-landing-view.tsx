@@ -154,6 +154,10 @@ export function CourseLandingView({
     () => formatCohortDateRange(course.cohort_start_date, course.cohort_end_date),
     [course.cohort_start_date, course.cohort_end_date]
   );
+  const maxSeats = course.max_seats ? Number(course.max_seats) : null;
+  const enrolledCount = course.enrolled_students_count || 0;
+  const remainingSeats = maxSeats ? Math.max(0, maxSeats - enrolledCount) : null;
+  const isSoldOut = Boolean(maxSeats && maxSeats > 0 && enrolledCount >= maxSeats);
   const liveStatus = useMemo(
     () =>
       calculateLiveSessionStatus({
@@ -333,12 +337,13 @@ export function CourseLandingView({
                   </div>
                 )}
 
-                {/* Real Enrolled Students */}
+                {/* Real Enrolled Students / Cohort Seat Count */}
                 <div className="flex items-center gap-1 text-stone-300">
                   <Users className="h-3.5 w-3.5 text-stone-400" />
                   <span>
-                    {(course.enrolled_students_count || 0).toLocaleString()}{' '}
-                    {(course.enrolled_students_count || 0) === 1 ? 'student' : 'students'} enrolled
+                    {course.course_format === 'live_cohort' && maxSeats
+                      ? `${enrolledCount} / ${maxSeats} seats filled`
+                      : `${enrolledCount.toLocaleString()} ${enrolledCount === 1 ? 'student' : 'students'} enrolled`}
                   </span>
                 </div>
 
@@ -1148,9 +1153,61 @@ export function CourseLandingView({
                   )}
                 </div>
 
+                {/* Cohort Seat Capacity Indicator */}
+                {course.course_format === 'live_cohort' && maxSeats && (
+                  <div className="rounded-xl border border-stone-200 bg-stone-50/80 p-3 space-y-2">
+                    <div className="flex items-center justify-between text-xs font-bold">
+                      <span className="flex items-center gap-1.5 text-stone-800">
+                        <Users className="h-3.5 w-3.5 text-stone-600" />
+                        <span>Cohort Capacity</span>
+                      </span>
+                      <span
+                        className={`font-mono text-xs font-bold ${
+                          isSoldOut
+                            ? 'text-red-600'
+                            : (remainingSeats ?? 0) <= 5
+                            ? 'text-amber-600'
+                            : 'text-stone-700'
+                        }`}
+                      >
+                        {isSoldOut ? 'SOLD OUT' : `${remainingSeats} spots left`}
+                      </span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-stone-200">
+                      <div
+                        className={`h-full transition-all duration-300 ${
+                          isSoldOut
+                            ? 'bg-red-600'
+                            : (remainingSeats ?? 0) <= 5
+                            ? 'bg-amber-500'
+                            : 'bg-black'
+                        }`}
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            Math.round((enrolledCount / maxSeats) * 100)
+                          )}%`,
+                        }}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between text-[10px] text-stone-500">
+                      <span>{enrolledCount} enrolled</span>
+                      <span>Max {maxSeats} seats</span>
+                    </div>
+                  </div>
+                )}
+
                 {/* Primary CTA Button */}
                 <div className="space-y-2.5">
-                  {isPaywalled && !hasAccess ? (
+                  {isSoldOut && !isEnrolled ? (
+                    <Button
+                      disabled
+                      className="w-full rounded-xl bg-stone-200 py-3 text-sm font-bold text-stone-500 cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      <Lock className="h-4 w-4" />
+                      <span>Cohort Full (Sold Out)</span>
+                    </Button>
+                  ) : isPaywalled && !hasAccess ? (
                     <Button
                       onClick={() => onOpenCheckout?.(primaryPlan || undefined)}
                       className="w-full rounded-xl bg-black py-3 text-sm font-bold text-white shadow-xs hover:bg-stone-800 transition-all flex items-center justify-center gap-2"
