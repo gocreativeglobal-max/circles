@@ -1076,8 +1076,17 @@ export function SocialNewsfeedClient({
               <div className="rounded-2xl border border-stone-200/90 bg-white p-4 shadow-xs">
                 {!composerExpanded ? (
                   <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black text-xs font-bold text-white">
-                      {currentUser.display_name.slice(0, 1).toUpperCase()}
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-black text-xs font-bold text-white overflow-hidden border border-stone-200">
+                      {currentUser.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={currentUser.avatar_url}
+                          alt={currentUser.display_name}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        currentUser.display_name.slice(0, 1).toUpperCase()
+                      )}
                     </div>
                     <button
                       type="button"
@@ -1464,21 +1473,41 @@ export function SocialNewsfeedClient({
                           {/* Dual-Identity Header: Circle Context + Join Action */}
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex items-center gap-3 min-w-0">
-                              <Link
-                                href={`/circles/${item.circle.slug}`}
-                                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-black text-sm font-bold text-white shadow-2xs hover:bg-zinc-800 transition-colors overflow-hidden"
-                              >
-                                {item.circle.avatar_url ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img
-                                    src={item.circle.avatar_url}
-                                    alt={item.circle.name}
-                                    className="h-full w-full object-cover"
-                                  />
-                                ) : (
-                                  item.circle.name.slice(0, 1).toUpperCase()
-                                )}
-                              </Link>
+                              <div className="relative shrink-0">
+                                <Link
+                                  href={`/circles/${item.circle.slug}`}
+                                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-black text-sm font-bold text-white shadow-2xs hover:bg-zinc-800 transition-colors overflow-hidden"
+                                >
+                                  {item.circle.avatar_url ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                      src={item.circle.avatar_url}
+                                      alt={item.circle.name}
+                                      className="h-full w-full object-cover"
+                                    />
+                                  ) : (
+                                    item.circle.name.slice(0, 1).toUpperCase()
+                                  )}
+                                </Link>
+                                {/* Author Avatar Badge */}
+                                <div
+                                  className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full overflow-hidden border-2 border-white bg-stone-200 flex items-center justify-center shadow-2xs"
+                                  title={post.author?.display_name || 'Member'}
+                                >
+                                  {post.author?.avatar_url ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                      src={post.author.avatar_url}
+                                      alt={post.author.display_name}
+                                      className="h-full w-full object-cover"
+                                    />
+                                  ) : (
+                                    <span className="text-[9px] font-bold text-stone-700">
+                                      {(post.author?.display_name || 'M').slice(0, 1).toUpperCase()}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
 
                               <div className="min-w-0">
                                 <div className="flex flex-wrap items-center gap-1.5">
@@ -1502,11 +1531,21 @@ export function SocialNewsfeedClient({
 
                                 {/* Author Sub-line */}
                                 <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-stone-500">
-                                  <span>
-                                    Posted by{' '}
-                                    <strong className="font-semibold text-stone-700">
-                                      {post.author?.display_name || 'Member'}
-                                    </strong>
+                                  <span className="inline-flex items-center gap-1.5">
+                                    {post.author?.avatar_url ? (
+                                      // eslint-disable-next-line @next/next/no-img-element
+                                      <img
+                                        src={post.author.avatar_url}
+                                        alt={post.author.display_name}
+                                        className="h-3.5 w-3.5 rounded-full object-cover border border-stone-200"
+                                      />
+                                    ) : null}
+                                    <span>
+                                      Posted by{' '}
+                                      <strong className="font-semibold text-stone-700">
+                                        {post.author?.display_name || 'Member'}
+                                      </strong>
+                                    </span>
                                   </span>
                                   {item.authorRole &&
                                     ['owner', 'admin', 'moderator'].includes(item.authorRole) && (
@@ -1793,10 +1832,19 @@ export function SocialNewsfeedClient({
                                     key={comment.id}
                                     className="flex items-start gap-2.5 rounded-xl bg-white p-3 border border-stone-200/70"
                                   >
-                                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#F4F3EE] text-[11px] font-bold text-stone-900">
-                                      {(comment.author?.display_name || 'M')
-                                        .slice(0, 1)
-                                        .toUpperCase()}
+                                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#F4F3EE] text-[11px] font-bold text-stone-900 overflow-hidden border border-stone-200">
+                                      {comment.author?.avatar_url ? (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img
+                                          src={comment.author.avatar_url}
+                                          alt={comment.author.display_name}
+                                          className="h-full w-full object-cover"
+                                        />
+                                      ) : (
+                                        (comment.author?.display_name || 'M')
+                                          .slice(0, 1)
+                                          .toUpperCase()
+                                      )}
                                     </div>
                                     <div className="min-w-0 flex-1">
                                       <div className="flex items-center gap-2">
@@ -1836,8 +1884,17 @@ export function SocialNewsfeedClient({
                                 }
                                 className="flex items-center gap-2"
                               >
-                                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-black text-[11px] font-bold text-white">
-                                  {currentUser.display_name.slice(0, 1).toUpperCase()}
+                                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-black text-[11px] font-bold text-white overflow-hidden border border-stone-200">
+                                  {currentUser.avatar_url ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                      src={currentUser.avatar_url}
+                                      alt={currentUser.display_name}
+                                      className="h-full w-full object-cover"
+                                    />
+                                  ) : (
+                                    currentUser.display_name.slice(0, 1).toUpperCase()
+                                  )}
                                 </div>
                                 <input
                                   type="text"
@@ -1913,9 +1970,18 @@ export function SocialNewsfeedClient({
                           <div className="flex items-center gap-2.5 min-w-0">
                             <Link
                               href={`/circles/${item.circle.slug}`}
-                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black text-xs font-bold text-white"
+                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black text-xs font-bold text-white shadow-2xs overflow-hidden"
                             >
-                              {item.circle.name.slice(0, 1).toUpperCase()}
+                              {item.circle.avatar_url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={item.circle.avatar_url}
+                                  alt={item.circle.name}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                item.circle.name.slice(0, 1).toUpperCase()
+                              )}
                             </Link>
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5">
@@ -1929,10 +1995,22 @@ export function SocialNewsfeedClient({
                                   EVENT
                                 </span>
                               </div>
-                              <p className="text-[11px] text-stone-500">
-                                Hosted by {ev.host?.display_name || ev.organizer?.display_name || 'Host'} ·{' '}
-                                {formatRelativeTime(ev.created_at)}
-                              </p>
+                              <div className="flex items-center gap-1.5 text-[11px] text-stone-500">
+                                <span>Hosted by</span>
+                                {(ev.host?.avatar_url || ev.organizer?.avatar_url) ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={ev.host?.avatar_url || ev.organizer?.avatar_url || ''}
+                                    alt={ev.host?.display_name || ev.organizer?.display_name || 'Host'}
+                                    className="h-3.5 w-3.5 rounded-full object-cover border border-stone-200"
+                                  />
+                                ) : null}
+                                <span className="font-semibold text-stone-700">
+                                  {ev.host?.display_name || ev.organizer?.display_name || 'Host'}
+                                </span>
+                                <span>·</span>
+                                <span>{formatRelativeTime(ev.created_at)}</span>
+                              </div>
                             </div>
                           </div>
 
@@ -1945,6 +2023,18 @@ export function SocialNewsfeedClient({
                             {channelLabel}
                           </span>
                         </div>
+
+                        {/* Event Cover Image if provided */}
+                        {ev.cover_image_url && (
+                          <div className="relative overflow-hidden rounded-xl border border-stone-200 bg-stone-100 aspect-[21/9] max-h-56 w-full">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={ev.cover_image_url}
+                              alt={ev.title}
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
+                        )}
 
                         {/* Event Card Body */}
                         <div className="flex items-start gap-4 rounded-xl border border-stone-200/80 bg-[#FAF9F6] p-4">
@@ -2044,9 +2134,18 @@ export function SocialNewsfeedClient({
                           <div className="flex items-center gap-2.5 min-w-0">
                             <Link
                               href={`/circles/${item.circle.slug}`}
-                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black text-xs font-bold text-white"
+                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black text-xs font-bold text-white shadow-2xs overflow-hidden"
                             >
-                              {item.circle.name.slice(0, 1).toUpperCase()}
+                              {item.circle.avatar_url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={item.circle.avatar_url}
+                                  alt={item.circle.name}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                item.circle.name.slice(0, 1).toUpperCase()
+                              )}
                             </Link>
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5">
@@ -2060,10 +2159,22 @@ export function SocialNewsfeedClient({
                                   {listing.listing_type || 'Listing'}
                                 </span>
                               </div>
-                              <p className="text-[11px] text-stone-500">
-                                Listed by {listing.seller?.display_name || 'Member'} ·{' '}
-                                {formatRelativeTime(listing.created_at)}
-                              </p>
+                              <div className="flex items-center gap-1.5 text-[11px] text-stone-500">
+                                <span>Listed by</span>
+                                {listing.seller?.avatar_url ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={listing.seller.avatar_url}
+                                    alt={listing.seller.display_name}
+                                    className="h-3.5 w-3.5 rounded-full object-cover border border-stone-200"
+                                  />
+                                ) : null}
+                                <span className="font-semibold text-stone-700">
+                                  {listing.seller?.display_name || 'Member'}
+                                </span>
+                                <span>·</span>
+                                <span>{formatRelativeTime(listing.created_at)}</span>
+                              </div>
                             </div>
                           </div>
 
@@ -2139,9 +2250,18 @@ export function SocialNewsfeedClient({
                           <div className="flex items-center gap-2.5 min-w-0">
                             <Link
                               href={`/circles/${item.circle.slug}`}
-                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black text-xs font-bold text-white shadow-2xs"
+                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black text-xs font-bold text-white shadow-2xs overflow-hidden"
                             >
-                              {item.circle.name.slice(0, 1).toUpperCase()}
+                              {item.circle.avatar_url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={item.circle.avatar_url}
+                                  alt={item.circle.name}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                item.circle.name.slice(0, 1).toUpperCase()
+                              )}
                             </Link>
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5">
@@ -2155,9 +2275,22 @@ export function SocialNewsfeedClient({
                                   Course
                                 </span>
                               </div>
-                              <p className="text-[11px] text-stone-500">
-                                By {course.instructor?.display_name || 'Instructor'} · {formatRelativeTime(item.timestamp)}
-                              </p>
+                              <div className="flex items-center gap-1.5 text-[11px] text-stone-500">
+                                <span>By</span>
+                                {course.instructor?.avatar_url ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={course.instructor.avatar_url}
+                                    alt={course.instructor.display_name}
+                                    className="h-3.5 w-3.5 rounded-full object-cover border border-stone-200"
+                                  />
+                                ) : null}
+                                <span className="font-semibold text-stone-700">
+                                  {course.instructor?.display_name || 'Instructor'}
+                                </span>
+                                <span>·</span>
+                                <span>{formatRelativeTime(item.timestamp)}</span>
+                              </div>
                             </div>
                           </div>
 
@@ -2246,9 +2379,18 @@ export function SocialNewsfeedClient({
                           <div className="flex items-center gap-2.5 min-w-0">
                             <Link
                               href={`/circles/${item.circle.slug}`}
-                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black text-xs font-bold text-white shadow-2xs"
+                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black text-xs font-bold text-white shadow-2xs overflow-hidden"
                             >
-                              {item.circle.name.slice(0, 1).toUpperCase()}
+                              {item.circle.avatar_url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={item.circle.avatar_url}
+                                  alt={item.circle.name}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                item.circle.name.slice(0, 1).toUpperCase()
+                              )}
                             </Link>
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5">
@@ -2262,9 +2404,22 @@ export function SocialNewsfeedClient({
                                   {res.category || 'Guide'}
                                 </span>
                               </div>
-                              <p className="text-[11px] text-stone-500">
-                                Published by {res.author?.display_name || 'Member'} · {formatRelativeTime(item.timestamp)}
-                              </p>
+                              <div className="flex items-center gap-1.5 text-[11px] text-stone-500">
+                                <span>Published by</span>
+                                {res.author?.avatar_url ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={res.author.avatar_url}
+                                    alt={res.author.display_name}
+                                    className="h-3.5 w-3.5 rounded-full object-cover border border-stone-200"
+                                  />
+                                ) : null}
+                                <span className="font-semibold text-stone-700">
+                                  {res.author?.display_name || 'Member'}
+                                </span>
+                                <span>·</span>
+                                <span>{formatRelativeTime(item.timestamp)}</span>
+                              </div>
                             </div>
                           </div>
 
@@ -2330,9 +2485,18 @@ export function SocialNewsfeedClient({
                           <div className="flex items-center gap-2.5 min-w-0">
                             <Link
                               href={`/circles/${item.circle.slug}`}
-                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black text-xs font-bold text-white shadow-2xs"
+                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black text-xs font-bold text-white shadow-2xs overflow-hidden"
                             >
-                              {item.circle.name.slice(0, 1).toUpperCase()}
+                              {item.circle.avatar_url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={item.circle.avatar_url}
+                                  alt={item.circle.name}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                item.circle.name.slice(0, 1).toUpperCase()
+                              )}
                             </Link>
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5">
@@ -2508,14 +2672,23 @@ export function SocialNewsfeedClient({
                         href={`/circles/${ev.circle.slug}/events`}
                         className="group flex items-start gap-3 rounded-xl p-2 hover:bg-stone-50 transition-colors"
                       >
-                        <div className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg bg-[#F4F3EE] text-stone-900">
-                          <span className="text-[9px] font-mono font-bold uppercase leading-none">
-                            {d.toLocaleDateString([], { month: 'short' })}
-                          </span>
-                          <span className="mt-0.5 text-sm font-extrabold leading-none">
-                            {d.getDate()}
-                          </span>
-                        </div>
+                        {ev.cover_image_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={ev.cover_image_url}
+                            alt={ev.title}
+                            className="h-10 w-10 shrink-0 rounded-lg object-cover border border-stone-200"
+                          />
+                        ) : (
+                          <div className="flex h-10 w-10 shrink-0 flex-col items-center justify-center rounded-lg bg-[#F4F3EE] text-stone-900">
+                            <span className="text-[9px] font-mono font-bold uppercase leading-none">
+                              {d.toLocaleDateString([], { month: 'short' })}
+                            </span>
+                            <span className="mt-0.5 text-sm font-extrabold leading-none">
+                              {d.getDate()}
+                            </span>
+                          </div>
+                        )}
                         <div className="min-w-0 flex-1">
                           <p className="truncate text-xs font-bold text-stone-900 group-hover:text-black">
                             {ev.title}

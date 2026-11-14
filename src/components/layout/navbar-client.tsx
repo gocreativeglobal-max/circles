@@ -156,8 +156,17 @@ export function NavbarClient({ user, unreadCount, canModerate = false }: NavbarC
                 href="/settings"
                 className="group flex items-center gap-2 rounded-xl border border-stone-200/90 bg-white px-2.5 py-1.5 text-xs font-medium text-stone-800 shadow-xs hover:border-stone-300 hover:bg-stone-50 transition-all"
               >
-                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-black text-[10px] font-bold text-white">
-                  {user.display_name.slice(0, 1).toUpperCase()}
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-black text-[10px] font-bold text-white overflow-hidden">
+                  {user.avatar_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={user.avatar_url}
+                      alt={user.display_name}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    user.display_name.slice(0, 1).toUpperCase()
+                  )}
                 </span>
                 <span className="max-w-[120px] truncate">{user.display_name}</span>
                 <Settings className="h-3 w-3 text-stone-400 group-hover:text-stone-600 transition-colors" />

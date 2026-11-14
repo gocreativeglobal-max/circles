@@ -624,8 +624,17 @@ export function DiscussionsClient({
                   }`}
                 >
                   {!isGroupedWithPrev ? (
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#F4F3EE] text-xs font-semibold text-stone-900">
-                      {(post.author?.display_name || 'M').slice(0, 2).toUpperCase()}
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#F4F3EE] text-xs font-semibold text-stone-900 overflow-hidden border border-stone-200">
+                      {post.author?.avatar_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={post.author.avatar_url}
+                          alt={post.author.display_name}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        (post.author?.display_name || 'M').slice(0, 2).toUpperCase()
+                      )}
                     </div>
                   ) : (
                     <div className="w-8 shrink-0 text-right opacity-0 group-hover:opacity-100">
@@ -1089,9 +1098,23 @@ export function DiscussionsClient({
           <div className="flex-1 overflow-y-auto p-4 space-y-4">
             <div className="rounded-xl bg-[#FAF9F6] p-3">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-stone-900">
-                  {activeThreadPost.author?.display_name || 'Member'}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  {activeThreadPost.author?.avatar_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={activeThreadPost.author.avatar_url}
+                      alt={activeThreadPost.author.display_name}
+                      className="h-4 w-4 rounded-full object-cover border border-stone-200"
+                    />
+                  ) : (
+                    <span className="flex h-4 w-4 items-center justify-center rounded-full bg-stone-200 text-[8px] font-bold text-stone-700">
+                      {(activeThreadPost.author?.display_name || 'M').slice(0, 1).toUpperCase()}
+                    </span>
+                  )}
+                  <span className="text-xs font-semibold text-stone-900">
+                    {activeThreadPost.author?.display_name || 'Member'}
+                  </span>
+                </div>
                 <span className="text-[10px] text-stone-400">
                   {formatShortTime(activeThreadPost.created_at)}
                 </span>
@@ -1116,9 +1139,23 @@ export function DiscussionsClient({
                       className="group rounded-xl border border-stone-100 bg-white p-2.5 text-xs"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold text-stone-900">
-                          {c.author?.display_name || 'Member'}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          {c.author?.avatar_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={c.author.avatar_url}
+                              alt={c.author.display_name}
+                              className="h-4 w-4 rounded-full object-cover border border-stone-200"
+                            />
+                          ) : (
+                            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-stone-100 text-[8px] font-bold text-stone-700">
+                              {(c.author?.display_name || 'M').slice(0, 1).toUpperCase()}
+                            </span>
+                          )}
+                          <span className="font-semibold text-stone-900">
+                            {c.author?.display_name || 'Member'}
+                          </span>
+                        </div>
                         <div className="flex items-center gap-1.5">
                           <span className="text-[10px] text-stone-400">
                             {formatShortTime(c.created_at)}

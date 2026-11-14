@@ -112,8 +112,17 @@ export function PostDetailClient({
 
       <article className="rounded-2xl border border-stone-200 bg-white p-6 sm:p-8 shadow-sm">
         <div className="flex items-center gap-2.5 text-xs text-stone-500">
-          <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-stone-100 font-bold text-stone-900">
-            {(post.author?.display_name || 'M').slice(0, 1).toUpperCase()}
+          <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-stone-100 font-bold text-stone-900 overflow-hidden border border-stone-200">
+            {post.author?.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={post.author.avatar_url}
+                alt={post.author.display_name}
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              (post.author?.display_name || 'M').slice(0, 1).toUpperCase()
+            )}
           </span>
           <span className="font-semibold text-stone-900">{post.author?.display_name}</span>
           <span>@{post.author?.username}</span>

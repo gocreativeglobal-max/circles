@@ -14,6 +14,7 @@ import {
   ChevronDown,
   FolderGit2,
   Globe,
+  GraduationCap,
   Heart,
   Lock,
   MapPin,
@@ -883,6 +884,17 @@ export function CommunityActivityStream({
                 </Link>
               </div>
 
+              {spotlightEvent.cover_image_url && (
+                <div className="mb-3 overflow-hidden rounded-xl border border-stone-200 aspect-[16/9] max-h-36 w-full">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={spotlightEvent.cover_image_url}
+                    alt={spotlightEvent.title}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              )}
+
               <div className="flex items-start gap-3">
                 <div className="flex h-14 w-12 shrink-0 flex-col items-center justify-center rounded-xl bg-stone-100 text-stone-900 border border-stone-200 shadow-2xs">
                   <span className="text-[9px] font-bold uppercase text-stone-500 leading-none">
@@ -1293,18 +1305,32 @@ export function CommunityActivityStream({
                   See all →
                 </Link>
               </div>
-              <ul className="space-y-2">
+              <ul className="space-y-2.5">
                 {featuredCourses.slice(0, 3).map((crs) => (
-                  <li key={crs.id}>
-                    <Link
-                      href={`/circles/${circle.slug}/courses/${crs.id}`}
-                      className="block text-xs font-semibold text-stone-900 hover:underline truncate"
-                    >
-                      {crs.title}
-                    </Link>
-                    <span className="text-[10px] text-stone-400">
-                      {crs.total_lessons_count || 0} lessons
-                    </span>
+                  <li key={crs.id} className="flex items-center gap-2.5">
+                    {crs.thumbnail_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={crs.thumbnail_url}
+                        alt={crs.title}
+                        className="h-10 w-10 shrink-0 rounded-lg object-cover border border-stone-200"
+                      />
+                    ) : (
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700 border border-blue-100">
+                        <GraduationCap className="h-5 w-5" />
+                      </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <Link
+                        href={`/circles/${circle.slug}/courses/${crs.id}`}
+                        className="block text-xs font-semibold text-stone-900 hover:underline truncate"
+                      >
+                        {crs.title}
+                      </Link>
+                      <span className="text-[10px] text-stone-400">
+                        {crs.total_lessons_count || 0} lessons
+                      </span>
+                    </div>
                   </li>
                 ))}
               </ul>
@@ -1856,9 +1882,19 @@ function ActivityFeedCard({
               Event
             </span>
             <h3 className="font-bold text-stone-900 text-sm mt-1">{event.title}</h3>
-            <p className="text-xs text-stone-500 mt-0.5">
-              {date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} · {event.going_count ?? 0} attending
-            </p>
+            <div className="flex items-center gap-1.5 text-xs text-stone-500 mt-0.5">
+              {(event.host?.avatar_url || event.organizer?.avatar_url) ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={event.host?.avatar_url || event.organizer?.avatar_url || ''}
+                  alt={event.host?.display_name || event.organizer?.display_name || 'Host'}
+                  className="h-3.5 w-3.5 rounded-full object-cover border border-stone-200"
+                />
+              ) : null}
+              <span>
+                {date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} · {event.going_count ?? 0} attending
+              </span>
+            </div>
           </div>
           {isMember && (
             <button
@@ -1940,6 +1976,12 @@ function ActivityFeedCard({
     const href = `/circles/${circle.slug}/courses/${course.id}`;
     return (
       <article className={`space-y-3 rounded-2xl ${cardBgClass} p-4`}>
+        {course.thumbnail_url && (
+          <div className="relative overflow-hidden rounded-xl border border-stone-200 bg-stone-100 aspect-[16/9] max-h-56 w-full">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={course.thumbnail_url} alt={course.title} className="h-full w-full object-cover" />
+          </div>
+        )}
         <div className="flex items-center justify-between">
           <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700">
             Course
@@ -1952,6 +1994,23 @@ function ActivityFeedCard({
             <p className="mt-1 line-clamp-2 text-xs text-stone-600">{course.description}</p>
           )}
         </Link>
+        {course.instructor && (
+          <div className="flex items-center gap-2 pt-1 border-t border-stone-100 text-xs text-stone-500">
+            {course.instructor.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={course.instructor.avatar_url}
+                alt={course.instructor.display_name}
+                className="h-4 w-4 rounded-full object-cover border border-stone-200"
+              />
+            ) : (
+              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-stone-100 text-[9px] font-bold text-stone-700">
+                {(course.instructor.display_name || 'I').slice(0, 1).toUpperCase()}
+              </span>
+            )}
+            <span>Instructor: <strong className="text-stone-700">{course.instructor.display_name}</strong></span>
+          </div>
+        )}
       </article>
     );
   }
