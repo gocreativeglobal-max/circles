@@ -1244,141 +1244,188 @@ function ActivityFeedCard({
 
     return (
       <article className={`overflow-hidden rounded-2xl ${cardBgClass} transition-all hover:border-stone-300`}>
-        {/* Compact Header: Author Avatar + Name > #Space + Relative Time */}
-        <div className="flex items-start justify-between p-4 pb-2.5">
+        {/* Compact Header */}
+        <div className="flex items-start justify-between px-4 pt-4 pb-2.5">
           <div className="flex items-center gap-3 min-w-0">
             <Link
               href={`/circles/${circle.slug}/members/${post.author?.id || post.author_id}`}
-              className="shrink-0 group"
+              className="shrink-0"
             >
               <Avatar url={post.author?.avatar_url} name={authorName} size="lg" />
             </Link>
-            <div className="min-w-0 text-sm">
+            <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-x-1.5 leading-snug">
                 <Link
                   href={`/circles/${circle.slug}/members/${post.author?.id || post.author_id}`}
-                  className="font-bold text-stone-900 hover:underline truncate"
+                  className="text-sm font-bold text-stone-900 hover:underline"
                 >
                   {authorName}
                 </Link>
                 {post.space?.name && (
                   <Link
                     href={`/circles/${circle.slug}/spaces/${post.space.slug}`}
-                    className="text-xs font-medium text-stone-500 hover:text-stone-900 transition-colors"
+                    className="text-xs font-medium text-stone-400 hover:text-stone-700 transition-colors"
                   >
-                    › #{post.space.name}
+                    &#8250; #{post.space.name}
                   </Link>
                 )}
               </div>
-              <div className="flex items-center gap-1.5 text-xs text-stone-400">
+              <div className="flex items-center gap-1 text-[11px] text-stone-400 mt-0.5">
                 <span title={new Date(item.timestamp).toLocaleString()}>{time}</span>
-                <span>•</span>
-                <Globe className="h-3 w-3 text-stone-400" />
+                <span>·</span>
+                <Globe className="h-2.5 w-2.5" />
               </div>
             </div>
           </div>
-
-          {/* Three dots / Copy Link */}
           <button
             type="button"
             onClick={handleCopyPost}
             title="Copy link to post"
-            className="rounded-full p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors"
+            className="shrink-0 rounded-full p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors ml-2"
           >
             <MoreHorizontal className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Text-First Post Body */}
-        <div className="px-4 pb-3">
-          {showTitle && (
-            <h3 className="font-bold text-stone-950 text-sm mb-1 leading-snug">{post.title}</h3>
-          )}
-          {cleanBody && (
-            <div className="text-[13px] text-stone-800 leading-relaxed whitespace-pre-wrap break-words">
-              {isLongText && !isExpandedText ? (
-                <>
-                  {cleanBody.slice(0, 220)}...{' '}
-                  <button
-                    type="button"
-                    onClick={() => setIsExpandedText(true)}
-                    className="font-semibold text-stone-500 hover:text-stone-900 hover:underline text-xs inline-block ml-0.5"
-                  >
-                    See more
-                  </button>
-                </>
-              ) : (
-                cleanBody
-              )}
-            </div>
-          )}
-        </div>
+        {/* Caption Text — above the image, Facebook style */}
+        {(showTitle || cleanBody) && (
+          <div className="px-4 pb-2.5">
+            {showTitle && (
+              <p className="font-bold text-stone-900 text-[14px] leading-snug mb-0.5">{post.title}</p>
+            )}
+            {cleanBody && (
+              <div className="text-[13.5px] text-stone-800 leading-relaxed whitespace-pre-wrap break-words">
+                {isLongText && !isExpandedText ? (
+                  <>
+                    {cleanBody.slice(0, 240)}
+                    {'... '}
+                    <button
+                      type="button"
+                      onClick={() => setIsExpandedText(true)}
+                      className="font-semibold text-stone-500 hover:text-stone-900 text-[13px]"
+                    >
+                      See more
+                    </button>
+                  </>
+                ) : (
+                  cleanBody
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
-        {/* Media Grid */}
+        {/* Full-Bleed Media — edge-to-edge, no side padding */}
         {mediaUrls.length > 0 && (
-          <div className="px-4 pb-3">
+          <div className="w-full overflow-hidden">
+            {/* 1 photo — full-width hero up to 560px tall */}
             {mediaUrls.length === 1 && (
-              <div className="relative overflow-hidden rounded-xl border border-stone-200/80 bg-stone-100 max-h-[460px]">
+              <div
+                className="relative w-full bg-stone-100 cursor-pointer overflow-hidden"
+                onClick={() => window.open(mediaUrls[0], '_blank')}
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={mediaUrls[0]}
-                  alt="Post attachment"
-                  className="w-full h-auto max-h-[460px] object-cover cursor-pointer hover:opacity-95 transition-opacity"
-                  onClick={() => window.open(mediaUrls[0], '_blank')}
+                  alt="Post photo"
+                  className="w-full object-cover hover:brightness-95 transition-all"
+                  style={{ maxHeight: 560, display: 'block' }}
                 />
               </div>
             )}
+
+            {/* 2 photos — 50/50 side-by-side */}
             {mediaUrls.length === 2 && (
-              <div className="grid grid-cols-2 gap-1.5 rounded-xl overflow-hidden max-h-[380px]">
+              <div className="flex gap-px" style={{ maxHeight: 420 }}>
                 {mediaUrls.map((url, idx) => (
-                  <div key={idx} className="relative aspect-4/3 overflow-hidden rounded-lg border border-stone-200 bg-stone-100">
+                  <div
+                    key={idx}
+                    className="relative flex-1 bg-stone-100 overflow-hidden cursor-pointer"
+                    onClick={() => window.open(url, '_blank')}
+                  >
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={url}
-                      alt={`Attachment ${idx + 1}`}
-                      className="h-full w-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
-                      onClick={() => window.open(url, '_blank')}
+                      alt={`Photo ${idx + 1}`}
+                      className="w-full h-full object-cover hover:brightness-95 transition-all"
+                      style={{ minHeight: 260, maxHeight: 420 }}
                     />
                   </div>
                 ))}
               </div>
             )}
+
+            {/* 3 photos — Facebook collage: large hero left (60%) + 2 stacked right */}
             {mediaUrls.length === 3 && (
-              <div className="grid grid-cols-3 gap-1.5 rounded-xl overflow-hidden max-h-[300px]">
-                {mediaUrls.map((url, idx) => (
-                  <div key={idx} className="relative aspect-square overflow-hidden rounded-lg border border-stone-200 bg-stone-100">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={url}
-                      alt={`Attachment ${idx + 1}`}
-                      className="h-full w-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
+              <div className="flex gap-px" style={{ maxHeight: 460 }}>
+                <div
+                  className="relative bg-stone-100 overflow-hidden cursor-pointer"
+                  style={{ flex: '0 0 60%' }}
+                  onClick={() => window.open(mediaUrls[0], '_blank')}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={mediaUrls[0]}
+                    alt="Photo 1"
+                    className="w-full h-full object-cover hover:brightness-95 transition-all"
+                    style={{ minHeight: 300, maxHeight: 460 }}
+                  />
+                </div>
+                <div className="flex flex-col gap-px flex-1">
+                  {mediaUrls.slice(1, 3).map((url, idx) => (
+                    <div
+                      key={idx}
+                      className="relative flex-1 bg-stone-100 overflow-hidden cursor-pointer"
                       onClick={() => window.open(url, '_blank')}
-                    />
-                  </div>
-                ))}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={url}
+                        alt={`Photo ${idx + 2}`}
+                        className="w-full h-full object-cover hover:brightness-95 transition-all"
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
+
+            {/* 4+ photos — full-width hero + 3-column thumbnail strip */}
             {mediaUrls.length >= 4 && (
-              <div className="grid grid-cols-2 gap-1.5 rounded-xl overflow-hidden max-h-[420px]">
-                {mediaUrls.slice(0, 4).map((url, idx) => (
-                  <div key={idx} className="relative aspect-4/3 overflow-hidden rounded-lg border border-stone-200 bg-stone-100">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={url}
-                      alt={`Attachment ${idx + 1}`}
-                      className="h-full w-full object-cover cursor-pointer hover:opacity-95 transition-opacity"
+              <div className="flex flex-col gap-px">
+                <div
+                  className="relative w-full bg-stone-100 overflow-hidden cursor-pointer"
+                  onClick={() => window.open(mediaUrls[0], '_blank')}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={mediaUrls[0]}
+                    alt="Photo 1"
+                    className="w-full object-cover hover:brightness-95 transition-all"
+                    style={{ maxHeight: 360, display: 'block' }}
+                  />
+                </div>
+                <div className="flex gap-px" style={{ height: 150 }}>
+                  {mediaUrls.slice(1, 4).map((url, idx) => (
+                    <div
+                      key={idx}
+                      className="relative flex-1 bg-stone-100 overflow-hidden cursor-pointer"
                       onClick={() => window.open(url, '_blank')}
-                    />
-                    {idx === 3 && mediaUrls.length > 4 && (
-                      <div
-                        onClick={() => window.open(url, '_blank')}
-                        className="absolute inset-0 bg-black/55 backdrop-blur-xs flex items-center justify-center cursor-pointer text-white font-bold text-base"
-                      >
-                        +{mediaUrls.length - 4}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={url}
+                        alt={`Photo ${idx + 2}`}
+                        className="w-full h-full object-cover hover:brightness-95 transition-all"
+                      />
+                      {idx === 2 && mediaUrls.length > 4 && (
+                        <div className="absolute inset-0 bg-black/55 flex items-center justify-center pointer-events-none">
+                          <span className="text-white font-bold text-xl">+{mediaUrls.length - 4}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
