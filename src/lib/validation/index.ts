@@ -1,5 +1,23 @@
 import { z } from 'zod';
 
+export const imagePathOrUrlSchema = z
+  .string()
+  .trim()
+  .max(1000)
+  .refine(
+    (val) => {
+      if (!val) return true;
+      if (val.startsWith('/') || val.startsWith('data:image/')) return true;
+      try {
+        const u = new URL(val);
+        return u.protocol === 'http:' || u.protocol === 'https:';
+      } catch {
+        return false;
+      }
+    },
+    { message: 'Must be a valid web URL or uploaded image path.' }
+  );
+
 export const signUpSchema = z.object({
   email: z.string().trim().email('Please enter a valid email address.').transform((v) => v.toLowerCase()),
   password: z.string().min(8, 'Password must be at least 8 characters long.').max(128),
@@ -25,7 +43,7 @@ export const updateProfileSchema = z.object({
     .regex(/^[a-z0-9_]{3,32}$/, 'Username must be 3-32 lowercase alphanumeric or underscore characters.'),
   bio: z.string().trim().max(500).default(''),
   location: z.string().trim().max(100).nullable().optional(),
-  avatarUrl: z.string().trim().url().nullable().optional().or(z.literal('')),
+  avatarUrl: imagePathOrUrlSchema.nullable().optional().or(z.literal('')),
   profileVisibility: z.enum(['public', 'members_only', 'private']).default('public'),
 });
 
@@ -83,7 +101,7 @@ export const circleThemeSettingsSchema = z.object({
   borderRadius: z.enum(['none', 'sm', 'md', 'lg', 'full']).nullable().optional(),
 
   // Background Imagery & Atmosphere
-  coverUrl: z.string().trim().url().max(1000).nullable().optional(),
+  coverUrl: imagePathOrUrlSchema.nullable().optional(),
   coverPreset: z.string().trim().max(100).nullable().optional(),
   coverOverlayOpacity: z.number().min(0).max(1).nullable().optional(),
 
@@ -92,7 +110,7 @@ export const circleThemeSettingsSchema = z.object({
   canvasColor: z.string().trim().max(50).nullable().optional(),
 
   pageBackgroundMode: z.enum(['none', 'banner', 'mesh', 'pattern', 'custom']).nullable().optional(),
-  pageBackgroundUrl: z.string().trim().url().max(1000).nullable().optional(),
+  pageBackgroundUrl: imagePathOrUrlSchema.nullable().optional(),
   pageBackgroundPattern: z.enum(['dots', 'grid', 'topography', 'noise']).nullable().optional(),
   pageBackgroundBlur: z.number().min(0).max(100).nullable().optional(),
   pageBackgroundOpacity: z.number().min(0).max(1).nullable().optional(),
@@ -104,8 +122,8 @@ export const updateCircleSchema = z.object({
   description: z.string().trim().max(2000).optional(),
   category: circleCategoryEnum.optional(),
   location: z.string().trim().max(120).nullable().optional(),
-  avatarUrl: z.string().trim().max(500).nullable().optional(),
-  coverUrl: z.string().trim().max(500).nullable().optional(),
+  avatarUrl: imagePathOrUrlSchema.nullable().optional(),
+  coverUrl: imagePathOrUrlSchema.nullable().optional(),
   visibility: circleVisibilityEnum.optional(),
   membershipPolicy: membershipPolicyEnum.optional(),
   themeSettings: circleThemeSettingsSchema.nullable().optional(),
