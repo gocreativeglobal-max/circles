@@ -952,23 +952,37 @@ export function CircleStudioClient({
                 })}
               </div>
 
-              {/* Custom Cover Image URL & Dark Overlay Slider */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+              {/* Custom Cover Image Upload & Dark Overlay Slider */}
+              <div className="space-y-4 pt-1">
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold text-stone-700">Custom Banner Image URL</label>
-                  <input
-                    type="url"
+                  <ImageUploader
+                    circleId={initialCircle.id}
                     value={themeSettings.coverUrl || ''}
-                    onChange={(e) =>
+                    onChange={(url) =>
                       setThemeSettings((prev) => ({
                         ...prev,
-                        coverUrl: e.target.value.trim() || null,
+                        coverUrl: typeof url === 'string' ? (url.trim() || null) : null,
                         coverPreset: null,
                       }))
                     }
-                    placeholder="https://example.com/banner.jpg"
-                    className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs text-stone-900 placeholder-stone-400 focus:border-black focus:outline-hidden"
+                    aspectRatio="banner"
+                    label="Custom Banner Artwork (PNG, JPG, WebP)"
+                    helperText="Upload a wide 16:9 or 21:9 hero banner or enter an external image URL."
                   />
+                  {themeSettings.coverUrl && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setThemeSettings((prev) => ({
+                          ...prev,
+                          coverUrl: null,
+                        }))
+                      }
+                      className="text-[11px] font-semibold text-rose-600 hover:text-rose-700 underline"
+                    >
+                      Remove custom banner artwork
+                    </button>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">

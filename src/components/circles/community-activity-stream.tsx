@@ -24,6 +24,7 @@ import {
   Share2,
   User,
   Users,
+  X,
 } from 'lucide-react';
 import {
   Circle,
@@ -184,6 +185,48 @@ export function CommunityActivityStream({
   const [submittingComment, setSubmittingComment] = useState<Record<string, boolean>>({});
   const [copiedShare, setCopiedShare] = useState(false);
   const [moreNavOpen, setMoreNavOpen] = useState(false);
+
+  // Cover photo / banner management state
+  const [currentBanner, setCurrentBanner] = useState<string | null>(
+    getEffectiveBannerUrl(circle.theme_settings, circle.cover_url)
+  );
+  const [bannerModalOpen, setBannerModalOpen] = useState(false);
+  const [bannerDraftUrl, setBannerDraftUrl] = useState<string>(
+    getEffectiveBannerUrl(circle.theme_settings, circle.cover_url) || ''
+  );
+  const [isSavingBanner, setIsSavingBanner] = useState(false);
+  const [bannerFeedback, setBannerFeedback] = useState<string | null>(null);
+
+  async function handleSaveBanner(newUrl: string | null) {
+    setIsSavingBanner(true);
+    setBannerFeedback(null);
+    try {
+      const res = await fetch(`/api/circles/${circle.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          coverUrl: newUrl,
+          themeSettings: {
+            ...(circle.theme_settings || {}),
+            coverUrl: newUrl,
+            coverPreset: null,
+          },
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed to update community banner');
+      }
+
+      setCurrentBanner(newUrl);
+      setBannerModalOpen(false);
+    } catch (err) {
+      setBannerFeedback(err instanceof Error ? err.message : 'Failed to update banner');
+    } finally {
+      setIsSavingBanner(false);
+    }
+  }
 
   // Close "More" dropdown when clicking outside
   useEffect(() => {
@@ -516,7 +559,6 @@ export function CommunityActivityStream({
   const memberCount = circle.member_count ?? 1;
   const postCount = items.filter((i) => i.itemType === 'post').length;
 
-  const effectiveBanner = getEffectiveBannerUrl(circle.theme_settings, circle.cover_url);
   const coverOverlayOpacity = circle.theme_settings?.coverOverlayOpacity ?? 0.6;
   const cardBgClass = 'border border-stone-200 bg-white shadow-sm';
 
@@ -528,8 +570,8 @@ export function CommunityActivityStream({
         <div
           className="absolute inset-0 bg-cover bg-center transition-all duration-700"
           style={{
-            backgroundImage: effectiveBanner
-              ? `url(${effectiveBanner})`
+            backgroundImage: currentBanner
+              ? `url(${currentBanner})`
               : 'linear-gradient(135deg, rgba(24,24,27,0.95) 0%, rgba(9,9,11,0.98) 100%)',
           }}
         />
@@ -541,6 +583,25 @@ export function CommunityActivityStream({
           className="pointer-events-none absolute -right-20 -top-20 h-96 w-96 rounded-full opacity-30 blur-3xl"
           style={{ backgroundColor: 'var(--circle-primary, #6366f1)' }}
         />
+
+        {/* Cover Photo Action Button (Staff only) */}
+        {isStaff && (
+          <div className="absolute top-4 right-4 z-20">
+            <button
+              type="button"
+              onClick={() => {
+                setBannerDraftUrl(currentBanner || '');
+                setBannerFeedback(null);
+                setBannerModalOpen(true);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-full bg-black/60 hover:bg-black/80 px-3.5 py-1.5 text-xs font-semibold text-white backdrop-blur-md border border-white/20 transition-all shadow-md active:scale-95"
+              title={currentBanner ? 'Change community cover photo' : 'Add community cover photo'}
+            >
+              <Camera className="h-3.5 w-3.5" />
+              <span>{currentBanner ? 'Edit Cover Photo' : 'Add Cover Photo'}</span>
+            </button>
+          </div>
+        )}
 
         {/* Hero Content */}
         <div className="relative z-10 flex flex-col justify-between gap-6 p-6 sm:p-8 md:flex-row md:items-end">
@@ -629,6 +690,87 @@ export function CommunityActivityStream({
           </div>
         </div>
       </section>
+
+      {/* Cover Photo / Banner Upload Modal (Staff only) */}
+      {bannerModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-stone-950/60 backdrop-blur-xs transition-opacity"
+            onClick={() => !isSavingBanner && setBannerModalOpen(false)}
+          />
+          <div className="relative w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl border border-stone-200 z-10 space-y-5">
+            <div className="flex items-center justify-between border-b border-stone-100 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-stone-900">
+                  {currentBanner ? 'Update Cover Photo' : 'Add Cover Photo'}
+                </h3>
+                <p className="text-xs text-stone-500 mt-0.5">
+                  Upload a 16:9 or 21:9 wide hero banner artwork for your community.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBannerModalOpen(false)}
+                disabled={isSavingBanner}
+                className="rounded-full p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {bannerFeedback && (
+              <div className="rounded-lg bg-rose-50 border border-rose-200 px-3 py-2 text-xs text-rose-700 font-medium">
+                {bannerFeedback}
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <ImageUploader
+                circleId={circle.id}
+                value={bannerDraftUrl}
+                onChange={(val) => setBannerDraftUrl(typeof val === 'string' ? val : val[0] || '')}
+                aspectRatio="banner"
+                label="Banner Image"
+                helperText="Upload a photo (PNG, JPG, WebP up to 10MB) or enter an external image URL."
+              />
+            </div>
+
+            <div className="flex items-center justify-between border-t border-stone-100 pt-4">
+              {currentBanner ? (
+                <button
+                  type="button"
+                  onClick={() => handleSaveBanner(null)}
+                  disabled={isSavingBanner}
+                  className="text-xs font-semibold text-rose-600 hover:text-rose-800 transition-colors"
+                >
+                  Remove Cover
+                </button>
+              ) : (
+                <div />
+              )}
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBannerModalOpen(false)}
+                  disabled={isSavingBanner}
+                  className="rounded-lg border border-stone-200 px-3.5 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSaveBanner(bannerDraftUrl.trim() || null)}
+                  disabled={isSavingBanner || (!bannerDraftUrl.trim() && !currentBanner)}
+                  className="rounded-lg bg-stone-900 px-4 py-2 text-xs font-bold text-white hover:bg-stone-800 transition-colors disabled:opacity-50"
+                >
+                  {isSavingBanner ? 'Saving...' : 'Save Cover Photo'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 2. DYNAMIC SUB-NAVIGATION PILL BAR */}
       <nav className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
