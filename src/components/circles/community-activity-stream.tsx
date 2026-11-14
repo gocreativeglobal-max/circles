@@ -1,7 +1,8 @@
 'use client';
 
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import {
   ArrowUp,
   BadgeCheck,
@@ -11,15 +12,12 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
-  FileText,
   FolderGit2,
   Globe,
   Heart,
-  HeartHandshake,
   Lock,
   MapPin,
   MessageCircle,
-  MessageSquare,
   MoreHorizontal,
   Plus,
   Quote,
@@ -30,6 +28,7 @@ import {
 import {
   Circle,
   CircleEventItem,
+  CircleNavigationItem,
   CircleProjectItem,
   CommentItem,
   CourseItem,
@@ -37,6 +36,7 @@ import {
   MarketplaceListingItem,
   UserProfile,
 } from '@/types/domain';
+import { DynamicIcon } from '@/components/ui/icon-map';
 import { ActivityStreamItem } from '@/features/circles/activity-stream';
 import { DirectMessageDrawer } from '@/components/messages/direct-message-drawer';
 import { getEffectiveBannerUrl } from '@/lib/theme/utils';
@@ -51,6 +51,7 @@ export interface CommunityActivityStreamProps {
   featuredCauses?: FundraisingCampaignItem[];
   featuredProjects?: CircleProjectItem[];
   enabledCapabilityKeys: string[];
+  navigationItems?: CircleNavigationItem[];
   currentUserId?: string | null;
   currentUser?: UserProfile | null;
   isMember: boolean;
@@ -153,10 +154,15 @@ export function CommunityActivityStream({
   featuredCauses = [],
   featuredProjects = [],
   enabledCapabilityKeys,
+  navigationItems,
   currentUserId,
   currentUser,
   isMember,
 }: CommunityActivityStreamProps) {
+  const isStaff = circle.current_user_role === 'owner' || circle.current_user_role === 'admin';
+  const pathname = usePathname();
+  const moreNavRef = useRef<HTMLDivElement>(null);
+
   const [items, setItems] = useState<ActivityStreamItem[]>(initialItems);
   const [activeFilter, setActiveFilter] = useState<StreamFilter>('all');
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
@@ -178,6 +184,87 @@ export function CommunityActivityStream({
   const [submittingComment, setSubmittingComment] = useState<Record<string, boolean>>({});
   const [copiedShare, setCopiedShare] = useState(false);
   const [moreNavOpen, setMoreNavOpen] = useState(false);
+
+  // Close "More" dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (moreNavRef.current && !moreNavRef.current.contains(event.target as Node)) {
+        setMoreNavOpen(false);
+      }
+    }
+    if (moreNavOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => document.removeEventListener('mousedown', handleClickOutside);
+    }
+  }, [moreNavOpen]);
+
+  // Compute dynamic navigation items based on circle's enabled capabilities
+  const dynamicNavItems = useMemo(() => {
+    if (navigationItems && navigationItems.length > 0) {
+      return navigationItems.map((item) => {
+        let displayLabel = item.label;
+        if (item.label.toLowerCase() === 'overview') displayLabel = 'Home';
+        else if (item.label.toLowerCase() === 'discussions') displayLabel = 'Feed';
+        else if (item.label.toLowerCase() === 'member directory') displayLabel = 'Members';
+        else if (item.label.toLowerCase() === 'projects & collaboration') displayLabel = 'Projects';
+        else if (item.label.toLowerCase() === 'courses & learning') displayLabel = 'Courses';
+        else if (item.label.toLowerCase() === 'shared resources') displayLabel = 'Resources';
+
+        return {
+          id: item.id,
+          label: displayLabel,
+          href: item.href,
+          icon: item.icon || (item.href === `/circles/${circle.slug}` ? 'home' : 'compass'),
+        };
+      });
+    }
+
+    // Dynamic fallback built purely from enabledCapabilityKeys
+    const items: Array<{ id: string; label: string; href: string; icon: string }> = [
+      { id: 'nav-home', label: 'Home', href: `/circles/${circle.slug}`, icon: 'home' },
+    ];
+    if (enabledCapabilityKeys.includes('discussions')) {
+      items.push({ id: 'nav-feed', label: 'Feed', href: `/circles/${circle.slug}/discussions`, icon: 'message-square' });
+    }
+    if (enabledCapabilityKeys.includes('events') || enabledCapabilityKeys.includes('events_activities')) {
+      items.push({ id: 'nav-events', label: 'Events', href: `/circles/${circle.slug}/events`, icon: 'calendar' });
+    }
+    if (enabledCapabilityKeys.includes('projects_collaboration')) {
+      items.push({ id: 'nav-projects', label: 'Projects', href: `/circles/${circle.slug}/projects`, icon: 'folder-kanban' });
+    }
+    if (enabledCapabilityKeys.includes('shared_resources') || enabledCapabilityKeys.includes('learning_resources')) {
+      items.push({ id: 'nav-resources', label: 'Resources', href: `/circles/${circle.slug}/resources`, icon: 'book-open' });
+    }
+    if (enabledCapabilityKeys.includes('member_directory')) {
+      items.push({ id: 'nav-members', label: 'Members', href: `/circles/${circle.slug}/members`, icon: 'users' });
+    }
+    if (enabledCapabilityKeys.includes('marketplace')) {
+      items.push({ id: 'nav-marketplace', label: 'Marketplace', href: `/circles/${circle.slug}/marketplace`, icon: 'shopping-bag' });
+    }
+    if (enabledCapabilityKeys.includes('learning_resources')) {
+      items.push({ id: 'nav-courses', label: 'Courses', href: `/circles/${circle.slug}/courses`, icon: 'graduation-cap' });
+    }
+    if (enabledCapabilityKeys.includes('fundraising_campaigns') || enabledCapabilityKeys.includes('fundraising_causes')) {
+      items.push({ id: 'nav-causes', label: 'Causes', href: `/circles/${circle.slug}/causes`, icon: 'heart' });
+    }
+    return items;
+  }, [navigationItems, enabledCapabilityKeys, circle.slug]);
+
+  const PRIMARY_NAV_LIMIT = 5;
+  const primaryPills = dynamicNavItems.slice(0, PRIMARY_NAV_LIMIT);
+  const overflowPills = dynamicNavItems.slice(PRIMARY_NAV_LIMIT);
+  const hasMoreNav = overflowPills.length > 0 || isStaff;
+
+  const isItemActive = (href: string) => {
+    if (href === `/circles/${circle.slug}`) {
+      return pathname === href || pathname === `${href}/`;
+    }
+    return pathname.startsWith(href);
+  };
+
+  const isMoreActive =
+    overflowPills.some((item) => isItemActive(item.href)) ||
+    pathname.startsWith(`/circles/${circle.slug}/studio`);
 
   // Extract hashtags dynamically from real posts only
   const trendingTopics = useMemo(() => {
@@ -543,114 +630,98 @@ export function CommunityActivityStream({
         </div>
       </section>
 
-      {/* 2. SUB-NAVIGATION PILL BAR */}
+      {/* 2. DYNAMIC SUB-NAVIGATION PILL BAR */}
       <nav className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
-        <Link
-          href={`/circles/${circle.slug}`}
-          className="inline-flex shrink-0 items-center gap-2 rounded-full px-4 py-2 text-xs font-bold shadow-xs transition-all"
-          style={{
-            backgroundColor: 'var(--circle-primary-subtle, #f3f4f6)',
-            color: 'var(--circle-primary, #111827)',
-          }}
-        >
-          <span className="text-sm">🏠</span>
-          <span>Home</span>
-        </Link>
+        {primaryPills.map((item) => {
+          const active = isItemActive(item.href);
+          return (
+            <Link
+              key={item.id}
+              href={item.href}
+              className={
+                active
+                  ? 'inline-flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2 text-xs font-bold shadow-xs transition-all'
+                  : 'inline-flex shrink-0 items-center gap-1.5 rounded-full border border-stone-200 bg-white px-4 py-2 text-xs font-semibold text-stone-600 hover:bg-stone-50 hover:text-stone-900 transition-colors shadow-2xs'
+              }
+              style={
+                active
+                  ? {
+                      backgroundColor: 'var(--circle-primary-subtle, #f3f4f6)',
+                      color: 'var(--circle-primary, #111827)',
+                    }
+                  : undefined
+              }
+            >
+              <DynamicIcon name={item.icon} className="h-3.5 w-3.5 shrink-0" />
+              <span>{item.label}</span>
+            </Link>
+          );
+        })}
 
-        {enabledCapabilityKeys.includes('discussions') && (
-          <Link
-            href={`/circles/${circle.slug}/discussions`}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-stone-200 bg-white px-4 py-2 text-xs font-semibold text-stone-600 hover:bg-stone-50 hover:text-stone-900 transition-colors shadow-2xs"
-          >
-            <MessageSquare className="h-3.5 w-3.5" />
-            <span>Feed</span>
-          </Link>
+        {/* Dynamic More Dropdown */}
+        {hasMoreNav && (
+          <div className="relative" ref={moreNavRef}>
+            <button
+              type="button"
+              onClick={() => setMoreNavOpen((prev) => !prev)}
+              className={
+                isMoreActive
+                  ? 'inline-flex shrink-0 items-center gap-1 rounded-full px-3.5 py-2 text-xs font-bold shadow-xs transition-all'
+                  : 'inline-flex shrink-0 items-center gap-1 rounded-full border border-stone-200 bg-white px-3.5 py-2 text-xs font-semibold text-stone-600 hover:bg-stone-50 hover:text-stone-900 transition-colors shadow-2xs'
+              }
+              style={
+                isMoreActive
+                  ? {
+                      backgroundColor: 'var(--circle-primary-subtle, #f3f4f6)',
+                      color: 'var(--circle-primary, #111827)',
+                    }
+                  : undefined
+              }
+            >
+              <span>More</span>
+              <ChevronDown className="h-3.5 w-3.5" />
+            </button>
+            {moreNavOpen && (
+              <div className="absolute left-0 mt-2 min-w-48 max-w-64 rounded-xl border border-stone-200 bg-white py-1 shadow-lg z-30">
+                {overflowPills.map((item) => {
+                  const active = isItemActive(item.href);
+                  return (
+                    <Link
+                      key={item.id}
+                      href={item.href}
+                      onClick={() => setMoreNavOpen(false)}
+                      className={`flex items-center gap-2.5 px-4 py-2 text-xs transition-colors ${
+                        active
+                          ? 'bg-stone-100 font-bold text-stone-900'
+                          : 'text-stone-700 hover:bg-stone-50 hover:text-stone-900'
+                      }`}
+                    >
+                      <DynamicIcon name={item.icon} className="h-3.5 w-3.5 shrink-0 text-stone-400" />
+                      <span className="truncate">{item.label}</span>
+                    </Link>
+                  );
+                })}
+
+                {isStaff && (
+                  <div className={overflowPills.length > 0 ? 'border-t border-stone-100 pt-1 mt-1' : ''}>
+                    <Link
+                      href={`/circles/${circle.slug}/studio`}
+                      onClick={() => setMoreNavOpen(false)}
+                      className={`flex items-center gap-2.5 px-4 py-2 text-xs transition-colors ${
+                        pathname.startsWith(`/circles/${circle.slug}/studio`)
+                          ? 'bg-stone-100 font-bold text-stone-900'
+                          : 'text-stone-700 hover:bg-stone-50 hover:text-stone-900 font-semibold'
+                      }`}
+                    >
+                      <DynamicIcon name="shield" className="h-3.5 w-3.5 shrink-0 text-stone-400" />
+                      <span>Circle Studio</span>
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         )}
-
-        {(enabledCapabilityKeys.includes('events') || enabledCapabilityKeys.includes('events_activities')) && (
-          <Link
-            href={`/circles/${circle.slug}/events`}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-stone-200 bg-white px-4 py-2 text-xs font-semibold text-stone-600 hover:bg-stone-50 hover:text-stone-900 transition-colors shadow-2xs"
-          >
-            <Calendar className="h-3.5 w-3.5" />
-            <span>Events</span>
-          </Link>
-        )}
-
-        {enabledCapabilityKeys.includes('learning_resources') && (
-          <Link
-            href={`/circles/${circle.slug}/projects`}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-stone-200 bg-white px-4 py-2 text-xs font-semibold text-stone-600 hover:bg-stone-50 hover:text-stone-900 transition-colors shadow-2xs"
-          >
-            <FolderGit2 className="h-3.5 w-3.5" />
-            <span>Projects</span>
-          </Link>
-        )}
-
-        {enabledCapabilityKeys.includes('fundraising_campaigns') && (
-          <Link
-            href={`/circles/${circle.slug}/causes`}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-stone-200 bg-white px-4 py-2 text-xs font-semibold text-stone-600 hover:bg-stone-50 hover:text-stone-900 transition-colors shadow-2xs"
-          >
-            <HeartHandshake className="h-3.5 w-3.5" />
-            <span>Causes</span>
-          </Link>
-        )}
-
-        {enabledCapabilityKeys.includes('learning_resources') && (
-          <Link
-            href={`/circles/${circle.slug}/resources`}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-stone-200 bg-white px-4 py-2 text-xs font-semibold text-stone-600 hover:bg-stone-50 hover:text-stone-900 transition-colors shadow-2xs"
-          >
-            <FileText className="h-3.5 w-3.5" />
-            <span>Resources</span>
-          </Link>
-        )}
-
-        <Link
-          href={`/circles/${circle.slug}/members`}
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-stone-200 bg-white px-4 py-2 text-xs font-semibold text-stone-600 hover:bg-stone-50 hover:text-stone-900 transition-colors shadow-2xs"
-        >
-          <Users className="h-3.5 w-3.5" />
-          <span>Members</span>
-        </Link>
-
-        {/* Dropdown for More */}
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setMoreNavOpen(!moreNavOpen)}
-            className="inline-flex shrink-0 items-center gap-1 rounded-full border border-stone-200 bg-white px-3 py-2 text-xs font-semibold text-stone-600 hover:bg-stone-50 hover:text-stone-900 transition-colors shadow-2xs"
-          >
-            <span>More</span>
-            <ChevronDown className="h-3.5 w-3.5" />
-          </button>
-          {moreNavOpen && (
-            <div className="absolute left-0 mt-2 w-48 rounded-xl border border-stone-200 bg-white py-1 shadow-lg z-20">
-              <Link
-                href={`/circles/${circle.slug}/courses`}
-                onClick={() => setMoreNavOpen(false)}
-                className="block px-4 py-2 text-xs text-stone-700 hover:bg-stone-50"
-              >
-                Courses & Learning
-              </Link>
-              <Link
-                href={`/circles/${circle.slug}/marketplace`}
-                onClick={() => setMoreNavOpen(false)}
-                className="block px-4 py-2 text-xs text-stone-700 hover:bg-stone-50"
-              >
-                Marketplace
-              </Link>
-              <Link
-                href={`/circles/${circle.slug}/studio`}
-                onClick={() => setMoreNavOpen(false)}
-                className="block px-4 py-2 text-xs text-stone-700 hover:bg-stone-50 font-semibold"
-              >
-                Circle Studio
-              </Link>
-            </div>
-          )}
-        </div>
       </nav>
 
       {/* 3. 3-COLUMN COMMUNITY FEED LAYOUT */}

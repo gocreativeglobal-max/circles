@@ -327,6 +327,7 @@ export async function getCircleNavigation(
       'marketplace',
       'learning_resources',
       'projects_collaboration',
+      'shared_resources',
       'fundraising_causes',
     ];
 

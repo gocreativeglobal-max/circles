@@ -78,6 +78,7 @@ export default async function CircleOverviewPage({
             featuredCauses={streamData.featuredCauses}
             featuredProjects={streamData.featuredProjects}
             enabledCapabilityKeys={navigation.enabledCapabilityKeys}
+            navigationItems={navigation.navigationItems}
             currentUserId={user?.id ?? null}
             currentUser={user}
             isMember={isMember}
