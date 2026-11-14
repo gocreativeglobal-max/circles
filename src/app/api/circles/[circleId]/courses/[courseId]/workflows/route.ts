@@ -8,6 +8,7 @@ import {
 } from '@/features/courses/service';
 import { handleApiError, resolveApiUser } from '@/lib/auth/api-helpers';
 import { UnauthorizedError, ValidationError } from '@/lib/errors';
+import { isResendConfigured, getSenderEmail } from '@/lib/email';
 
 export async function GET(
   req: NextRequest,
@@ -22,7 +23,12 @@ export async function GET(
       getCourseWorkflowLogs(user.id, params.circleId, params.courseId, 40),
     ]);
 
-    return NextResponse.json({ settings, logs });
+    return NextResponse.json({
+      settings,
+      logs,
+      isEmailConfigured: isResendConfigured(),
+      senderEmail: getSenderEmail(),
+    });
   } catch (error) {
     return handleApiError(error);
   }
@@ -48,7 +54,11 @@ export async function PATCH(
       body.settings || body
     );
 
-    return NextResponse.json({ settings });
+    return NextResponse.json({
+      settings,
+      isEmailConfigured: isResendConfigured(),
+      senderEmail: getSenderEmail(),
+    });
   } catch (error) {
     return handleApiError(error);
   }
@@ -73,7 +83,11 @@ export async function POST(
         params.courseId,
         workflowType
       );
-      return NextResponse.json({ test: result });
+      return NextResponse.json({
+        test: result,
+        isEmailConfigured: isResendConfigured(),
+        senderEmail: getSenderEmail(),
+      });
     }
 
     // Default: Dispatch upcoming due reminders
@@ -82,7 +96,11 @@ export async function POST(
       params.courseId
     );
 
-    return NextResponse.json({ stats });
+    return NextResponse.json({
+      stats,
+      isEmailConfigured: isResendConfigured(),
+      senderEmail: getSenderEmail(),
+    });
   } catch (error) {
     return handleApiError(error);
   }

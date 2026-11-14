@@ -58,6 +58,8 @@ export function CourseWorkflowsManager({
   const [isSaving, setIsSaving] = useState(false);
   const [isDispatching, setIsDispatching] = useState(false);
   const [testingType, setTestingType] = useState<string | null>(null);
+  const [isEmailConfigured, setIsEmailConfigured] = useState<boolean>(true);
+  const [senderEmail, setSenderEmail] = useState<string>('');
   const [feedback, setFeedback] = useState<{
     type: 'success' | 'error';
     message: string;
@@ -75,6 +77,12 @@ export function CourseWorkflowsManager({
         if (isMounted) {
           if (data.settings) setSettings(data.settings);
           if (data.logs) setLogs(data.logs);
+          if (typeof data.isEmailConfigured === 'boolean') {
+            setIsEmailConfigured(data.isEmailConfigured);
+          }
+          if (data.senderEmail) {
+            setSenderEmail(data.senderEmail);
+          }
         }
       } catch {
         // Fallback to initial course.workflow_settings
@@ -90,7 +98,7 @@ export function CourseWorkflowsManager({
 
   function showMessage(type: 'success' | 'error', message: string) {
     setFeedback({ type, message });
-    setTimeout(() => setFeedback(null), 5000);
+    setTimeout(() => setFeedback(null), 7000);
   }
 
   async function handleSaveSettings() {
@@ -135,10 +143,14 @@ export function CourseWorkflowsManager({
         (stats.mondayKickoffSent || 0) +
         (stats.fridayScorecardSent || 0);
 
+      const emailNote = data.isEmailConfigured === false
+        ? ' (Note: Delivered to in-app drawer only; email delivery is inactive because RESEND_API_KEY is not configured).'
+        : '';
+
       showMessage(
         'success',
         totalSent > 0
-          ? `Dispatched ${totalSent} reminders (${stats.liveSession24hSent} live 24h, ${stats.liveSession15mSent} live 15m, ${stats.assignment24hSent} assignment 24h, ${stats.assignment3hSent} assignment 3h, ${stats.mondayKickoffSent} Monday digests).`
+          ? `Dispatched ${totalSent} reminders (${stats.liveSession24hSent} live 24h, ${stats.liveSession15mSent} live 15m, ${stats.assignment24hSent} assignment 24h, ${stats.assignment3hSent} assignment 3h, ${stats.mondayKickoffSent} Monday digests).${emailNote}`
           : 'Workflow check complete. All enrolled students are currently up to date with zero pending reminders.'
       );
 
@@ -165,10 +177,29 @@ export function CourseWorkflowsManager({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to send test preview.');
-      showMessage(
-        'success',
-        `Test preview sent! Check your notification drawer and email inbox for "${data.test?.previewTitle}".`
-      );
+
+      const testResult = data.test;
+      if (testResult?.emailStatus === 'delivered') {
+        showMessage(
+          'success',
+          `✅ Test preview delivered! Sent to your email (${testResult.recipientEmail || 'inbox'}) and in-app notification drawer.`
+        );
+      } else if (testResult?.emailStatus === 'skipped_unconfigured') {
+        showMessage(
+          'error',
+          `⚠️ In-app preview created, but email was NOT sent because RESEND_API_KEY is missing from environment variables (.env.local).`
+        );
+      } else if (testResult?.emailStatus === 'failed') {
+        showMessage(
+          'error',
+          `❌ In-app preview created, but Resend email delivery failed: ${testResult.emailErrorMessage || 'Domain not verified or rejected'}.`
+        );
+      } else {
+        showMessage(
+          'success',
+          `Test preview notification created for "${testResult?.previewTitle}".`
+        );
+      }
 
       // Refresh logs
       const logsRes = await fetch(`/api/circles/${circleId}/courses/${course.id}/workflows`);
@@ -193,10 +224,23 @@ export function CourseWorkflowsManager({
               <Workflow className="h-5 w-5" />
             </span>
             <div>
-              <h2 className="text-base font-bold text-stone-900">
-                Course Automations & Workflows
-              </h2>
-              <p className="text-xs text-stone-500">
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-stone-900">
+                  Course Automations & Workflows
+                </h2>
+                {isEmailConfigured ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-800 border border-emerald-200">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    Email Active (Resend)
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-800 border border-amber-200">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                    In-App Only (Resend Unconfigured)
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-stone-500 mt-0.5">
                 Multi-channel email and in-app notifications for live cohort sessions, assignment deadlines, and weekly student digests.
               </p>
             </div>
@@ -225,6 +269,26 @@ export function CourseWorkflowsManager({
             </Button>
           </div>
         </div>
+
+        {/* Email Unconfigured Alert Banner */}
+        {!isEmailConfigured && (
+          <div className="mt-4 rounded-2xl border border-amber-300 bg-amber-50/80 p-4 text-xs text-amber-900 shadow-2xs flex items-start gap-3">
+            <AlertCircle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="font-bold text-amber-950">Email Delivery Is Inactive (RESEND_API_KEY Not Configured)</p>
+              <p className="text-amber-900 leading-relaxed">
+                Reminders and digests are currently delivering to students&apos; <strong>in-app notification drawers only</strong>. External emails cannot be sent until you add your Resend API key to your environment variables:
+              </p>
+              <div className="mt-2 rounded-xl bg-amber-100/90 border border-amber-200 p-2.5 font-mono text-[11px] text-amber-950 space-y-1">
+                <div>RESEND_API_KEY=re_your_api_key_here</div>
+                <div>RESEND_FROM_EMAIL=Circles &lt;{senderEmail || 'onboarding@resend.dev'}&gt;</div>
+              </div>
+              <p className="text-[11px] text-amber-800 pt-1">
+                Tip: Resend provides <code className="bg-amber-100 px-1 py-0.5 rounded font-mono">onboarding@resend.dev</code> for instant sandbox testing to your registered account email without DNS verification.
+              </p>
+            </div>
+          </div>
+        )}
 
         {feedback && (
           <div
@@ -710,16 +774,41 @@ export function CourseWorkflowsManager({
                         {cleanType}
                       </td>
                       <td className="py-2.5 px-3 text-[11px] text-stone-600">
-                        <span className="inline-flex items-center gap-1 rounded-md bg-stone-100 px-2 py-0.5 text-[10px] font-semibold text-stone-700">
-                          <Mail className="h-3 w-3" />
-                          <span>Email &amp; In-App</span>
-                        </span>
+                        {log.channel === 'both' ? (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-stone-100 px-2 py-0.5 text-[10px] font-semibold text-stone-700">
+                            <Mail className="h-3 w-3 text-purple-600" />
+                            <span>Email &amp; In-App</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-stone-100 px-2 py-0.5 text-[10px] font-semibold text-stone-600">
+                            <Layers className="h-3 w-3 text-stone-500" />
+                            <span>In-App Only</span>
+                          </span>
+                        )}
                       </td>
                       <td className="py-2.5 px-3">
-                        <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
-                          <CheckCircle2 className="h-3 w-3" />
-                          <span>Delivered</span>
-                        </span>
+                        {log.metadata && log.metadata.emailStatus === 'skipped_unconfigured' ? (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-800 border border-amber-200"
+                            title={String(log.metadata.emailErrorMessage || 'Email skipped: RESEND_API_KEY unconfigured')}
+                          >
+                            <AlertCircle className="h-3 w-3 text-amber-600" />
+                            <span>Email Skipped (No Key)</span>
+                          </span>
+                        ) : log.metadata && log.metadata.emailStatus === 'failed' ? (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-md bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700 border border-rose-200"
+                            title={String(log.metadata.emailErrorMessage || 'Email delivery failed')}
+                          >
+                            <AlertCircle className="h-3 w-3 text-rose-600" />
+                            <span>Email Failed</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-700 border border-emerald-200">
+                            <CheckCircle2 className="h-3 w-3" />
+                            <span>Delivered</span>
+                          </span>
+                        )}
                       </td>
                       <td className="py-2.5 px-3 text-right text-[11px] text-stone-500 whitespace-nowrap">
                         {new Date(log.delivered_at).toLocaleString(undefined, {

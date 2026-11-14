@@ -35,7 +35,6 @@ import {
   CourseWorkflowLogItem,
 } from '@/types/domain';
 import { createNotification } from '@/features/notifications/service';
-import { sendTransactionalEmail } from '@/lib/email';
 import {
   CapabilityDisabledError,
   ConflictError,
@@ -4176,7 +4175,7 @@ export async function dispatchAssignmentFeedbackReminder(
   const linkUrl = `/circles/${data.circleSlug}/courses/${courseId}/learn?lesson=${data.lessonId}`;
   const idempotencyKey = `wf:feedback:${courseId}:${assignmentId}:${studentId}`;
 
-  await createNotification({
+  const notif = await createNotification({
     recipientId: studentId,
     actorId: actorUserId ?? null,
     circleId,
@@ -4188,18 +4187,23 @@ export async function dispatchAssignmentFeedbackReminder(
     sendEmail: true,
   });
 
+  const emailStatus = notif?.emailDelivery?.status || 'skipped_unconfigured';
+  const emailErrorMessage = notif?.emailDelivery?.errorMessage;
+  const channel = emailStatus === 'delivered' ? 'both' : 'in_app';
+
   await withServiceRoleTransaction(async (tx) => {
     await tx.query(
       `INSERT INTO public.course_workflow_logs (
          circle_id, course_id, recipient_id, workflow_type, entity_id, channel, status, metadata
-       ) VALUES ($1, $2, $3, 'assignment_feedback', $4, 'both', 'delivered', $5)
+       ) VALUES ($1, $2, $3, 'assignment_feedback', $4, $5, 'delivered', $6)
        ON CONFLICT (course_id, recipient_id, workflow_type, entity_id) DO NOTHING;`,
       [
         circleId,
         courseId,
         studentId,
         assignmentId,
-        JSON.stringify({ gradeScore, assignTitle: data.assignTitle }),
+        channel,
+        JSON.stringify({ gradeScore, assignTitle: data.assignTitle, emailStatus, emailErrorMessage }),
       ]
     );
   });
@@ -4257,7 +4261,7 @@ export async function dispatchSessionReplayAlert(
     const idempotencyKey = `wf:replay:${courseId}:${lessonId}:${studentId}`;
 
     try {
-      await createNotification({
+      const notif = await createNotification({
         recipientId: studentId,
         actorId: actorUserId ?? null,
         circleId,
@@ -4269,18 +4273,23 @@ export async function dispatchSessionReplayAlert(
         sendEmail: true,
       });
 
+      const emailStatus = notif?.emailDelivery?.status || 'skipped_unconfigured';
+      const emailErrorMessage = notif?.emailDelivery?.errorMessage;
+      const channel = emailStatus === 'delivered' ? 'both' : 'in_app';
+
       await withServiceRoleTransaction(async (tx) => {
         await tx.query(
           `INSERT INTO public.course_workflow_logs (
              circle_id, course_id, recipient_id, workflow_type, entity_id, channel, status, metadata
-           ) VALUES ($1, $2, $3, 'session_replay', $4, 'both', 'delivered', $5)
+           ) VALUES ($1, $2, $3, 'session_replay', $4, $5, 'delivered', $6)
            ON CONFLICT (course_id, recipient_id, workflow_type, entity_id) DO NOTHING;`,
           [
             circleId,
             courseId,
             studentId,
             lessonId,
-            JSON.stringify({ lessonTitle }),
+            channel,
+            JSON.stringify({ lessonTitle, emailStatus, emailErrorMessage }),
           ]
         );
       });
@@ -4594,7 +4603,17 @@ export async function dispatchCourseWorkflowReminders(
   // Dispatch notifications outside of transaction to avoid nested lockups
   for (const item of queue) {
     try {
-      await createNotification({
+      const emailHtml = renderCourseEmailHtml({
+        circleName: circleSlug,
+        courseTitle: course.title,
+        badgeText: 'Course Reminder',
+        heading: item.title,
+        bodyText: item.body,
+        primaryActionLabel: 'Open in Circles',
+        primaryActionUrl: item.linkUrl.startsWith('http') ? item.linkUrl : `https://circles.example.com${item.linkUrl}`,
+      });
+
+      const notif = await createNotification({
         recipientId: item.studentId,
         circleId,
         eventType: 'course_reminder',
@@ -4603,15 +4622,28 @@ export async function dispatchCourseWorkflowReminders(
         linkUrl: item.linkUrl,
         idempotencyKey: item.idempotencyKey,
         sendEmail: true,
+        emailHtml,
       });
+
+      const emailStatus = notif?.emailDelivery?.status || 'skipped_unconfigured';
+      const emailErrorMessage = notif?.emailDelivery?.errorMessage;
+      const channel = emailStatus === 'delivered' ? 'both' : 'in_app';
 
       await withServiceRoleTransaction(async (tx) => {
         await tx.query(
           `INSERT INTO public.course_workflow_logs (
-             circle_id, course_id, recipient_id, workflow_type, entity_id, channel, status
-           ) VALUES ($1, $2, $3, $4, $5, 'both', 'delivered')
+             circle_id, course_id, recipient_id, workflow_type, entity_id, channel, status, metadata
+           ) VALUES ($1, $2, $3, $4, $5, $6, 'delivered', $7)
            ON CONFLICT (course_id, recipient_id, workflow_type, entity_id) DO NOTHING;`,
-          [circleId, course.id, item.studentId, item.workflowType, item.entityId]
+          [
+            circleId,
+            course.id,
+            item.studentId,
+            item.workflowType,
+            item.entityId,
+            channel,
+            JSON.stringify({ emailStatus, emailErrorMessage }),
+          ]
         );
       });
 
@@ -4632,7 +4664,14 @@ export async function sendTestWorkflowReminder(
   circleId: string,
   courseId: string,
   workflowType: string
-): Promise<{ success: boolean; previewTitle: string; previewBody: string }> {
+): Promise<{
+  success: boolean;
+  previewTitle: string;
+  previewBody: string;
+  emailStatus: string;
+  emailErrorMessage?: string;
+  recipientEmail?: string;
+}> {
   const data = await withServiceRoleTransaction(async (tx) => {
     const courseRes = await tx.query<{ title: string; cohort_meeting_url: string | null }>(
       `SELECT title, cohort_meeting_url FROM public.courses WHERE id = $1 AND circle_id = $2 LIMIT 1;`,
@@ -4713,8 +4752,19 @@ export async function sendTestWorkflowReminder(
 
   const testIdempotencyKey = `wf:test:${courseId}:${workflowType}:${Date.now()}`;
 
-  // Send in-app notification
-  await createNotification({
+  const emailHtml = renderCourseEmailHtml({
+    circleName: data.circleName,
+    courseTitle: data.courseTitle,
+    badgeText: 'Test Preview',
+    heading: previewTitle,
+    bodyText: previewBody,
+    primaryActionLabel,
+    primaryActionUrl: linkUrl.startsWith('http') ? linkUrl : `https://circles.example.com${linkUrl}`,
+    secondaryInfo: `This was sent from the Course Studio Workflows tab to verify your reminder templates.`,
+  });
+
+  // Send in-app notification and email with formatted HTML
+  const notif = await createNotification({
     recipientId: actorUserId,
     actorId: actorUserId,
     circleId,
@@ -4724,40 +4774,32 @@ export async function sendTestWorkflowReminder(
     linkUrl,
     idempotencyKey: testIdempotencyKey,
     sendEmail: true,
+    emailHtml,
   });
 
-  // Also send rich HTML email directly
-  if (data.recipientEmail) {
-    const emailHtml = renderCourseEmailHtml({
-      circleName: data.circleName,
-      courseTitle: data.courseTitle,
-      badgeText: 'Test Preview',
-      heading: previewTitle,
-      bodyText: previewBody,
-      primaryActionLabel,
-      primaryActionUrl: linkUrl.startsWith('http') ? linkUrl : `https://circles.example.com${linkUrl}`,
-      secondaryInfo: `This was sent from the Course Studio Workflows tab to verify your reminder templates.`,
-    });
-    await sendTransactionalEmail({
-      to: data.recipientEmail,
-      subject: previewTitle,
-      html: emailHtml,
-      text: `${previewTitle}\n\n${previewBody}\n\n${linkUrl}`,
-    });
-  }
+  const emailStatus = notif?.emailDelivery?.status || 'skipped_unconfigured';
+  const emailErrorMessage = notif?.emailDelivery?.errorMessage;
+  const channel = emailStatus === 'delivered' ? 'both' : 'in_app';
 
   // Record test in logs
   await withServiceRoleTransaction(async (tx) => {
     await tx.query(
       `INSERT INTO public.course_workflow_logs (
          circle_id, course_id, recipient_id, workflow_type, entity_id, channel, status, metadata
-       ) VALUES ($1, $2, $3, $4, 'test_preview', 'both', 'delivered', $5);`,
+       ) VALUES ($1, $2, $3, $4, 'test_preview', $5, 'delivered', $6);`,
       [
         circleId,
         courseId,
         actorUserId,
         workflowType,
-        JSON.stringify({ isTest: true, previewTitle }),
+        channel,
+        JSON.stringify({
+          isTest: true,
+          previewTitle,
+          emailStatus,
+          emailErrorMessage,
+          recipientEmail: data.recipientEmail,
+        }),
       ]
     );
   });
@@ -4766,5 +4808,8 @@ export async function sendTestWorkflowReminder(
     success: true,
     previewTitle,
     previewBody,
+    emailStatus,
+    emailErrorMessage,
+    recipientEmail: data.recipientEmail,
   };
 }

@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import { withRlsTransaction, withServiceRoleTransaction } from '@/lib/db/postgres';
 import { NotificationItem } from '@/types/domain';
-import { sendTransactionalEmail } from '@/lib/email';
+import { sendTransactionalEmail, EmailDeliveryResult } from '@/lib/email';
 
 export interface CreateNotificationInput {
   recipientId: string;
@@ -13,9 +13,16 @@ export interface CreateNotificationInput {
   linkUrl: string;
   idempotencyKey?: string;
   sendEmail?: boolean;
+  emailHtml?: string;
 }
 
-export async function createNotification(input: CreateNotificationInput): Promise<NotificationItem | null> {
+export type NotificationWithDelivery = NotificationItem & {
+  emailDelivery?: EmailDeliveryResult;
+};
+
+export async function createNotification(
+  input: CreateNotificationInput
+): Promise<NotificationWithDelivery | null> {
   if (input.actorId && input.actorId === input.recipientId) {
     // Do not self-notify on own comments
     if (input.eventType === 'new_comment') return null;
@@ -60,6 +67,7 @@ export async function createNotification(input: CreateNotificationInput): Promis
       [crypto.randomUUID(), notifId]
     );
 
+    let emailDelivery: EmailDeliveryResult | undefined;
     if (input.sendEmail) {
       const profileRes = await tx.query<{ email: string }>(
         `SELECT email FROM public.profiles WHERE id = $1 LIMIT 1;`,
@@ -67,11 +75,11 @@ export async function createNotification(input: CreateNotificationInput): Promis
       );
       const recipientEmail = profileRes.rows[0]?.email;
       if (recipientEmail) {
-        const emailResult = await sendTransactionalEmail({
+        emailDelivery = await sendTransactionalEmail({
           to: recipientEmail,
           subject: input.title,
           text: `${input.body}\n\nOpen in Circles: ${input.linkUrl}`,
-          html: `<p>${input.body}</p><p><a href="${input.linkUrl}">Open in Circles</a></p>`,
+          html: input.emailHtml || `<p>${input.body}</p><p><a href="${input.linkUrl}">Open in Circles</a></p>`,
         });
 
         await tx.query(
@@ -82,15 +90,15 @@ export async function createNotification(input: CreateNotificationInput): Promis
           [
             crypto.randomUUID(),
             notifId,
-            emailResult.status,
-            emailResult.providerReference ?? null,
-            emailResult.errorMessage ?? null,
+            emailDelivery.status,
+            emailDelivery.providerReference ?? null,
+            emailDelivery.errorMessage ?? null,
           ]
         );
       }
     }
 
-    return notification;
+    return Object.assign(notification, { emailDelivery });
   });
 }
 
