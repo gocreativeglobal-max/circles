@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import {
   createCoursePaywall,
   deleteCourse,
+  enrollInCourse,
   getCoursePaywalls,
   getCourseWithCurriculum,
   linkCoursePaywall,
@@ -11,6 +12,7 @@ import {
 } from '@/features/courses/service';
 import { handleApiError, resolveApiUser } from '@/lib/auth/api-helpers';
 import { UnauthorizedError, ValidationError } from '@/lib/errors';
+import { createNotification } from '@/features/notifications/service';
 
 export async function GET(
   req: NextRequest,
@@ -67,6 +69,28 @@ export async function POST(
 
     const body = await req.json().catch(() => ({}));
     const action = body.action;
+
+    if (action === 'enroll') {
+      const enrollment = await enrollInCourse(
+        user.id,
+        params.circleId,
+        params.courseId
+      );
+
+      // Async in-app confirmation notification for enrolled learner
+      createNotification({
+        recipientId: user.id,
+        actorId: user.id,
+        circleId: params.circleId,
+        eventType: 'system',
+        title: 'Course Enrollment Confirmed',
+        body: 'You are successfully enrolled! Access live sessions, curriculum modules, and replays anytime.',
+        linkUrl: `/circles/${params.circleId}/courses/${params.courseId}`,
+        idempotencyKey: `course_enroll_${params.courseId}_${user.id}`,
+      }).catch(() => {});
+
+      return NextResponse.json({ success: true, enrollment }, { status: 200 });
+    }
 
     if (action === 'create_paywall') {
       const paywall = await createCoursePaywall(

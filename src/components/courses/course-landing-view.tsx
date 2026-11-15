@@ -31,6 +31,8 @@ import {
   Video,
   ExternalLink,
   Wrench,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 import {
   CourseItem,
@@ -104,6 +106,54 @@ export function CourseLandingView({
   const [reviewText, setReviewText] = useState<string>(course.user_review?.review_text || '');
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [reviewMsg, setReviewMsg] = useState<string | null>(null);
+
+  // Enrollment state
+  const [isEnrolling, setIsEnrolling] = useState(false);
+  const [enrollError, setEnrollError] = useState<string | null>(null);
+  const [enrollSuccessMsg, setEnrollSuccessMsg] = useState<string | null>(null);
+
+  async function handleEnroll() {
+    setEnrollError(null);
+    setEnrollSuccessMsg(null);
+    setIsEnrolling(true);
+    try {
+      const res = await fetch(`/api/circles/${circleId}/courses/${course.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'enroll' }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (res.status === 401 && typeof window !== 'undefined') {
+          const returnUrl = `${window.location.pathname}${window.location.search}`;
+          window.location.href = `/login?next=${encodeURIComponent(returnUrl)}`;
+          return;
+        }
+        throw new Error(data.error || 'Failed to enroll in this course.');
+      }
+
+      const updatedCourse: CourseItem = {
+        ...course,
+        is_enrolled: true,
+        enrolled_students_count: (course.enrolled_students_count || 0) + 1,
+        seats_remaining:
+          course.max_seats != null
+            ? Math.max(0, (course.seats_remaining ?? course.max_seats) - 1)
+            : null,
+      };
+
+      onCourseUpdated?.(updatedCourse);
+      setEnrollSuccessMsg(
+        course.course_format === 'live_cohort'
+          ? '🎉 Successfully enrolled in this live cohort! You now have full access to live workshops, calendar sync, and recording replays.'
+          : '🎉 Successfully enrolled! You now have full access to all curriculum modules and lessons.'
+      );
+    } catch (err) {
+      setEnrollError(err instanceof Error ? err.message : 'Failed to enroll.');
+    } finally {
+      setIsEnrolling(false);
+    }
+  }
 
   // Flatten all lessons
   const allLessons = useMemo(() => {
@@ -1134,17 +1184,25 @@ export function CourseLandingView({
                 <div>
                   {isPaywalled && !hasAccess ? (
                     <div className="space-y-1">
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-2xl font-black text-stone-900">
-                          {primaryPlan ? formatBachsAmount(primaryPlan.amount_cents, primaryPlan.currency) : '$49.99'}
-                        </span>
-                        <span className="text-xs text-stone-400 line-through">
-                          {primaryPlan ? formatBachsAmount(primaryPlan.amount_cents * 2, primaryPlan.currency) : '$99.99'}
-                        </span>
-                        <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-bold text-stone-900">
-                          50% OFF
-                        </span>
-                      </div>
+                      {primaryPlan ? (
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-2xl font-black text-stone-900">
+                            {formatBachsAmount(primaryPlan.amount_cents, primaryPlan.currency)}
+                          </span>
+                          <span className="text-xs text-stone-400 line-through">
+                            {formatBachsAmount(primaryPlan.amount_cents * 2, primaryPlan.currency)}
+                          </span>
+                          <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-bold text-stone-900">
+                            50% OFF
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-2.5 text-[11px] text-amber-800 font-medium">
+                          {isStaff
+                            ? '⚠️ Paywall access rule is active, but no pricing plan has been linked yet. Go to Settings or Studio to attach a plan.'
+                            : 'This course is set to private / paywall. Access plans will be available soon.'}
+                        </div>
+                      )}
                       <p className="text-[11px] text-stone-500">
                         {course.course_format === 'live_cohort'
                           ? 'Includes all live workshops & cohort recordings'
@@ -1230,6 +1288,26 @@ export function CourseLandingView({
 
                 {/* Primary CTA Button */}
                 <div className="space-y-2.5">
+                  {enrollError && (
+                    <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-700 flex items-start gap-2">
+                      <AlertCircle className="h-4 w-4 shrink-0 text-red-500 mt-0.5" />
+                      <div className="flex-1">
+                        <span className="font-semibold block mb-0.5">Enrollment Notice</span>
+                        <span className="leading-relaxed">{enrollError}</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {enrollSuccessMsg && (
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 flex items-start gap-2">
+                      <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-600 mt-0.5" />
+                      <div className="flex-1">
+                        <span className="font-semibold block mb-0.5">Enrollment Confirmed!</span>
+                        <span className="leading-relaxed">{enrollSuccessMsg}</span>
+                      </div>
+                    </div>
+                  )}
+
                   {isSoldOut && !isEnrolled ? (
                     <Button
                       disabled
@@ -1240,7 +1318,19 @@ export function CourseLandingView({
                     </Button>
                   ) : isPaywalled && !hasAccess ? (
                     <Button
-                      onClick={() => onOpenCheckout?.(primaryPlan || undefined)}
+                      onClick={() => {
+                        if (!primaryPlan) {
+                          if (isStaff) {
+                            onOpenSettings?.();
+                          } else {
+                            setEnrollError(
+                              'Enrollment pricing is currently being configured by the instructor. Please check back shortly.'
+                            );
+                          }
+                          return;
+                        }
+                        onOpenCheckout?.(primaryPlan);
+                      }}
                       className="w-full rounded-xl bg-black py-3 text-sm font-bold text-white shadow-xs hover:bg-stone-800 transition-all flex items-center justify-center gap-2"
                     >
                       <CreditCard className="h-4 w-4" />
@@ -1283,24 +1373,61 @@ export function CourseLandingView({
                         </a>
                       )}
                       <Button
-                        onClick={() => onStartLearning(firstPlayableLesson?.id)}
+                        onClick={() => {
+                          if (!isEnrolled) {
+                            handleEnroll();
+                          } else {
+                            onStartLearning(firstPlayableLesson?.id);
+                          }
+                        }}
+                        disabled={isEnrolling}
                         className={`w-full rounded-xl py-3 text-sm font-bold transition-all flex items-center justify-center gap-2 ${
                           isEnrolled && course.cohort_meeting_url
                             ? 'bg-stone-100 text-stone-900 hover:bg-stone-200 border border-stone-200'
                             : 'bg-black text-white hover:bg-stone-800'
                         }`}
                       >
-                        <BookOpen className="h-4 w-4" />
-                        <span>{isEnrolled ? 'View Curriculum & Replays' : 'Join This Live Cohort'}</span>
+                        {isEnrolling ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span>Enrolling in Cohort...</span>
+                          </>
+                        ) : isEnrolled ? (
+                          <>
+                            <BookOpen className="h-4 w-4" />
+                            <span>View Curriculum & Replays</span>
+                          </>
+                        ) : (
+                          <>
+                            <Users className="h-4 w-4" />
+                            <span>Enroll in Live Cohort</span>
+                          </>
+                        )}
                       </Button>
                     </div>
                   ) : (
                     <Button
-                      onClick={() => onStartLearning(firstPlayableLesson?.id)}
+                      onClick={() => {
+                        if (!isEnrolled) {
+                          handleEnroll();
+                        } else {
+                          onStartLearning(firstPlayableLesson?.id);
+                        }
+                      }}
+                      disabled={isEnrolling}
                       className="w-full rounded-xl bg-black py-3 text-sm font-bold text-white shadow-xs hover:bg-stone-800 transition-all flex items-center justify-center gap-2"
                     >
-                      <Play className="h-4 w-4 fill-current" />
-                      <span>{isEnrolled ? 'Continue Learning' : 'Start Course'}</span>
+                      {isEnrolling ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span>Enrolling...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Play className="h-4 w-4 fill-current" />
+                          <span>{isEnrolled ? 'Continue Learning' : 'Start Course'}</span>
+                        </>
+                      )}
                     </Button>
                   )}
 

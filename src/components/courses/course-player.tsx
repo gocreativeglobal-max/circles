@@ -1141,7 +1141,23 @@ export function CoursePlayer({
               window.location.href = `/login?next=${encodeURIComponent(returnUrl)}`;
               return;
             }
-            setSelectedPaywallPlan(plan || course.paywall_plans?.[0] || null);
+            const targetPlan = plan || course.paywall_plans?.[0] || null;
+            if (!targetPlan) {
+              if (effectiveIsStaff) {
+                showToast(
+                  'This course is set to Paywalled, but has no pricing plan attached. Opening Settings so you can attach a plan or change the access rule to Open.',
+                  'error'
+                );
+                setShowCourseSettings(true);
+              } else {
+                showToast(
+                  'Enrollment pricing is currently being configured by the instructor. Please check back shortly!',
+                  'error'
+                );
+              }
+              return;
+            }
+            setSelectedPaywallPlan(targetPlan);
             setShowCheckoutModal(true);
           }}
           onOpenSettings={() => setShowCourseSettings(true)}

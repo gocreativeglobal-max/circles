@@ -611,8 +611,18 @@ export function CoursesCatalog({
                             href={`/circles/${circleSlug}/courses/${course.id}`}
                             className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-stone-900 px-3 py-2 text-xs font-medium text-white hover:bg-black transition-colors"
                           >
-                            <Play className="h-3.5 w-3.5 fill-current" />
-                            {hasStarted ? 'Continue Learning' : 'Start Course'}
+                            {course.course_format === 'live_cohort' ? (
+                              <Video className="h-3.5 w-3.5" />
+                            ) : (
+                              <Play className="h-3.5 w-3.5 fill-current" />
+                            )}
+                            {course.course_format === 'live_cohort'
+                              ? course.is_enrolled
+                                ? 'Enter Live Cohort'
+                                : 'View Cohort & Enroll'
+                              : hasStarted
+                              ? 'Continue Learning'
+                              : 'Start Course'}
                           </Link>
                           {isStaff && (
                             <Link
