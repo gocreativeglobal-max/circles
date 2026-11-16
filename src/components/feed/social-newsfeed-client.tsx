@@ -103,15 +103,6 @@ const CATEGORIES = [
 
 const RESOURCE_CATEGORIES = ['Guide', 'Link', 'Document', 'Template', 'Video'];
 
-const TRENDING_HASHTAGS = [
-  '#AI',
-  '#WebDevelopment',
-  '#CommunityGrowth',
-  '#Tech',
-  '#Innovation',
-  '#DigitalSkills',
-];
-
 const CAPABILITY_TILES = [
   {
     key: 'communities',
@@ -176,55 +167,6 @@ function renderTextWithHashtags(
     return part;
   });
 }
-
-const SHOWCASE_POST: GlobalFeedItem = {
-  id: 'post-circles-welcome',
-  itemType: 'post',
-  timestamp: new Date().toISOString(),
-  engagementScore: 1200,
-  circle: {
-    id: 'circle-circles-official',
-    name: 'Circles',
-    slug: 'circles',
-    description: 'Official global community for Circles platform.',
-    category: 'creator',
-    location: null,
-    avatar_url: null,
-    cover_url: null,
-    visibility: 'public',
-    membership_policy: 'open',
-    member_count: 12500,
-    viewer_role: null,
-    viewer_membership_status: null,
-    viewer_join_request_status: null,
-  },
-  authorRole: 'owner',
-  data: {
-    id: 'post-circles-welcome-id',
-    circle_id: 'circle-circles-official',
-    space_id: null,
-    author_id: 'circles-official-user',
-    title: 'Together is a better place.',
-    body: 'Join or create a community on Circles and bring your people together around the things that matter most.\n\n#Circles #Community #Connect #Belong',
-    status: 'published',
-    is_pinned: true,
-    comment_count: 248,
-    reaction_count: 1200,
-    created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    updated_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
-    author: {
-      id: 'circles-official-user',
-      username: 'circles',
-      display_name: 'Circles',
-      avatar_url: null,
-    },
-    space: null,
-    viewer_has_liked: false,
-    viewer_has_saved: false,
-    poll_id: null,
-    poll: null,
-  },
-};
 
 function parsePostContent(body: string): {
   resource: AttachedResourceMeta | null;
@@ -340,14 +282,7 @@ export function SocialNewsfeedClient({
   stats: _stats,
 }: SocialNewsfeedClientProps) {
   const router = useRouter();
-  const [items, setItems] = useState<GlobalFeedItem[]>(() => {
-    const hasShowcase = initialItems.some(
-      (it) =>
-        it.id === SHOWCASE_POST.id ||
-        (it.itemType === 'post' && it.data.title === 'Together is a better place.')
-    );
-    return hasShowcase ? initialItems : [SHOWCASE_POST, ...initialItems];
-  });
+  const [items, setItems] = useState<GlobalFeedItem[]>(initialItems);
   const [myCircles, setMyCircles] = useState<Circle[]>(initialMyCircles);
   const [trendingCircles, setTrendingCircles] = useState<Circle[]>(initialTrendingCircles);
   const [composerCircles] = useState<ComposerCircleOption[]>(initialComposerCircles);
@@ -357,6 +292,33 @@ export function SocialNewsfeedClient({
   const [contentType, setContentType] = useState<ContentTypeFilter>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Extract real trending hashtags dynamically from active posts or real categories
+  const trendingHashtags = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const item of items) {
+      if (item.itemType === 'post') {
+        const text = `${item.data.title || ''} ${item.data.body || ''}`;
+        const found = text.match(/#[a-zA-Z0-9_]+/g);
+        if (found) {
+          for (const t of found) {
+            const clean = t.toLowerCase();
+            counts.set(t, (counts.get(clean) || 0) + 1);
+          }
+        }
+      }
+    }
+    const realTags = Array.from(counts.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([t]) => t);
+
+    if (realTags.length > 0) {
+      return realTags.slice(0, 6);
+    }
+    return CATEGORIES.filter((c) => c.key !== 'all')
+      .map((c) => `#${c.label.replace(/\s+/g, '')}`)
+      .slice(0, 6);
+  }, [items]);
 
   // Hero Welcome Banner & User Menu
   const [showHeroBanner, setShowHeroBanner] = useState(true);
@@ -1539,39 +1501,43 @@ export function SocialNewsfeedClient({
                 </div>
 
                 <div className="space-y-3">
-                  {trendingCircles.slice(0, 5).map((circle) => {
-                    const isMember = isViewerActiveMember(circle as unknown as FeedCircleContext);
-                    const isPending = isViewerPendingMember(circle as unknown as FeedCircleContext);
+                  {trendingCircles.length === 0 ? (
+                    <p className="text-xs text-stone-500 py-3 text-center">No public communities yet.</p>
+                  ) : (
+                    trendingCircles.slice(0, 5).map((circle) => {
+                      const isMember = isViewerActiveMember(circle as unknown as FeedCircleContext);
+                      const isPending = isViewerPendingMember(circle as unknown as FeedCircleContext);
+                      const count = circle.member_count ?? 0;
 
-                    return (
-                      <div key={circle.id} className="flex items-center justify-between gap-2.5">
-                        <Link
-                          href={`/circles/${circle.slug}`}
-                          className="flex items-center gap-2.5 min-w-0 flex-1 group"
-                        >
-                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-stone-100 text-xs font-bold text-stone-900 border border-stone-200 overflow-hidden shadow-2xs">
-                            {circle.avatar_url ? (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img
-                                src={circle.avatar_url}
-                                alt={circle.name}
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              circle.name.slice(0, 1).toUpperCase()
-                            )}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="truncate text-xs font-bold text-stone-900 group-hover:underline leading-tight">
-                              {circle.name}
-                            </p>
-                            <p className="text-[11px] text-stone-400 leading-tight">
-                              {(circle.member_count ?? 1) >= 1000
-                                ? `${((circle.member_count ?? 1) / 1000).toFixed(1)}k members`
-                                : `${circle.member_count ?? 1} members`}
-                            </p>
-                          </div>
-                        </Link>
+                      return (
+                        <div key={circle.id} className="flex items-center justify-between gap-2.5">
+                          <Link
+                            href={`/circles/${circle.slug}`}
+                            className="flex items-center gap-2.5 min-w-0 flex-1 group"
+                          >
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-stone-100 text-xs font-bold text-stone-900 border border-stone-200 overflow-hidden shadow-2xs">
+                              {circle.avatar_url ? (
+                                // eslint-disable-next-line @next/next/no-img-element
+                                <img
+                                  src={circle.avatar_url}
+                                  alt={circle.name}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                circle.name.slice(0, 1).toUpperCase()
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="truncate text-xs font-bold text-stone-900 group-hover:underline leading-tight">
+                                {circle.name}
+                              </p>
+                              <p className="text-[11px] text-stone-400 leading-tight">
+                                {count >= 1000
+                                  ? `${(count / 1000).toFixed(1)}k members`
+                                  : `${count} members`}
+                              </p>
+                            </div>
+                          </Link>
 
                         {isMember ? (
                           <span className="flex h-7 w-7 items-center justify-center rounded-full bg-stone-100 text-stone-600 text-xs font-bold">
@@ -1594,8 +1560,9 @@ export function SocialNewsfeedClient({
                         )}
                       </div>
                     );
-                  })}
-                </div>
+                  })
+                )}
+              </div>
               </div>
 
               {/* 10X Faster Promo Card (Matching Reference Layout) */}
@@ -2078,7 +2045,7 @@ export function SocialNewsfeedClient({
                           <div className="flex items-center gap-3 min-w-0">
                             {/* Author Avatar */}
                             <div className="relative shrink-0">
-                              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black text-white font-bold border border-stone-200 overflow-hidden shadow-2xs">
+                              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-stone-900 text-white font-bold border border-stone-200 overflow-hidden shadow-2xs">
                                 {post.author?.avatar_url ? (
                                   // eslint-disable-next-line @next/next/no-img-element
                                   <img
@@ -2086,42 +2053,38 @@ export function SocialNewsfeedClient({
                                     alt={post.author.display_name}
                                     className="h-full w-full object-cover"
                                   />
-                                ) : post.author?.display_name === 'Circles' || item.circle.name === 'Circles' ? (
-                                  <span className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white">
-                                    <span className="h-2.5 w-2.5 rounded-full bg-white" />
-                                  </span>
                                 ) : (
                                   <span>{(post.author?.display_name || 'M').slice(0, 1).toUpperCase()}</span>
                                 )}
                               </div>
-                              {/* Circle Mini Badge (if posted in a distinct Circle) */}
-                              {item.circle.name !== 'Circles' && (
-                                <Link
-                                  href={`/circles/${item.circle.slug}`}
-                                  title={`Posted in ${item.circle.name}`}
-                                  className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-black text-[8px] font-bold text-white border-2 border-white overflow-hidden shadow-2xs hover:scale-110 transition-transform"
-                                >
-                                  {item.circle.avatar_url ? (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img
-                                      src={item.circle.avatar_url}
-                                      alt={item.circle.name}
-                                      className="h-full w-full object-cover"
-                                    />
-                                  ) : (
-                                    item.circle.name.slice(0, 1).toUpperCase()
-                                  )}
-                                </Link>
-                              )}
+                              {/* Circle Mini Badge */}
+                              <Link
+                                href={`/circles/${item.circle.slug}`}
+                                title={`Posted in ${item.circle.name}`}
+                                className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-black text-[8px] font-bold text-white border-2 border-white overflow-hidden shadow-2xs hover:scale-110 transition-transform"
+                              >
+                                {item.circle.avatar_url ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={item.circle.avatar_url}
+                                    alt={item.circle.name}
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  item.circle.name.slice(0, 1).toUpperCase()
+                                )}
+                              </Link>
                             </div>
 
                             {/* Author & Circle Context Lines (Matching Reference Header) */}
                             <div className="min-w-0 leading-tight">
                               <div className="flex items-center gap-1.5 flex-wrap">
                                 <span className="text-base font-bold text-stone-900 hover:underline cursor-pointer">
-                                  {post.author?.display_name || 'Circles'}
+                                  {post.author?.display_name || 'Member'}
                                 </span>
-                                <CheckCircle2 className="h-4 w-4 fill-[#1877F2] text-white shrink-0" />
+                                {item.authorRole && ['owner', 'admin'].includes(item.authorRole) && (
+                                  <CheckCircle2 className="h-4 w-4 fill-[#1877F2] text-white shrink-0" />
+                                )}
                                 {item.authorRole && ['owner', 'admin', 'moderator'].includes(item.authorRole) && (
                                   <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[9px] font-mono font-bold uppercase text-stone-700 border border-stone-200">
                                     {item.authorRole}
@@ -2133,19 +2096,15 @@ export function SocialNewsfeedClient({
                                 <span>·</span>
                                 <span className="inline-flex items-center gap-1">
                                   <Globe className="h-3 w-3 text-stone-400" />
-                                  <span>{item.circle.visibility === 'public' ? 'Public' : item.circle.name}</span>
+                                  <span>{item.circle.visibility === 'public' ? 'Public' : 'Members'}</span>
                                 </span>
-                                {item.circle.name !== 'Circles' && (
-                                  <>
-                                    <span>·</span>
-                                    <Link
-                                      href={`/circles/${item.circle.slug}`}
-                                      className="text-stone-500 hover:text-stone-900 hover:underline truncate"
-                                    >
-                                      {item.circle.name}
-                                    </Link>
-                                  </>
-                                )}
+                                <span>·</span>
+                                <Link
+                                  href={`/circles/${item.circle.slug}`}
+                                  className="text-stone-500 hover:text-stone-900 hover:underline truncate"
+                                >
+                                  {item.circle.name}
+                                </Link>
                                 {post.space?.name && (
                                   <span className="text-stone-400">
                                     › #{post.space.name}
@@ -2254,41 +2213,6 @@ export function SocialNewsfeedClient({
                                 window.scrollTo({ top: 350, behavior: 'smooth' });
                               })}
                             </p>
-                          )}
-
-                          {/* Official Circles Showcase Graphic Banner matching reference */}
-                          {(post.id === 'post-circles-welcome-id' || post.title === 'Together is a better place.') && (
-                            <div className="relative mt-3 overflow-hidden rounded-2xl border border-purple-200/70 bg-gradient-to-r from-purple-50/90 via-stone-50/50 to-purple-100/50 p-5 sm:p-7 shadow-xs">
-                              <div className="grid grid-cols-1 sm:grid-cols-12 gap-5 items-center">
-                                <div className="sm:col-span-7 space-y-3">
-                                  <h3 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-stone-950 leading-[1.15]">
-                                    Your People.<br />
-                                    Your Space.<br />
-                                    <span className="text-purple-600">Your Circle.</span>
-                                  </h3>
-                                  <p className="text-xs sm:text-sm text-stone-600 leading-relaxed font-medium">
-                                    Discover, connect and build communities that matter.
-                                  </p>
-                                  <div className="pt-1">
-                                    <Link
-                                      href={currentUser ? '/circles/new' : '/register'}
-                                      className="inline-flex items-center gap-1.5 rounded-full bg-black px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-stone-800 transition-all hover:scale-105"
-                                    >
-                                      <span>Join Circles</span>
-                                      <ArrowRight className="h-3.5 w-3.5" />
-                                    </Link>
-                                  </div>
-                                </div>
-                                <div className="sm:col-span-5 h-44 sm:h-52 rounded-2xl overflow-hidden shadow-2xs border border-stone-200/80">
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  <img
-                                    src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=600&q=80"
-                                    alt="Circles community collaborators"
-                                    className="h-full w-full object-cover object-center"
-                                  />
-                                </div>
-                              </div>
-                            </div>
                           )}
 
                           {/* Attached Images Gallery (Full-bleed / Collage like Facebook) */}
@@ -2461,50 +2385,42 @@ export function SocialNewsfeedClient({
                           )}
                         </div>
 
-                        {/* 3. Facebook-style Social Engagement Stats Row */}
-                        <div className="flex items-center justify-between px-4 sm:px-5 py-2.5 text-xs text-stone-500 border-t border-stone-100">
-                          {/* Overlapping Reactions: 👍 ❤️ 🥰 */}
-                          <div className="flex items-center gap-2">
-                            <div className="flex -space-x-1 items-center">
-                              {/* 1. Thumbs Up (Blue) */}
-                              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#1877F2] text-white shadow-2xs z-30">
-                                <ThumbsUp className="h-2.5 w-2.5 fill-white text-white" />
-                              </span>
-                              {/* 2. Heart (Red) */}
-                              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#FA383E] text-white shadow-2xs z-20">
-                                <Heart className="h-2.5 w-2.5 fill-white text-white" />
-                              </span>
-                              {/* 3. Care / Smile (Amber) */}
-                              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#F7B125] text-white shadow-2xs z-10 text-[9px] leading-none">
-                                🥰
-                              </span>
+                        {/* 3. Social Engagement Stats Row (Only shown when there are real reactions or comments) */}
+                        {(post.reaction_count > 0 || post.comment_count > 0) && (
+                          <div className="flex items-center justify-between px-4 sm:px-5 py-2 text-xs text-stone-500 border-t border-stone-100">
+                            {/* Real Reactions: 👍 ❤️ */}
+                            <div className="flex items-center gap-1.5">
+                              {post.reaction_count > 0 && (
+                                <>
+                                  <div className="flex -space-x-1 items-center">
+                                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#1877F2] text-white shadow-2xs z-20">
+                                      <ThumbsUp className="h-2.5 w-2.5 fill-white text-white" />
+                                    </span>
+                                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#FA383E] text-white shadow-2xs z-10">
+                                      <Heart className="h-2.5 w-2.5 fill-white text-white" />
+                                    </span>
+                                  </div>
+                                  <span className="font-semibold text-stone-700 text-xs">
+                                    {post.reaction_count >= 1000
+                                      ? `${(post.reaction_count / 1000).toFixed(1)}K`
+                                      : post.reaction_count}
+                                  </span>
+                                </>
+                              )}
                             </div>
-                            <span className="font-semibold text-stone-700 text-xs">
-                              {post.reaction_count >= 1000
-                                ? `${(post.reaction_count / 1000).toFixed(1)}K`
-                                : post.reaction_count || 12}
-                            </span>
-                          </div>
 
-                          {/* Comments & Shares Counters */}
-                          <div className="flex items-center gap-2 text-xs text-stone-500 font-medium">
-                            <button
-                              type="button"
-                              onClick={() => handleToggleComments(item.circle.id, post.id)}
-                              className="hover:underline"
-                            >
-                              {post.comment_count} comments
-                            </button>
-                            <span>·</span>
-                            <button
-                              type="button"
-                              onClick={() => handleShareUrl(item.id, `/circles/${item.circle.slug}/discussions/${post.id}`)}
-                              className="hover:underline"
-                            >
-                              {Math.max(1, Math.round((post.reaction_count + post.comment_count) * 0.4))} shares
-                            </button>
+                            {/* Real Comments Counter */}
+                            {post.comment_count > 0 && (
+                              <button
+                                type="button"
+                                onClick={() => handleToggleComments(item.circle.id, post.id)}
+                                className="hover:underline text-xs text-stone-500 font-medium"
+                              >
+                                {post.comment_count} {post.comment_count === 1 ? 'comment' : 'comments'}
+                              </button>
+                            )}
                           </div>
-                        </div>
+                        )}
 
                         {/* 4. Facebook-style 4-Button Action Bar matching reference image */}
                         <div className="grid grid-cols-4 border-t border-stone-100 px-2 py-1 text-xs sm:text-sm font-semibold text-stone-600">
@@ -3563,7 +3479,7 @@ export function SocialNewsfeedClient({
 
               {/* Hashtag Cloud */}
               <div className="flex flex-wrap gap-2 pt-0.5">
-                {TRENDING_HASHTAGS.map((tag) => (
+                {trendingHashtags.map((tag) => (
                   <button
                     key={tag}
                     type="button"
@@ -3634,13 +3550,8 @@ export function SocialNewsfeedClient({
                             {time}
                           </p>
                           <div className="flex items-center gap-1.5 pt-0.5">
-                            <div className="flex -space-x-1.5 overflow-hidden">
-                              <span className="inline-block h-4 w-4 rounded-full bg-stone-300 ring-1 ring-white" />
-                              <span className="inline-block h-4 w-4 rounded-full bg-stone-400 ring-1 ring-white" />
-                              <span className="inline-block h-4 w-4 rounded-full bg-stone-500 ring-1 ring-white" />
-                            </div>
                             <span className="text-[10px] font-semibold text-stone-500">
-                              +{ev.going_count || 12} going
+                              {ev.going_count || 0} attending
                             </span>
                           </div>
                         </div>
@@ -3662,91 +3573,15 @@ export function SocialNewsfeedClient({
                     );
                   })
                 ) : (
-                  <>
-                    {/* Featured Event 1 (Matching Reference Screenshot) */}
+                  <div className="py-4 text-center">
+                    <p className="text-xs text-stone-500">No upcoming events scheduled yet.</p>
                     <Link
                       href="/explore?tab=events"
-                      className="group flex items-center justify-between gap-3 rounded-xl p-1.5 hover:bg-stone-50 transition-colors"
+                      className="mt-1.5 inline-block text-xs font-semibold text-purple-600 hover:underline"
                     >
-                      <div className="flex flex-col items-center justify-center rounded-xl bg-stone-100 border border-stone-200/90 py-1.5 px-2 min-w-[46px] shrink-0 text-center leading-tight">
-                        <span className="text-[9px] font-mono font-bold uppercase text-stone-500">
-                          SAT
-                        </span>
-                        <span className="text-base font-extrabold text-stone-900">
-                          29
-                        </span>
-                        <span className="text-[9px] font-mono font-bold uppercase text-stone-600">
-                          NOV
-                        </span>
-                      </div>
-                      <div className="min-w-0 flex-1 space-y-0.5">
-                        <p className="truncate text-xs font-bold text-stone-900 group-hover:underline">
-                          Circles Tech Summit 2025
-                        </p>
-                        <p className="text-[11px] text-stone-400">
-                          9:00 AM - 5:00 PM
-                        </p>
-                        <div className="flex items-center gap-1.5 pt-0.5">
-                          <div className="flex -space-x-1.5 overflow-hidden">
-                            <span className="inline-block h-4 w-4 rounded-full bg-purple-400 ring-1 ring-white" />
-                            <span className="inline-block h-4 w-4 rounded-full bg-sky-400 ring-1 ring-white" />
-                            <span className="inline-block h-4 w-4 rounded-full bg-emerald-400 ring-1 ring-white" />
-                          </div>
-                          <span className="text-[10px] font-semibold text-stone-500">
-                            +1.2k going
-                          </span>
-                        </div>
-                      </div>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src="https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=120&q=80"
-                        alt="Circles Tech Summit"
-                        className="h-12 w-12 shrink-0 rounded-xl object-cover border border-stone-200"
-                      />
+                      Explore events →
                     </Link>
-
-                    {/* Featured Event 2 (Matching Reference Screenshot) */}
-                    <Link
-                      href="/explore?tab=events"
-                      className="group flex items-center justify-between gap-3 rounded-xl p-1.5 hover:bg-stone-50 transition-colors"
-                    >
-                      <div className="flex flex-col items-center justify-center rounded-xl bg-stone-100 border border-stone-200/90 py-1.5 px-2 min-w-[46px] shrink-0 text-center leading-tight">
-                        <span className="text-[9px] font-mono font-bold uppercase text-stone-500">
-                          TUE
-                        </span>
-                        <span className="text-base font-extrabold text-stone-900">
-                          02
-                        </span>
-                        <span className="text-[9px] font-mono font-bold uppercase text-stone-600">
-                          DEC
-                        </span>
-                      </div>
-                      <div className="min-w-0 flex-1 space-y-0.5">
-                        <p className="truncate text-xs font-bold text-stone-900 group-hover:underline">
-                          Build with AI Workshop
-                        </p>
-                        <p className="text-[11px] text-stone-400">
-                          4:00 PM - 6:00 PM
-                        </p>
-                        <div className="flex items-center gap-1.5 pt-0.5">
-                          <div className="flex -space-x-1.5 overflow-hidden">
-                            <span className="inline-block h-4 w-4 rounded-full bg-amber-400 ring-1 ring-white" />
-                            <span className="inline-block h-4 w-4 rounded-full bg-rose-400 ring-1 ring-white" />
-                            <span className="inline-block h-4 w-4 rounded-full bg-blue-400 ring-1 ring-white" />
-                          </div>
-                          <span className="text-[10px] font-semibold text-stone-500">
-                            +420 going
-                          </span>
-                        </div>
-                      </div>
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src="https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&w=120&q=80"
-                        alt="Build with AI Workshop"
-                        className="h-12 w-12 shrink-0 rounded-xl object-cover border border-stone-200"
-                      />
-                    </Link>
-                  </>
+                  </div>
                 )}
               </div>
             </div>
