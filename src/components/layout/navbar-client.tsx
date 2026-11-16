@@ -30,11 +30,6 @@ export function NavbarClient({ user, unreadCount, canModerate = false }: NavbarC
   const [mobileOpen, setMobileOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
-  // Close mobile drawer on route changes
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
-
   // Lock scroll when mobile menu is active
   useEffect(() => {
     if (mobileOpen) {
@@ -46,6 +41,11 @@ export function NavbarClient({ user, unreadCount, canModerate = false }: NavbarC
       document.body.style.overflow = '';
     };
   }, [mobileOpen]);
+
+  // The homepage features an integrated app dashboard with its own docked sidebar and search header
+  if (pathname === '/') {
+    return null;
+  }
 
   async function handleSignOut() {
     setSigningOut(true);
