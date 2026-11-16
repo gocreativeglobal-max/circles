@@ -32,7 +32,6 @@ import {
   Pin,
   Play,
   Plus,
-  Repeat2,
   Search,
   Send,
   Settings,
@@ -41,11 +40,13 @@ import {
   Sparkles,
   Sun,
   Tag,
+  ThumbsUp,
   User,
   UserPlus,
   Users,
   Video,
   X,
+  Globe,
 } from 'lucide-react';
 import {
   Circle,
@@ -148,6 +149,82 @@ const CAPABILITY_TILES = [
     href: '/explore?category=professional',
   },
 ];
+
+function renderTextWithHashtags(
+  text: string,
+  onHashtagClick?: (tag: string) => void
+): React.ReactNode {
+  if (!text) return null;
+  const parts = text.split(/(#[a-zA-Z0-9_]+)/g);
+  return parts.map((part, index) => {
+    if (part.startsWith('#')) {
+      return (
+        <span
+          key={index}
+          onClick={(e) => {
+            if (onHashtagClick) {
+              e.stopPropagation();
+              onHashtagClick(part.slice(1));
+            }
+          }}
+          className="text-purple-600 font-semibold hover:underline cursor-pointer transition-colors"
+        >
+          {part}
+        </span>
+      );
+    }
+    return part;
+  });
+}
+
+const SHOWCASE_POST: GlobalFeedItem = {
+  id: 'post-circles-welcome',
+  itemType: 'post',
+  timestamp: new Date().toISOString(),
+  engagementScore: 1200,
+  circle: {
+    id: 'circle-circles-official',
+    name: 'Circles',
+    slug: 'circles',
+    description: 'Official global community for Circles platform.',
+    category: 'creator',
+    location: null,
+    avatar_url: null,
+    cover_url: null,
+    visibility: 'public',
+    membership_policy: 'open',
+    member_count: 12500,
+    viewer_role: null,
+    viewer_membership_status: null,
+    viewer_join_request_status: null,
+  },
+  authorRole: 'owner',
+  data: {
+    id: 'post-circles-welcome-id',
+    circle_id: 'circle-circles-official',
+    space_id: null,
+    author_id: 'circles-official-user',
+    title: 'Together is a better place.',
+    body: 'Join or create a community on Circles and bring your people together around the things that matter most.\n\n#Circles #Community #Connect #Belong',
+    status: 'published',
+    is_pinned: true,
+    comment_count: 248,
+    reaction_count: 1200,
+    created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    updated_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    author: {
+      id: 'circles-official-user',
+      username: 'circles',
+      display_name: 'Circles',
+      avatar_url: null,
+    },
+    space: null,
+    viewer_has_liked: false,
+    viewer_has_saved: false,
+    poll_id: null,
+    poll: null,
+  },
+};
 
 function parsePostContent(body: string): {
   resource: AttachedResourceMeta | null;
@@ -263,7 +340,14 @@ export function SocialNewsfeedClient({
   stats: _stats,
 }: SocialNewsfeedClientProps) {
   const router = useRouter();
-  const [items, setItems] = useState<GlobalFeedItem[]>(initialItems);
+  const [items, setItems] = useState<GlobalFeedItem[]>(() => {
+    const hasShowcase = initialItems.some(
+      (it) =>
+        it.id === SHOWCASE_POST.id ||
+        (it.itemType === 'post' && it.data.title === 'Together is a better place.')
+    );
+    return hasShowcase ? initialItems : [SHOWCASE_POST, ...initialItems];
+  });
   const [myCircles, setMyCircles] = useState<Circle[]>(initialMyCircles);
   const [trendingCircles, setTrendingCircles] = useState<Circle[]>(initialTrendingCircles);
   const [composerCircles] = useState<ComposerCircleOption[]>(initialComposerCircles);
@@ -1989,12 +2073,12 @@ export function SocialNewsfeedClient({
                         key={item.id}
                         className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-xs transition-all hover:border-stone-300/90"
                       >
-                        {/* 1. Facebook-style Clean Header */}
-                        <div className="p-4 pb-2.5 flex items-start justify-between gap-3">
+                        {/* 1. Facebook-style Clean Header matching reference */}
+                        <div className="p-4 sm:p-5 pb-3 flex items-start justify-between gap-3">
                           <div className="flex items-center gap-3 min-w-0">
-                            {/* Author Avatar with subtle Circle Badge */}
+                            {/* Author Avatar */}
                             <div className="relative shrink-0">
-                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-sm font-bold text-stone-800 border border-stone-200 overflow-hidden shadow-2xs">
+                              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-black text-white font-bold border border-stone-200 overflow-hidden shadow-2xs">
                                 {post.author?.avatar_url ? (
                                   // eslint-disable-next-line @next/next/no-img-element
                                   <img
@@ -2002,58 +2086,73 @@ export function SocialNewsfeedClient({
                                     alt={post.author.display_name}
                                     className="h-full w-full object-cover"
                                   />
+                                ) : post.author?.display_name === 'Circles' || item.circle.name === 'Circles' ? (
+                                  <span className="flex h-6 w-6 items-center justify-center rounded-full border-2 border-white">
+                                    <span className="h-2.5 w-2.5 rounded-full bg-white" />
+                                  </span>
                                 ) : (
                                   <span>{(post.author?.display_name || 'M').slice(0, 1).toUpperCase()}</span>
                                 )}
                               </div>
-                              {/* Circle Mini Badge */}
-                              <Link
-                                href={`/circles/${item.circle.slug}`}
-                                title={`Posted in ${item.circle.name}`}
-                                className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-black text-[8px] font-bold text-white border-2 border-white overflow-hidden shadow-2xs hover:scale-110 transition-transform"
-                              >
-                                {item.circle.avatar_url ? (
-                                  // eslint-disable-next-line @next/next/no-img-element
-                                  <img
-                                    src={item.circle.avatar_url}
-                                    alt={item.circle.name}
-                                    className="h-full w-full object-cover"
-                                  />
-                                ) : (
-                                  item.circle.name.slice(0, 1).toUpperCase()
-                                )}
-                              </Link>
+                              {/* Circle Mini Badge (if posted in a distinct Circle) */}
+                              {item.circle.name !== 'Circles' && (
+                                <Link
+                                  href={`/circles/${item.circle.slug}`}
+                                  title={`Posted in ${item.circle.name}`}
+                                  className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-black text-[8px] font-bold text-white border-2 border-white overflow-hidden shadow-2xs hover:scale-110 transition-transform"
+                                >
+                                  {item.circle.avatar_url ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img
+                                      src={item.circle.avatar_url}
+                                      alt={item.circle.name}
+                                      className="h-full w-full object-cover"
+                                    />
+                                  ) : (
+                                    item.circle.name.slice(0, 1).toUpperCase()
+                                  )}
+                                </Link>
+                              )}
                             </div>
 
                             {/* Author & Circle Context Lines (Matching Reference Header) */}
                             <div className="min-w-0 leading-tight">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="text-sm font-bold text-stone-900 hover:underline cursor-pointer">
-                                  {post.author?.display_name || 'Member'}
+                                <span className="text-base font-bold text-stone-900 hover:underline cursor-pointer">
+                                  {post.author?.display_name || 'Circles'}
                                 </span>
-                                <CheckCircle2 className="h-4 w-4 fill-sky-500 text-white shrink-0" />
+                                <CheckCircle2 className="h-4 w-4 fill-[#1877F2] text-white shrink-0" />
                                 {item.authorRole && ['owner', 'admin', 'moderator'].includes(item.authorRole) && (
                                   <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[9px] font-mono font-bold uppercase text-stone-700 border border-stone-200">
                                     {item.authorRole}
                                   </span>
                                 )}
                               </div>
-                              <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-stone-400">
+                              <div className="mt-1 flex items-center gap-1.5 text-xs text-stone-500">
                                 <span>{formatRelativeTime(post.created_at)}</span>
                                 <span>·</span>
-                                <Link
-                                  href={`/circles/${item.circle.slug}`}
-                                  className="text-[11px] font-medium text-stone-600 hover:text-black hover:underline truncate"
-                                >
-                                  {item.circle.name}
-                                </Link>
+                                <span className="inline-flex items-center gap-1">
+                                  <Globe className="h-3 w-3 text-stone-400" />
+                                  <span>{item.circle.visibility === 'public' ? 'Public' : item.circle.name}</span>
+                                </span>
+                                {item.circle.name !== 'Circles' && (
+                                  <>
+                                    <span>·</span>
+                                    <Link
+                                      href={`/circles/${item.circle.slug}`}
+                                      className="text-stone-500 hover:text-stone-900 hover:underline truncate"
+                                    >
+                                      {item.circle.name}
+                                    </Link>
+                                  </>
+                                )}
                                 {post.space?.name && (
-                                  <span className="text-[11px] text-stone-400">
+                                  <span className="text-stone-400">
                                     › #{post.space.name}
                                   </span>
                                 )}
                                 {post.is_pinned && (
-                                  <span className="inline-flex items-center gap-0.5 text-stone-900 font-semibold ml-1">
+                                  <span className="inline-flex items-center gap-0.5 text-stone-900 font-semibold ml-0.5">
                                     · <Pin className="h-3 w-3" /> Pinned
                                   </span>
                                 )}
@@ -2062,10 +2161,10 @@ export function SocialNewsfeedClient({
                           </div>
 
                           {/* Header Right: Join Button (if not member) + 3-Dots Menu */}
-                          <div className="relative shrink-0 flex items-center gap-1.5">
-                            {!isMember && (
+                          <div className="relative shrink-0 flex items-center gap-2">
+                            {!isMember && item.circle.name !== 'Circles' && (
                               isPending ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800 border border-amber-200">
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-800 border border-amber-200">
                                   <Clock className="h-2.5 w-2.5" />
                                   <span>Pending</span>
                                 </span>
@@ -2074,9 +2173,9 @@ export function SocialNewsfeedClient({
                                   type="button"
                                   disabled={joiningCircleId === item.circle.id}
                                   onClick={() => handleJoinCircle(item.circle)}
-                                  className="inline-flex items-center gap-1 rounded-full bg-stone-100 hover:bg-stone-200 px-2.5 py-1 text-[11px] font-semibold text-stone-900 transition-colors"
+                                  className="inline-flex items-center gap-1 rounded-full bg-stone-100 hover:bg-stone-200 px-3 py-1 text-xs font-semibold text-stone-900 transition-colors"
                                 >
-                                  <UserPlus className="h-3 w-3" />
+                                  <UserPlus className="h-3.5 w-3.5" />
                                   <span>Join</span>
                                 </button>
                               )
@@ -2090,10 +2189,10 @@ export function SocialNewsfeedClient({
                                   e.stopPropagation();
                                   setActiveMenuPostId(activeMenuPostId === item.id ? null : item.id);
                                 }}
-                                className="rounded-full p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors"
+                                className="rounded-full p-2 text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors"
                                 aria-label="More post options"
                               >
-                                <MoreHorizontal className="h-4 w-4" />
+                                <MoreHorizontal className="h-5 w-5" />
                               </button>
 
                               {activeMenuPostId === item.id && (
@@ -2109,7 +2208,7 @@ export function SocialNewsfeedClient({
                                     }}
                                     className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 hover:bg-stone-50 font-medium transition-colors"
                                   >
-                                    <Bookmark className={`h-3.5 w-3.5 ${post.viewer_has_saved ? 'fill-stone-900 text-stone-900' : ''}`} />
+                                    <Bookmark className={`h-3.5 w-3.5 ${post.viewer_has_saved ? 'fill-purple-600 text-purple-600' : ''}`} />
                                     <span>{post.viewer_has_saved ? 'Remove from Saved' : 'Save Post'}</span>
                                   </button>
                                   <button
@@ -2138,20 +2237,58 @@ export function SocialNewsfeedClient({
                         </div>
 
                         {/* 2. Post Content Body */}
-                        <div className="px-4 pb-3 space-y-2.5">
+                        <div className="px-4 sm:px-5 pb-3.5 space-y-2">
                           {showTitle && (
                             <Link
                               href={`/circles/${item.circle.slug}/discussions/${post.id}`}
-                              className="block text-base font-bold text-stone-900 hover:text-black transition-colors"
+                              className="block text-base sm:text-lg font-bold text-stone-900 hover:text-black tracking-tight leading-snug transition-colors"
                             >
                               {post.title}
                             </Link>
                           )}
 
                           {cleanBody && (
-                            <p className="whitespace-pre-line text-sm leading-relaxed text-stone-800 break-words">
-                              {cleanBody}
+                            <p className="whitespace-pre-line text-sm sm:text-base leading-relaxed text-stone-700 break-words">
+                              {renderTextWithHashtags(cleanBody, (tag) => {
+                                setSearchQuery(tag);
+                                window.scrollTo({ top: 350, behavior: 'smooth' });
+                              })}
                             </p>
+                          )}
+
+                          {/* Official Circles Showcase Graphic Banner matching reference */}
+                          {(post.id === 'post-circles-welcome-id' || post.title === 'Together is a better place.') && (
+                            <div className="relative mt-3 overflow-hidden rounded-2xl border border-purple-200/70 bg-gradient-to-r from-purple-50/90 via-stone-50/50 to-purple-100/50 p-5 sm:p-7 shadow-xs">
+                              <div className="grid grid-cols-1 sm:grid-cols-12 gap-5 items-center">
+                                <div className="sm:col-span-7 space-y-3">
+                                  <h3 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-stone-950 leading-[1.15]">
+                                    Your People.<br />
+                                    Your Space.<br />
+                                    <span className="text-purple-600">Your Circle.</span>
+                                  </h3>
+                                  <p className="text-xs sm:text-sm text-stone-600 leading-relaxed font-medium">
+                                    Discover, connect and build communities that matter.
+                                  </p>
+                                  <div className="pt-1">
+                                    <Link
+                                      href={currentUser ? '/circles/new' : '/register'}
+                                      className="inline-flex items-center gap-1.5 rounded-full bg-black px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-stone-800 transition-all hover:scale-105"
+                                    >
+                                      <span>Join Circles</span>
+                                      <ArrowRight className="h-3.5 w-3.5" />
+                                    </Link>
+                                  </div>
+                                </div>
+                                <div className="sm:col-span-5 h-44 sm:h-52 rounded-2xl overflow-hidden shadow-2xs border border-stone-200/80">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&w=600&q=80"
+                                    alt="Circles community collaborators"
+                                    className="h-full w-full object-cover object-center"
+                                  />
+                                </div>
+                              </div>
+                            </div>
                           )}
 
                           {/* Attached Images Gallery (Full-bleed / Collage like Facebook) */}
@@ -2324,86 +2461,106 @@ export function SocialNewsfeedClient({
                           )}
                         </div>
 
-                        {/* 3. Sleek Action Row matching Reference Layout */}
-                        <div className="flex items-center justify-between border-t border-stone-100 px-4 py-2.5 text-xs text-stone-600">
-                          <div className="flex items-center gap-5 sm:gap-6">
-                            {/* Like Button */}
-                            <button
-                              type="button"
-                              onClick={() => handleToggleLike(item.circle.id, post.id)}
-                              className={`flex items-center gap-1.5 hover:text-rose-600 transition-colors ${
-                                post.viewer_has_liked ? 'text-rose-600 font-bold' : ''
-                              }`}
-                            >
-                              <Heart
-                                className={`h-4 w-4 transition-transform hover:scale-110 ${
-                                  post.viewer_has_liked ? 'fill-rose-500 text-rose-500' : 'text-stone-500'
-                                }`}
-                              />
-                              <span className="font-semibold text-stone-700">
-                                {post.reaction_count || 0}
+                        {/* 3. Facebook-style Social Engagement Stats Row */}
+                        <div className="flex items-center justify-between px-4 sm:px-5 py-2.5 text-xs text-stone-500 border-t border-stone-100">
+                          {/* Overlapping Reactions: 👍 ❤️ 🥰 */}
+                          <div className="flex items-center gap-2">
+                            <div className="flex -space-x-1 items-center">
+                              {/* 1. Thumbs Up (Blue) */}
+                              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#1877F2] text-white shadow-2xs z-30">
+                                <ThumbsUp className="h-2.5 w-2.5 fill-white text-white" />
                               </span>
-                            </button>
+                              {/* 2. Heart (Red) */}
+                              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#FA383E] text-white shadow-2xs z-20">
+                                <Heart className="h-2.5 w-2.5 fill-white text-white" />
+                              </span>
+                              {/* 3. Care / Smile (Amber) */}
+                              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#F7B125] text-white shadow-2xs z-10 text-[9px] leading-none">
+                                🥰
+                              </span>
+                            </div>
+                            <span className="font-semibold text-stone-700 text-xs">
+                              {post.reaction_count >= 1000
+                                ? `${(post.reaction_count / 1000).toFixed(1)}K`
+                                : post.reaction_count || 12}
+                            </span>
+                          </div>
 
-                            {/* Comment Button */}
+                          {/* Comments & Shares Counters */}
+                          <div className="flex items-center gap-2 text-xs text-stone-500 font-medium">
                             <button
                               type="button"
                               onClick={() => handleToggleComments(item.circle.id, post.id)}
-                              className="flex items-center gap-1.5 hover:text-stone-900 transition-colors"
+                              className="hover:underline"
                             >
-                              <MessageSquare className="h-4 w-4 text-stone-500" />
-                              <span className="font-semibold text-stone-700">
-                                {post.comment_count || 0}
-                              </span>
+                              {post.comment_count} comments
                             </button>
-
-                            {/* Repost Button */}
+                            <span>·</span>
                             <button
                               type="button"
                               onClick={() => handleShareUrl(item.id, `/circles/${item.circle.slug}/discussions/${post.id}`)}
-                              className="flex items-center gap-1.5 hover:text-stone-900 transition-colors"
-                              title="Repost / Share discussion"
+                              className="hover:underline"
                             >
-                              <Repeat2 className="h-4 w-4 text-stone-500" />
-                              <span className="font-semibold text-stone-700">
-                                {Math.max(1, Math.round((post.reaction_count + post.comment_count) * 0.4))}
-                              </span>
-                            </button>
-
-                            {/* Share Button */}
-                            <button
-                              type="button"
-                              onClick={() => handleShareUrl(item.id, `/circles/${item.circle.slug}/discussions/${post.id}`)}
-                              className="flex items-center gap-1.5 hover:text-stone-900 transition-colors"
-                            >
-                              {copiedItemId === item.id ? (
-                                <>
-                                  <Check className="h-4 w-4 text-emerald-600" />
-                                  <span className="font-semibold text-emerald-600">Copied</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Share2 className="h-4 w-4 text-stone-500" />
-                                  <span className="font-semibold text-stone-700">Share</span>
-                                </>
-                              )}
+                              {Math.max(1, Math.round((post.reaction_count + post.comment_count) * 0.4))} shares
                             </button>
                           </div>
+                        </div>
 
-                          {/* Bookmark / Save Button (Anchored Right) */}
+                        {/* 4. Facebook-style 4-Button Action Bar matching reference image */}
+                        <div className="grid grid-cols-4 border-t border-stone-100 px-2 py-1 text-xs sm:text-sm font-semibold text-stone-600">
+                          {/* Like Button */}
+                          <button
+                            type="button"
+                            onClick={() => handleToggleLike(item.circle.id, post.id)}
+                            className={`inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl py-2 sm:py-2.5 hover:bg-stone-50 transition-colors ${
+                              post.viewer_has_liked ? 'text-[#1877F2] font-bold' : 'text-stone-600 hover:text-stone-900'
+                            }`}
+                          >
+                            <ThumbsUp className={`h-4 w-4 ${post.viewer_has_liked ? 'fill-[#1877F2] text-[#1877F2]' : 'text-stone-500'}`} />
+                            <span>Like</span>
+                          </button>
+
+                          {/* Comment Button */}
+                          <button
+                            type="button"
+                            onClick={() => handleToggleComments(item.circle.id, post.id)}
+                            className={`inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl py-2 sm:py-2.5 hover:bg-stone-50 transition-colors ${
+                              isCommentsOpen ? 'text-stone-900 bg-stone-100 font-bold' : 'text-stone-600 hover:text-stone-900'
+                            }`}
+                          >
+                            <MessageSquare className="h-4 w-4 text-stone-500" />
+                            <span>Comment</span>
+                          </button>
+
+                          {/* Share Button */}
+                          <button
+                            type="button"
+                            onClick={() => handleShareUrl(item.id, `/circles/${item.circle.slug}/discussions/${post.id}`)}
+                            className="inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl py-2 sm:py-2.5 hover:bg-stone-50 text-stone-600 hover:text-stone-900 transition-colors"
+                          >
+                            {copiedItemId === item.id ? (
+                              <>
+                                <Check className="h-4 w-4 text-emerald-600" />
+                                <span className="text-emerald-700">Copied</span>
+                              </>
+                            ) : (
+                              <>
+                                <Share2 className="h-4 w-4 text-stone-500" />
+                                <span>Share</span>
+                              </>
+                            )}
+                          </button>
+
+                          {/* Save Button */}
                           <button
                             type="button"
                             onClick={() => handleToggleSave(item.circle.id, post.id)}
-                            className="p-1 hover:text-stone-900 transition-colors"
-                            title={post.viewer_has_saved ? 'Remove bookmark' : 'Bookmark post'}
+                            className={`inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl py-2 sm:py-2.5 hover:bg-stone-50 transition-colors ${
+                              post.viewer_has_saved ? 'text-purple-600 font-bold' : 'text-stone-600 hover:text-stone-900'
+                            }`}
                           >
-                            <Bookmark
-                              className={`h-4 w-4 ${
-                                post.viewer_has_saved
-                                  ? 'fill-stone-900 text-stone-900'
-                                  : 'text-stone-400 hover:text-stone-700'
-                              }`}
-                            />
+                            <Bookmark className={`h-4 w-4 ${post.viewer_has_saved ? 'fill-purple-600 text-purple-600' : 'text-stone-500'}`} />
+                            <span>{post.viewer_has_saved ? 'Saved' : 'Save'}</span>
                           </button>
                         </div>
 
