@@ -19,7 +19,6 @@ import {
   Compass,
   ExternalLink,
   FileText,
-  Flame,
   Heart,
   HeartHandshake,
   Home,
@@ -278,7 +277,7 @@ export function SocialNewsfeedClient({
   composerCircles: initialComposerCircles,
   myCircles: initialMyCircles,
   trendingCircles: initialTrendingCircles,
-  upcomingEvents,
+  upcomingEvents: _upcomingEvents,
   stats: _stats,
 }: SocialNewsfeedClientProps) {
   const router = useRouter();
@@ -292,33 +291,6 @@ export function SocialNewsfeedClient({
   const [contentType, setContentType] = useState<ContentTypeFilter>('all');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
-
-  // Extract real trending hashtags dynamically from active posts or real categories
-  const trendingHashtags = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const item of items) {
-      if (item.itemType === 'post') {
-        const text = `${item.data.title || ''} ${item.data.body || ''}`;
-        const found = text.match(/#[a-zA-Z0-9_]+/g);
-        if (found) {
-          for (const t of found) {
-            const clean = t.toLowerCase();
-            counts.set(t, (counts.get(clean) || 0) + 1);
-          }
-        }
-      }
-    }
-    const realTags = Array.from(counts.entries())
-      .sort((a, b) => b[1] - a[1])
-      .map(([t]) => t);
-
-    if (realTags.length > 0) {
-      return realTags.slice(0, 6);
-    }
-    return CATEGORIES.filter((c) => c.key !== 'all')
-      .map((c) => `#${c.label.replace(/\s+/g, '')}`)
-      .slice(0, 6);
-  }, [items]);
 
   // Hero Welcome Banner & User Menu
   const [showHeroBanner, setShowHeroBanner] = useState(true);
@@ -1342,7 +1314,7 @@ export function SocialNewsfeedClient({
         </header>
 
         {/* Main Dashboard Space */}
-        <main className="flex-1 px-4 sm:px-6 lg:px-8 py-6 space-y-6 max-w-7xl mx-auto w-full">
+        <main className="flex-1 px-3 sm:px-6 lg:px-8 py-5 sm:py-6 space-y-5 sm:space-y-6 max-w-7xl mx-auto w-full pb-24 lg:pb-8">
           {/* A. HERO WELCOME BANNER ("Bring Your People Together.") */}
           {showHeroBanner && (
             <section className="relative overflow-hidden rounded-3xl border border-stone-200/90 bg-gradient-to-r from-stone-50 via-white to-stone-50/80 shadow-xs">
@@ -1357,25 +1329,25 @@ export function SocialNewsfeedClient({
 
               <div className="grid grid-cols-1 lg:grid-cols-12 items-center">
                 {/* Banner Left: Typography & CTAs */}
-                <div className="p-6 sm:p-8 lg:p-10 lg:col-span-7 space-y-4">
-                  <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-stone-950 leading-[1.1]">
+                <div className="p-5 sm:p-8 lg:p-10 lg:col-span-7 space-y-3 sm:space-y-4">
+                  <h1 className="text-2xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-stone-950 leading-[1.15]">
                     Bring Your People <br className="hidden sm:inline" />
                     Together<span className="text-stone-400">.</span>
                   </h1>
                   <p className="text-xs sm:text-sm text-stone-600 max-w-lg leading-relaxed">
                     Discover, join and build communities around the things that matter to you.
                   </p>
-                  <div className="flex flex-wrap items-center gap-3 pt-2">
+                  <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 pt-1 sm:pt-2">
                     <Link
                       href="/explore"
-                      className="inline-flex items-center gap-2 rounded-full bg-black px-5 py-2.5 text-xs sm:text-sm font-bold text-white shadow-xs hover:bg-zinc-800 transition-all"
+                      className="inline-flex items-center gap-2 rounded-full bg-black px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-bold text-white shadow-xs hover:bg-zinc-800 transition-all"
                     >
                       <span>Explore Communities</span>
                       <ArrowRight className="h-4 w-4" />
                     </Link>
                     <Link
                       href={currentUser ? '/circles/new' : '/register'}
-                      className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white px-5 py-2.5 text-xs sm:text-sm font-semibold text-stone-900 shadow-2xs hover:bg-stone-50 hover:border-black transition-all"
+                      className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold text-stone-900 shadow-2xs hover:bg-stone-50 hover:border-black transition-all"
                     >
                       <span>Create Your Circle</span>
                     </Link>
@@ -1383,7 +1355,7 @@ export function SocialNewsfeedClient({
                 </div>
 
                 {/* Banner Right: Community Collaboration Graphic */}
-                <div className="relative lg:col-span-5 h-56 sm:h-72 lg:h-full flex items-center justify-end overflow-hidden pr-0 lg:pr-6">
+                <div className="relative lg:col-span-5 h-48 sm:h-72 lg:h-full hidden md:flex items-center justify-end overflow-hidden pr-0 lg:pr-6">
                   <div className="relative w-full h-full max-h-72 rounded-2xl overflow-hidden shadow-2xs">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
@@ -1399,7 +1371,7 @@ export function SocialNewsfeedClient({
           )}
 
           {/* B. FIVE HORIZONTAL QUICK-JUMP CAPABILITY TILES */}
-          <section className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <section className="flex overflow-x-auto gap-2.5 pb-2 -mx-3 px-3 sm:mx-0 sm:px-0 sm:grid sm:grid-cols-3 lg:grid-cols-5 sm:gap-3 no-scrollbar">
             {CAPABILITY_TILES.map((tile) => {
               const Icon = tile.icon;
               const isFiltered = 'filter' in tile && contentType === tile.filter;
@@ -1409,7 +1381,7 @@ export function SocialNewsfeedClient({
                   <Link
                     key={tile.key}
                     href={tile.href}
-                    className="flex items-center justify-between rounded-2xl border border-stone-200/90 bg-white p-3.5 shadow-2xs hover:border-stone-400 hover:shadow-xs transition-all group"
+                    className="min-w-[155px] sm:min-w-0 shrink-0 sm:shrink flex items-center justify-between rounded-2xl border border-stone-200/90 bg-white p-3 sm:p-3.5 shadow-2xs hover:border-stone-400 hover:shadow-xs transition-all group"
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-stone-100 text-stone-900 border border-stone-200 group-hover:scale-105 transition-transform">
@@ -1438,7 +1410,7 @@ export function SocialNewsfeedClient({
                       setContentType(tile.filter);
                     }
                   }}
-                  className={`flex items-center justify-between rounded-2xl border p-3.5 shadow-2xs text-left transition-all group ${
+                  className={`min-w-[155px] sm:min-w-0 shrink-0 sm:shrink flex items-center justify-between rounded-2xl border p-3 sm:p-3.5 shadow-2xs text-left transition-all group ${
                     isFiltered
                       ? 'border-black bg-stone-900 text-white shadow-xs'
                       : 'border-stone-200/90 bg-white hover:border-stone-400 hover:shadow-xs'
@@ -1481,116 +1453,8 @@ export function SocialNewsfeedClient({
             })}
           </section>
 
-          {/* C. THREE-COLUMN FEED AREA */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* SUB-COLUMN 1: Top Communities & 10X Faster Promo */}
-            <div className="lg:col-span-3 space-y-5 order-2 lg:order-1">
-              {/* Top Communities Card */}
-              <div className="rounded-2xl border border-stone-200/90 bg-white p-4 shadow-xs space-y-3.5">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-xs font-bold text-stone-900">
-                    Top Communities
-                  </h2>
-                  <Link
-                    href="/explore"
-                    className="text-xs font-semibold text-purple-600 hover:underline flex items-center gap-0.5"
-                  >
-                    <span>See all</span>
-                    <ArrowRight className="h-3 w-3" />
-                  </Link>
-                </div>
-
-                <div className="space-y-3">
-                  {trendingCircles.length === 0 ? (
-                    <p className="text-xs text-stone-500 py-3 text-center">No public communities yet.</p>
-                  ) : (
-                    trendingCircles.slice(0, 5).map((circle) => {
-                      const isMember = isViewerActiveMember(circle as unknown as FeedCircleContext);
-                      const isPending = isViewerPendingMember(circle as unknown as FeedCircleContext);
-                      const count = circle.member_count ?? 0;
-
-                      return (
-                        <div key={circle.id} className="flex items-center justify-between gap-2.5">
-                          <Link
-                            href={`/circles/${circle.slug}`}
-                            className="flex items-center gap-2.5 min-w-0 flex-1 group"
-                          >
-                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-stone-100 text-xs font-bold text-stone-900 border border-stone-200 overflow-hidden shadow-2xs">
-                              {circle.avatar_url ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  src={circle.avatar_url}
-                                  alt={circle.name}
-                                  className="h-full w-full object-cover"
-                                />
-                              ) : (
-                                circle.name.slice(0, 1).toUpperCase()
-                              )}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="truncate text-xs font-bold text-stone-900 group-hover:underline leading-tight">
-                                {circle.name}
-                              </p>
-                              <p className="text-[11px] text-stone-400 leading-tight">
-                                {count >= 1000
-                                  ? `${(count / 1000).toFixed(1)}k members`
-                                  : `${count} members`}
-                              </p>
-                            </div>
-                          </Link>
-
-                        {isMember ? (
-                          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-stone-100 text-stone-600 text-xs font-bold">
-                            <Check className="h-3.5 w-3.5" />
-                          </span>
-                        ) : isPending ? (
-                          <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800 border border-amber-200">
-                            Pending
-                          </span>
-                        ) : (
-                          <button
-                            type="button"
-                            disabled={joiningCircleId === circle.id}
-                            onClick={() => handleJoinCircle(circle)}
-                            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-stone-200 bg-white text-stone-700 hover:bg-stone-900 hover:text-white hover:border-black transition-colors shadow-2xs text-xs font-bold"
-                            title={`Join ${circle.name}`}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-              </div>
-
-              {/* 10X Faster Promo Card (Matching Reference Layout) */}
-              <div className="relative overflow-hidden rounded-2xl border border-zinc-900 bg-gradient-to-br from-zinc-950 via-zinc-900 to-black p-5 text-white shadow-xs">
-                <div className="absolute right-0 top-0 -mr-6 -mt-6 h-24 w-24 rounded-full bg-purple-600/20 blur-xl pointer-events-none" />
-                <div className="relative space-y-1">
-                  <h3 className="text-base font-extrabold tracking-tight text-white leading-snug">
-                    10X Faster <br />
-                    with Circles
-                  </h3>
-                  <p className="text-xs text-zinc-400">
-                    Connect. Collaborate. Grow.
-                  </p>
-                </div>
-                <div className="mt-4 flex items-center justify-end">
-                  <Link
-                    href={currentUser ? '/circles/new' : '/register'}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-purple-600 hover:bg-purple-500 text-white shadow-md transition-all hover:scale-105"
-                    title="Create a Circle"
-                  >
-                    <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </div>
-              </div>
-            </div>
-
-            {/* SUB-COLUMN 2: Center Feed Stream + Quick Composer */}
-            <div className="lg:col-span-6 space-y-4 order-1 lg:order-2">
+          {/* C. FOCUSED SOCIAL NEWSFEED STREAM */}
+          <div className="max-w-2xl mx-auto w-full space-y-4 sm:space-y-5">
               {/* Quick-Post Composer ("What's on your mind?") */}
               {currentUser && composerCircles.length > 0 && (
                 <div className="rounded-2xl border border-stone-200/90 bg-white p-4 shadow-xs">
@@ -1618,19 +1482,19 @@ export function SocialNewsfeedClient({
                         </button>
                       </div>
 
-                      <div className="flex items-center justify-between border-t border-stone-100 pt-3">
-                        <div className="flex items-center gap-1 sm:gap-2">
+                      <div className="flex items-center justify-between border-t border-stone-100 pt-3 gap-2">
+                        <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar">
                           <button
                             type="button"
                             onClick={() => setComposerExpanded(true)}
-                            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-stone-600 hover:bg-stone-100 hover:text-stone-900 transition-colors"
+                            className="inline-flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-2.5 py-1.5 text-[11px] sm:text-xs font-semibold text-stone-600 hover:bg-stone-100 hover:text-stone-900 transition-colors shrink-0"
                           >
                             <ImageIcon className="h-4 w-4 text-emerald-500" />
                             <span>Photo</span>
                           </button>
                           <Link
                             href="/explore?tab=events"
-                            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-stone-600 hover:bg-stone-100 hover:text-stone-900 transition-colors"
+                            className="inline-flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-2.5 py-1.5 text-[11px] sm:text-xs font-semibold text-stone-600 hover:bg-stone-100 hover:text-stone-900 transition-colors shrink-0"
                           >
                             <Calendar className="h-4 w-4 text-rose-500" />
                             <span>Event</span>
@@ -1638,7 +1502,7 @@ export function SocialNewsfeedClient({
                           <button
                             type="button"
                             onClick={() => setComposerExpanded(true)}
-                            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-stone-600 hover:bg-stone-100 hover:text-stone-900 transition-colors"
+                            className="inline-flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-2.5 py-1.5 text-[11px] sm:text-xs font-semibold text-stone-600 hover:bg-stone-100 hover:text-stone-900 transition-colors shrink-0"
                           >
                             <Video className="h-4 w-4 text-sky-500" />
                             <span>Video</span>
@@ -1649,7 +1513,7 @@ export function SocialNewsfeedClient({
                               setComposerMode('resource');
                               setComposerExpanded(true);
                             }}
-                            className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-stone-600 hover:bg-stone-100 hover:text-stone-900 transition-colors"
+                            className="inline-flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-2.5 py-1.5 text-[11px] sm:text-xs font-semibold text-stone-600 hover:bg-stone-100 hover:text-stone-900 transition-colors shrink-0"
                           >
                             <FileText className="h-4 w-4 text-amber-500" />
                             <span>Document</span>
@@ -1659,7 +1523,7 @@ export function SocialNewsfeedClient({
                         <button
                           type="button"
                           onClick={() => setComposerExpanded(true)}
-                          className="rounded-full bg-purple-600 hover:bg-purple-700 px-5 py-1.5 text-xs font-bold text-white shadow-2xs transition-colors"
+                          className="rounded-full bg-purple-600 hover:bg-purple-700 px-4 sm:px-5 py-1.5 text-xs font-bold text-white shadow-2xs transition-colors shrink-0"
                         >
                           Post
                         </button>
@@ -2423,16 +2287,16 @@ export function SocialNewsfeedClient({
                         )}
 
                         {/* 4. Facebook-style 4-Button Action Bar matching reference image */}
-                        <div className="grid grid-cols-4 border-t border-stone-100 px-2 py-1 text-xs sm:text-sm font-semibold text-stone-600">
+                        <div className="grid grid-cols-4 border-t border-stone-100 px-1 sm:px-2 py-1 text-[11px] sm:text-xs md:text-sm font-semibold text-stone-600">
                           {/* Like Button */}
                           <button
                             type="button"
                             onClick={() => handleToggleLike(item.circle.id, post.id)}
-                            className={`inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl py-2 sm:py-2.5 hover:bg-stone-50 transition-colors ${
+                            className={`inline-flex items-center justify-center gap-1 sm:gap-1.5 rounded-xl py-2 sm:py-2.5 hover:bg-stone-50 transition-colors ${
                               post.viewer_has_liked ? 'text-[#1877F2] font-bold' : 'text-stone-600 hover:text-stone-900'
                             }`}
                           >
-                            <ThumbsUp className={`h-4 w-4 ${post.viewer_has_liked ? 'fill-[#1877F2] text-[#1877F2]' : 'text-stone-500'}`} />
+                            <ThumbsUp className={`h-4 w-4 shrink-0 ${post.viewer_has_liked ? 'fill-[#1877F2] text-[#1877F2]' : 'text-stone-500'}`} />
                             <span>Like</span>
                           </button>
 
@@ -2440,11 +2304,11 @@ export function SocialNewsfeedClient({
                           <button
                             type="button"
                             onClick={() => handleToggleComments(item.circle.id, post.id)}
-                            className={`inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl py-2 sm:py-2.5 hover:bg-stone-50 transition-colors ${
+                            className={`inline-flex items-center justify-center gap-1 sm:gap-1.5 rounded-xl py-2 sm:py-2.5 hover:bg-stone-50 transition-colors ${
                               isCommentsOpen ? 'text-stone-900 bg-stone-100 font-bold' : 'text-stone-600 hover:text-stone-900'
                             }`}
                           >
-                            <MessageSquare className="h-4 w-4 text-stone-500" />
+                            <MessageSquare className="h-4 w-4 shrink-0 text-stone-500" />
                             <span>Comment</span>
                           </button>
 
@@ -2452,16 +2316,16 @@ export function SocialNewsfeedClient({
                           <button
                             type="button"
                             onClick={() => handleShareUrl(item.id, `/circles/${item.circle.slug}/discussions/${post.id}`)}
-                            className="inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl py-2 sm:py-2.5 hover:bg-stone-50 text-stone-600 hover:text-stone-900 transition-colors"
+                            className="inline-flex items-center justify-center gap-1 sm:gap-1.5 rounded-xl py-2 sm:py-2.5 hover:bg-stone-50 text-stone-600 hover:text-stone-900 transition-colors"
                           >
                             {copiedItemId === item.id ? (
                               <>
-                                <Check className="h-4 w-4 text-emerald-600" />
+                                <Check className="h-4 w-4 shrink-0 text-emerald-600" />
                                 <span className="text-emerald-700">Copied</span>
                               </>
                             ) : (
                               <>
-                                <Share2 className="h-4 w-4 text-stone-500" />
+                                <Share2 className="h-4 w-4 shrink-0 text-stone-500" />
                                 <span>Share</span>
                               </>
                             )}
@@ -2471,11 +2335,11 @@ export function SocialNewsfeedClient({
                           <button
                             type="button"
                             onClick={() => handleToggleSave(item.circle.id, post.id)}
-                            className={`inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-xl py-2 sm:py-2.5 hover:bg-stone-50 transition-colors ${
+                            className={`inline-flex items-center justify-center gap-1 sm:gap-1.5 rounded-xl py-2 sm:py-2.5 hover:bg-stone-50 transition-colors ${
                               post.viewer_has_saved ? 'text-purple-600 font-bold' : 'text-stone-600 hover:text-stone-900'
                             }`}
                           >
-                            <Bookmark className={`h-4 w-4 ${post.viewer_has_saved ? 'fill-purple-600 text-purple-600' : 'text-stone-500'}`} />
+                            <Bookmark className={`h-4 w-4 shrink-0 ${post.viewer_has_saved ? 'fill-purple-600 text-purple-600' : 'text-stone-500'}`} />
                             <span>{post.viewer_has_saved ? 'Saved' : 'Save'}</span>
                           </button>
                         </div>
@@ -3454,140 +3318,77 @@ export function SocialNewsfeedClient({
               </div>
             )}
           </div>
-
-          {/* ----------------------------------------------------------------- */}
-          {/* SUB-COLUMN 3: Trending Topics & Upcoming Events (Matching Layout) */}
-          {/* ----------------------------------------------------------------- */}
-          <aside className="space-y-5 lg:col-span-3 order-3">
-            {/* 1. Trending Topics Card */}
-            <div className="rounded-2xl border border-stone-200/90 bg-white p-4 shadow-xs space-y-3.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <Flame className="h-4 w-4 text-amber-500 fill-amber-500" />
-                  <h2 className="text-xs font-bold text-stone-900">
-                    Trending Topics
-                  </h2>
-                </div>
-                <Link
-                  href="/explore"
-                  className="text-xs font-semibold text-purple-600 hover:underline flex items-center gap-0.5"
-                >
-                  <span>See all</span>
-                  <ArrowRight className="h-3 w-3" />
-                </Link>
-              </div>
-
-              {/* Hashtag Cloud */}
-              <div className="flex flex-wrap gap-2 pt-0.5">
-                {trendingHashtags.map((tag) => (
-                  <button
-                    key={tag}
-                    type="button"
-                    onClick={() => {
-                      setSearchQuery(tag.replace('#', ''));
-                      window.scrollTo({ top: 350, behavior: 'smooth' });
-                    }}
-                    className="rounded-xl bg-[#FAF9F6] border border-stone-200/90 px-3 py-1.5 text-xs font-bold text-stone-800 hover:border-black hover:bg-white hover:text-black transition-all shadow-2xs"
-                  >
-                    {tag}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* 2. Upcoming Events Card */}
-            <div className="rounded-2xl border border-stone-200/90 bg-white p-4 shadow-xs space-y-3.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <Calendar className="h-4 w-4 text-stone-900" />
-                  <h2 className="text-xs font-bold text-stone-900">
-                    Upcoming Events
-                  </h2>
-                </div>
-                <Link
-                  href="/explore?tab=events"
-                  className="text-xs font-semibold text-purple-600 hover:underline flex items-center gap-0.5"
-                >
-                  <span>See all</span>
-                  <ArrowRight className="h-3 w-3" />
-                </Link>
-              </div>
-
-              <div className="space-y-3 pt-1">
-                {upcomingEvents.length > 0 ? (
-                  upcomingEvents.slice(0, 3).map((ev) => {
-                    const d = new Date(ev.starts_at);
-                    const dayOfWeek = d.toLocaleDateString([], { weekday: 'short' }).toUpperCase();
-                    const dayNum = String(d.getDate()).padStart(2, '0');
-                    const month = d.toLocaleDateString([], { month: 'short' }).toUpperCase();
-                    const time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-
-                    return (
-                      <Link
-                        key={ev.id}
-                        href={`/circles/${ev.circle.slug}/events`}
-                        className="group flex items-center justify-between gap-3 rounded-xl p-1.5 hover:bg-stone-50 transition-colors"
-                      >
-                        {/* Date Badge */}
-                        <div className="flex flex-col items-center justify-center rounded-xl bg-stone-100 border border-stone-200/90 py-1.5 px-2 min-w-[46px] shrink-0 text-center leading-tight">
-                          <span className="text-[9px] font-mono font-bold uppercase text-stone-500">
-                            {dayOfWeek}
-                          </span>
-                          <span className="text-base font-extrabold text-stone-900">
-                            {dayNum}
-                          </span>
-                          <span className="text-[9px] font-mono font-bold uppercase text-stone-600">
-                            {month}
-                          </span>
-                        </div>
-
-                        {/* Event Details */}
-                        <div className="min-w-0 flex-1 space-y-0.5">
-                          <p className="truncate text-xs font-bold text-stone-900 group-hover:underline">
-                            {ev.title}
-                          </p>
-                          <p className="text-[11px] text-stone-400">
-                            {time}
-                          </p>
-                          <div className="flex items-center gap-1.5 pt-0.5">
-                            <span className="text-[10px] font-semibold text-stone-500">
-                              {ev.going_count || 0} attending
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Thumbnail */}
-                        {ev.cover_image_url ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            src={ev.cover_image_url}
-                            alt={ev.title}
-                            className="h-12 w-12 shrink-0 rounded-xl object-cover border border-stone-200"
-                          />
-                        ) : (
-                          <div className="h-12 w-12 shrink-0 rounded-xl bg-stone-100 border border-stone-200 flex items-center justify-center text-stone-400">
-                            <Calendar className="h-5 w-5" />
-                          </div>
-                        )}
-                      </Link>
-                    );
-                  })
-                ) : (
-                  <div className="py-4 text-center">
-                    <p className="text-xs text-stone-500">No upcoming events scheduled yet.</p>
-                    <Link
-                      href="/explore?tab=events"
-                      className="mt-1.5 inline-block text-xs font-semibold text-purple-600 hover:underline"
-                    >
-                      Explore events →
-                    </Link>
-                  </div>
-                )}
-              </div>
-            </div>
-          </aside>
-        </div>
         </main>
+
+        {/* Mobile Fixed Bottom Navigation Bar */}
+        <nav
+          aria-label="Mobile Navigation"
+          className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-stone-200/90 py-1.5 px-4 flex items-center justify-around shadow-lg"
+        >
+          <button
+            type="button"
+            onClick={() => {
+              setScope('public');
+              setContentType('all');
+              setSelectedCategory('all');
+              setSearchQuery('');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className="flex flex-col items-center gap-0.5 text-stone-900"
+          >
+            <Home className="h-5 w-5" />
+            <span className="text-[10px] font-bold">Home</span>
+          </button>
+
+          <Link
+            href="/explore"
+            className="flex flex-col items-center gap-0.5 text-stone-500 hover:text-stone-900"
+          >
+            <Compass className="h-5 w-5" />
+            <span className="text-[10px] font-semibold">Explore</span>
+          </Link>
+
+          <Link
+            href={currentUser ? '/circles/new' : '/register'}
+            className="flex flex-col items-center justify-center -mt-5 h-11 w-11 rounded-full bg-black text-white shadow-md hover:bg-zinc-800 transition-transform active:scale-95"
+            title="Create Circle"
+          >
+            <Plus className="h-5 w-5" />
+          </Link>
+
+          {currentUser ? (
+            <Link
+              href="/notifications"
+              className="relative flex flex-col items-center gap-0.5 text-stone-500 hover:text-stone-900"
+            >
+              <Bell className="h-5 w-5" />
+              {unreadNotificationsCount > 0 && (
+                <span className="absolute -top-1 right-1 flex h-3.5 min-w-[14px] items-center justify-center rounded-full bg-rose-500 px-0.5 text-[8px] font-bold text-white">
+                  {unreadNotificationsCount}
+                </span>
+              )}
+              <span className="text-[10px] font-semibold">Alerts</span>
+            </Link>
+          ) : (
+            <Link
+              href="/login"
+              className="flex flex-col items-center gap-0.5 text-stone-500 hover:text-stone-900"
+            >
+              <User className="h-5 w-5" />
+              <span className="text-[10px] font-semibold">Sign In</span>
+            </Link>
+          )}
+
+          {currentUser && (
+            <Link
+              href="/settings"
+              className="flex flex-col items-center gap-0.5 text-stone-500 hover:text-stone-900"
+            >
+              <Settings className="h-5 w-5" />
+              <span className="text-[10px] font-semibold">Settings</span>
+            </Link>
+          )}
+        </nav>
       </div>
     </div>
   );
