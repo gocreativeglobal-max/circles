@@ -28,6 +28,7 @@ import {
   MessageSquare,
   MoreHorizontal,
   PanelLeft,
+  PanelLeftClose,
   Pin,
   Play,
   Plus,
@@ -38,6 +39,7 @@ import {
   ShoppingBag,
   Sparkles,
   Sun,
+  Moon,
   Tag,
   ThumbsUp,
   User,
@@ -328,6 +330,44 @@ export function SocialNewsfeedClient({
   // Collapsible Sidemenu state (Desktop & Mobile)
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+
+  // Theme state (Light / Dark)
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+
+  useEffect(() => {
+    try {
+      const isDark =
+        document.documentElement.classList.contains('dark') ||
+        localStorage.getItem('circles_theme') === 'dark' ||
+        (!localStorage.getItem('circles_theme') && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      if (isDark) {
+        setTheme('dark');
+        document.documentElement.classList.add('dark');
+      } else {
+        setTheme('light');
+        document.documentElement.classList.remove('dark');
+      }
+    } catch {
+      // Ignore
+    }
+  }, []);
+
+  function toggleTheme() {
+    setTheme((prev) => {
+      const next = prev === 'dark' ? 'light' : 'dark';
+      try {
+        localStorage.setItem('circles_theme', next);
+        if (next === 'dark') {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      } catch {
+        // Ignore
+      }
+      return next;
+    });
+  }
 
   useEffect(() => {
     try {
@@ -900,7 +940,7 @@ export function SocialNewsfeedClient({
   }
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-stone-900 flex">
+    <div className="min-h-screen bg-[#F8F9FA] dark:bg-[#0B0C0E] text-stone-900 dark:text-stone-100 flex transition-colors duration-200">
       {/* ------------------------------------------------------------- */}
       {/* MOBILE DRAWER BACKDROP                                        */}
       {/* ------------------------------------------------------------- */}
@@ -915,35 +955,60 @@ export function SocialNewsfeedClient({
       {/* 1. DOCKED LEFT SIDEBAR NAVIGATION (Fixed/Sticky on Desktop)   */}
       {/* ------------------------------------------------------------- */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex flex-col justify-between border-r border-stone-200/90 bg-white transition-transform duration-200 ease-in-out lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 w-64 shrink-0 shadow-sm lg:shadow-none ${
+        className={`fixed inset-y-0 left-0 z-50 flex flex-col justify-between border-r border-stone-200/90 dark:border-zinc-800 bg-white dark:bg-[#121316] transition-all duration-300 ease-in-out lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${
+          isDesktopSidebarCollapsed ? 'lg:w-[72px]' : 'lg:w-64'
+        } w-64 shrink-0 shadow-sm lg:shadow-none ${
           isMobileSidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         {/* Brand Header */}
-        <div className="p-5 pb-3">
+        <div className={`p-4 pb-3 transition-all ${isDesktopSidebarCollapsed ? 'lg:px-2.5' : 'lg:p-5 lg:pb-3'}`}>
           <div className="flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-black text-white shadow-2xs group-hover:scale-105 transition-transform">
+            <Link
+              href="/"
+              className={`flex items-center gap-2.5 group ${isDesktopSidebarCollapsed ? 'lg:justify-center lg:w-full' : ''}`}
+              title="Circles Home"
+            >
+              <div className="flex h-9 w-9 items-center justify-center rounded-full bg-black text-white shadow-2xs group-hover:scale-105 transition-transform shrink-0">
                 <span className="flex h-5 w-5 items-center justify-center rounded-full border-2 border-white">
                   <span className="h-2 w-2 rounded-full bg-white" />
                 </span>
               </div>
-              <span className="text-xl font-extrabold tracking-tight text-stone-900">
+              <span className={`text-xl font-extrabold tracking-tight text-stone-900 dark:text-white transition-opacity ${
+                isDesktopSidebarCollapsed ? 'lg:hidden' : 'inline'
+              }`}>
                 Circles
               </span>
             </Link>
+
+            {/* Mobile close button */}
             <button
               type="button"
               onClick={() => setIsMobileSidebarOpen(false)}
-              className="lg:hidden rounded-lg p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+              className="lg:hidden rounded-lg p-1 text-stone-400 dark:text-zinc-400 hover:bg-stone-100 dark:hover:bg-zinc-800 hover:text-stone-700 dark:hover:text-zinc-200"
             >
               <X className="h-5 w-5" />
             </button>
+
+            {/* Desktop collapse button (when expanded) */}
+            {!isDesktopSidebarCollapsed && (
+              <button
+                type="button"
+                onClick={toggleDesktopSidebar}
+                className="hidden lg:flex rounded-lg p-1.5 text-stone-400 dark:text-zinc-400 hover:bg-stone-100 dark:hover:bg-zinc-800 hover:text-stone-700 dark:hover:text-zinc-200 transition-colors"
+                title="Collapse sidebar"
+                aria-label="Collapse sidebar"
+              >
+                <PanelLeftClose className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
 
         {/* Sidebar Nav Items */}
-        <div className="flex-1 overflow-y-auto px-3.5 py-2 space-y-6 no-scrollbar">
+        <div className={`flex-1 overflow-y-auto py-2 space-y-6 no-scrollbar ${
+          isDesktopSidebarCollapsed ? 'px-2' : 'px-3.5'
+        }`}>
           {/* Main Navigation List */}
           <nav className="space-y-1">
             <button
@@ -955,25 +1020,31 @@ export function SocialNewsfeedClient({
                 setSearchQuery('');
                 setIsMobileSidebarOpen(false);
               }}
-              className={`flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-bold transition-all ${
+              title="Home"
+              className={`flex w-full items-center rounded-xl py-2.5 text-xs font-bold transition-all ${
+                isDesktopSidebarCollapsed ? 'lg:justify-center px-2.5' : 'justify-between px-3.5'
+              } ${
                 scope === 'public' && contentType === 'all' && selectedCategory === 'all' && !searchQuery
-                  ? 'bg-black text-white shadow-xs'
-                  : 'text-stone-700 hover:bg-stone-100'
+                  ? 'bg-black text-white dark:bg-white dark:text-black shadow-xs'
+                  : 'text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-zinc-800/80'
               }`}
             >
               <div className="flex items-center gap-3">
-                <Home className="h-4 w-4" />
-                <span>Home</span>
+                <Home className="h-4 w-4 shrink-0" />
+                <span className={isDesktopSidebarCollapsed ? 'lg:hidden' : 'inline'}>Home</span>
               </div>
             </button>
 
             <Link
               href="/explore"
-              className="flex items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-700 hover:bg-stone-100 transition-colors"
+              title="Explore"
+              className={`flex items-center rounded-xl py-2.5 text-xs font-semibold text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-zinc-800/80 transition-colors ${
+                isDesktopSidebarCollapsed ? 'lg:justify-center px-2.5' : 'justify-between px-3.5'
+              }`}
             >
               <div className="flex items-center gap-3">
-                <Compass className="h-4 w-4 text-stone-500" />
-                <span>Explore</span>
+                <Compass className="h-4 w-4 text-stone-500 dark:text-zinc-400 shrink-0" />
+                <span className={isDesktopSidebarCollapsed ? 'lg:hidden' : 'inline'}>Explore</span>
               </div>
             </Link>
 
@@ -984,25 +1055,32 @@ export function SocialNewsfeedClient({
                 setContentType('all');
                 setIsMobileSidebarOpen(false);
               }}
-              className={`flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold transition-colors ${
+              title="Communities"
+              className={`flex w-full items-center rounded-xl py-2.5 text-xs font-semibold transition-colors relative ${
+                isDesktopSidebarCollapsed ? 'lg:justify-center px-2.5' : 'justify-between px-3.5'
+              } ${
                 scope === 'my_circles'
-                  ? 'bg-black text-white shadow-xs font-bold'
-                  : 'text-stone-700 hover:bg-stone-100'
+                  ? 'bg-black text-white dark:bg-white dark:text-black shadow-xs font-bold'
+                  : 'text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-zinc-800/80'
               }`}
             >
               <div className="flex items-center gap-3">
-                <Users className="h-4 w-4 text-stone-500" />
-                <span>Communities</span>
+                <Users className="h-4 w-4 text-stone-500 dark:text-zinc-400 shrink-0" />
+                <span className={isDesktopSidebarCollapsed ? 'lg:hidden' : 'inline'}>Communities</span>
               </div>
               {myCircles.length > 0 && (
                 <span
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-mono font-bold ${
+                  className={`${
+                    isDesktopSidebarCollapsed
+                      ? 'lg:absolute lg:top-1.5 lg:right-2 lg:h-2 lg:w-2 lg:p-0 rounded-full bg-stone-900 dark:bg-white'
+                      : 'rounded-full px-2 py-0.5 text-[10px] font-mono font-bold'
+                  } ${
                     scope === 'my_circles'
-                      ? 'bg-white/20 text-white'
-                      : 'bg-stone-100 text-stone-600'
+                      ? 'bg-white/20 text-white dark:bg-black/20 dark:text-black'
+                      : 'bg-stone-100 dark:bg-zinc-800 text-stone-600 dark:text-zinc-300'
                   }`}
                 >
-                  {myCircles.length}
+                  <span className={isDesktopSidebarCollapsed ? 'lg:hidden' : 'inline'}>{myCircles.length}</span>
                 </span>
               )}
             </button>
@@ -1013,15 +1091,18 @@ export function SocialNewsfeedClient({
                 setContentType(contentType === 'events' ? 'all' : 'events');
                 setIsMobileSidebarOpen(false);
               }}
-              className={`flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold transition-colors ${
+              title="Events"
+              className={`flex w-full items-center rounded-xl py-2.5 text-xs font-semibold transition-colors ${
+                isDesktopSidebarCollapsed ? 'lg:justify-center px-2.5' : 'justify-between px-3.5'
+              } ${
                 contentType === 'events'
-                  ? 'bg-stone-100 text-stone-900 font-bold'
-                  : 'text-stone-700 hover:bg-stone-100'
+                  ? 'bg-stone-100 dark:bg-zinc-800 text-stone-900 dark:text-zinc-100 font-bold'
+                  : 'text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-zinc-800/80'
               }`}
             >
               <div className="flex items-center gap-3">
-                <Calendar className="h-4 w-4 text-stone-500" />
-                <span>Events</span>
+                <Calendar className="h-4 w-4 text-stone-500 dark:text-zinc-400 shrink-0" />
+                <span className={isDesktopSidebarCollapsed ? 'lg:hidden' : 'inline'}>Events</span>
               </div>
             </button>
 
@@ -1031,15 +1112,18 @@ export function SocialNewsfeedClient({
                 setContentType(contentType === 'marketplace' ? 'all' : 'marketplace');
                 setIsMobileSidebarOpen(false);
               }}
-              className={`flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold transition-colors ${
+              title="Marketplace"
+              className={`flex w-full items-center rounded-xl py-2.5 text-xs font-semibold transition-colors ${
+                isDesktopSidebarCollapsed ? 'lg:justify-center px-2.5' : 'justify-between px-3.5'
+              } ${
                 contentType === 'marketplace'
-                  ? 'bg-stone-100 text-stone-900 font-bold'
-                  : 'text-stone-700 hover:bg-stone-100'
+                  ? 'bg-stone-100 dark:bg-zinc-800 text-stone-900 dark:text-zinc-100 font-bold'
+                  : 'text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-zinc-800/80'
               }`}
             >
               <div className="flex items-center gap-3">
-                <ShoppingBag className="h-4 w-4 text-stone-500" />
-                <span>Marketplace</span>
+                <ShoppingBag className="h-4 w-4 text-stone-500 dark:text-zinc-400 shrink-0" />
+                <span className={isDesktopSidebarCollapsed ? 'lg:hidden' : 'inline'}>Marketplace</span>
               </div>
             </button>
 
@@ -1049,40 +1133,53 @@ export function SocialNewsfeedClient({
                 setContentType(contentType === 'courses' ? 'all' : 'courses');
                 setIsMobileSidebarOpen(false);
               }}
-              className={`flex w-full items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold transition-colors ${
+              title="Learning"
+              className={`flex w-full items-center rounded-xl py-2.5 text-xs font-semibold transition-colors ${
+                isDesktopSidebarCollapsed ? 'lg:justify-center px-2.5' : 'justify-between px-3.5'
+              } ${
                 contentType === 'courses'
-                  ? 'bg-stone-100 text-stone-900 font-bold'
-                  : 'text-stone-700 hover:bg-stone-100'
+                  ? 'bg-stone-100 dark:bg-zinc-800 text-stone-900 dark:text-zinc-100 font-bold'
+                  : 'text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-zinc-800/80'
               }`}
             >
               <div className="flex items-center gap-3">
-                <BookOpen className="h-4 w-4 text-stone-500" />
-                <span>Learning</span>
+                <BookOpen className="h-4 w-4 text-stone-500 dark:text-zinc-400 shrink-0" />
+                <span className={isDesktopSidebarCollapsed ? 'lg:hidden' : 'inline'}>Learning</span>
               </div>
             </button>
 
             <Link
               href="/explore?category=professional"
-              className="flex items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-700 hover:bg-stone-100 transition-colors"
+              title="Jobs"
+              className={`flex items-center rounded-xl py-2.5 text-xs font-semibold text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-zinc-800/80 transition-colors ${
+                isDesktopSidebarCollapsed ? 'lg:justify-center px-2.5' : 'justify-between px-3.5'
+              }`}
             >
               <div className="flex items-center gap-3">
-                <Briefcase className="h-4 w-4 text-stone-500" />
-                <span>Jobs</span>
+                <Briefcase className="h-4 w-4 text-stone-500 dark:text-zinc-400 shrink-0" />
+                <span className={isDesktopSidebarCollapsed ? 'lg:hidden' : 'inline'}>Jobs</span>
               </div>
             </Link>
 
             {currentUser && (
               <Link
                 href="/notifications"
-                className="flex items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-700 hover:bg-stone-100 transition-colors"
+                title="Notifications"
+                className={`flex items-center rounded-xl py-2.5 text-xs font-semibold text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-zinc-800/80 transition-colors relative ${
+                  isDesktopSidebarCollapsed ? 'lg:justify-center px-2.5' : 'justify-between px-3.5'
+                }`}
               >
                 <div className="flex items-center gap-3">
-                  <Bell className="h-4 w-4 text-stone-500" />
-                  <span>Notifications</span>
+                  <Bell className="h-4 w-4 text-stone-500 dark:text-zinc-400 shrink-0" />
+                  <span className={isDesktopSidebarCollapsed ? 'lg:hidden' : 'inline'}>Notifications</span>
                 </div>
                 {unreadNotificationsCount > 0 && (
-                  <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white shadow-2xs">
-                    {unreadNotificationsCount}
+                  <span className={`${
+                    isDesktopSidebarCollapsed
+                      ? 'lg:absolute lg:top-1.5 lg:right-2 lg:h-2 lg:w-2 lg:p-0 rounded-full bg-rose-500'
+                      : 'flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white shadow-2xs'
+                  }`}>
+                    <span className={isDesktopSidebarCollapsed ? 'lg:hidden' : 'inline'}>{unreadNotificationsCount}</span>
                   </span>
                 )}
               </Link>
@@ -1091,15 +1188,22 @@ export function SocialNewsfeedClient({
             {currentUser && (
               <Link
                 href="/circles"
-                className="flex items-center justify-between rounded-xl px-3.5 py-2.5 text-xs font-semibold text-stone-700 hover:bg-stone-100 transition-colors"
+                title="Messages"
+                className={`flex items-center rounded-xl py-2.5 text-xs font-semibold text-stone-700 dark:text-stone-300 hover:bg-stone-100 dark:hover:bg-zinc-800/80 transition-colors relative ${
+                  isDesktopSidebarCollapsed ? 'lg:justify-center px-2.5' : 'justify-between px-3.5'
+                }`}
               >
                 <div className="flex items-center gap-3">
-                  <MessageSquare className="h-4 w-4 text-stone-500" />
-                  <span>Messages</span>
+                  <MessageSquare className="h-4 w-4 text-stone-500 dark:text-zinc-400 shrink-0" />
+                  <span className={isDesktopSidebarCollapsed ? 'lg:hidden' : 'inline'}>Messages</span>
                 </div>
                 {unreadMessagesCount > 0 && (
-                  <span className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white shadow-2xs">
-                    {unreadMessagesCount}
+                  <span className={`${
+                    isDesktopSidebarCollapsed
+                      ? 'lg:absolute lg:top-1.5 lg:right-2 lg:h-2 lg:w-2 lg:p-0 rounded-full bg-rose-500'
+                      : 'flex h-5 min-w-[20px] items-center justify-center rounded-full bg-rose-500 px-1.5 text-[10px] font-bold text-white shadow-2xs'
+                  }`}>
+                    <span className={isDesktopSidebarCollapsed ? 'lg:hidden' : 'inline'}>{unreadMessagesCount}</span>
                   </span>
                 )}
               </Link>
@@ -1110,27 +1214,32 @@ export function SocialNewsfeedClient({
           <div className="pt-1">
             <Link
               href={currentUser ? '/circles/new' : '/register'}
-              className="flex items-center justify-center gap-2 rounded-xl border border-stone-200 bg-white hover:bg-stone-50 py-2.5 text-xs font-bold text-stone-900 shadow-2xs transition-all hover:border-black"
+              title="Create a Circle"
+              className={`flex items-center justify-center gap-2 rounded-xl border border-stone-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 hover:bg-stone-50 dark:hover:bg-zinc-700 py-2.5 text-xs font-bold text-stone-900 dark:text-white shadow-2xs transition-all hover:border-black dark:hover:border-zinc-500 ${
+                isDesktopSidebarCollapsed ? 'lg:w-10 lg:h-10 lg:p-0 lg:mx-auto' : 'w-full'
+              }`}
             >
-              <Plus className="h-4 w-4" />
-              <span>Create a Circle</span>
+              <Plus className="h-4 w-4 shrink-0" />
+              <span className={isDesktopSidebarCollapsed ? 'lg:hidden' : 'inline'}>Create a Circle</span>
             </Link>
           </div>
 
-          {/* Sidebar Promo Box (Matching Reference Layout) */}
-          <div className="rounded-2xl border border-stone-200/90 bg-[#F4F3EE] p-4 text-stone-900 space-y-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-stone-900 text-white">
+          {/* Sidebar Promo Box (Hidden when collapsed) */}
+          <div className={`rounded-2xl border border-stone-200/90 dark:border-zinc-800 bg-[#F4F3EE] dark:bg-zinc-900/90 p-4 text-stone-900 dark:text-stone-100 space-y-2 ${
+            isDesktopSidebarCollapsed ? 'lg:hidden' : 'block'
+          }`}>
+            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-stone-900 dark:bg-zinc-800 text-white dark:text-zinc-200">
               <Sparkles className="h-4 w-4" />
             </div>
             <h4 className="text-xs font-bold leading-snug">
               Build your own community!
             </h4>
-            <p className="text-[11px] text-stone-600 leading-tight">
+            <p className="text-[11px] text-stone-600 dark:text-zinc-400 leading-tight">
               Create, customise and grow your circle.
             </p>
             <Link
               href={currentUser ? '/circles/new' : '/register'}
-              className="inline-flex items-center gap-1 text-[11px] font-bold text-stone-900 hover:underline pt-1"
+              className="inline-flex items-center gap-1 text-[11px] font-bold text-stone-900 dark:text-white hover:underline pt-1"
             >
               <span>Get Started</span>
               <ArrowRight className="h-3 w-3" />
@@ -1139,16 +1248,21 @@ export function SocialNewsfeedClient({
         </div>
 
         {/* Sidebar Footer: User Account Switcher */}
-        <div className="border-t border-stone-200/90 p-3">
+        <div className={`border-t border-stone-200/90 dark:border-zinc-800 transition-all ${
+          isDesktopSidebarCollapsed ? 'lg:p-2' : 'p-3'
+        }`}>
           {currentUser ? (
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setIsUserMenuOpen((prev) => !prev)}
-                className="flex w-full items-center justify-between rounded-xl p-2 text-left hover:bg-stone-100 transition-colors"
+                className={`flex w-full items-center rounded-xl p-2 text-left hover:bg-stone-100 dark:hover:bg-zinc-800/70 transition-colors ${
+                  isDesktopSidebarCollapsed ? 'lg:justify-center lg:p-1.5' : 'justify-between'
+                }`}
+                title={currentUser.display_name}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-stone-900 text-xs font-bold text-white overflow-hidden border border-stone-200">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-stone-900 text-xs font-bold text-white overflow-hidden border border-stone-200 dark:border-zinc-700">
                     {currentUser.avatar_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img
@@ -1160,24 +1274,28 @@ export function SocialNewsfeedClient({
                       currentUser.display_name.slice(0, 1).toUpperCase()
                     )}
                   </div>
-                  <div className="min-w-0 leading-tight">
-                    <p className="truncate text-xs font-bold text-stone-900">
+                  <div className={`min-w-0 leading-tight ${isDesktopSidebarCollapsed ? 'lg:hidden' : 'block'}`}>
+                    <p className="truncate text-xs font-bold text-stone-900 dark:text-stone-100">
                       {currentUser.display_name}
                     </p>
-                    <p className="truncate text-[11px] text-stone-400">
+                    <p className="truncate text-[11px] text-stone-400 dark:text-zinc-500">
                       @{currentUser.username}
                     </p>
                   </div>
                 </div>
-                <ChevronDown className="h-4 w-4 text-stone-400 shrink-0" />
+                <ChevronDown className={`h-4 w-4 text-stone-400 shrink-0 ${isDesktopSidebarCollapsed ? 'lg:hidden' : 'block'}`} />
               </button>
 
               {isUserMenuOpen && (
-                <div className="absolute bottom-full left-0 mb-2 w-full rounded-2xl border border-stone-200 bg-white p-1.5 shadow-xl z-50 animate-in fade-in zoom-in-95 duration-100 space-y-0.5">
+                <div className={`absolute mb-2 rounded-2xl border border-stone-200 dark:border-zinc-800 bg-white dark:bg-[#18191D] p-1.5 shadow-xl z-50 animate-in fade-in zoom-in-95 duration-100 space-y-0.5 ${
+                  isDesktopSidebarCollapsed
+                    ? 'bottom-0 left-full ml-3 w-48'
+                    : 'bottom-full left-0 w-full'
+                }`}>
                   <Link
                     href="/settings"
                     onClick={() => setIsUserMenuOpen(false)}
-                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-stone-700 hover:bg-stone-50"
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-stone-700 dark:text-stone-200 hover:bg-stone-50 dark:hover:bg-zinc-800"
                   >
                     <User className="h-3.5 w-3.5" />
                     <span>My Profile</span>
@@ -1185,7 +1303,7 @@ export function SocialNewsfeedClient({
                   <Link
                     href="/settings"
                     onClick={() => setIsUserMenuOpen(false)}
-                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-stone-700 hover:bg-stone-50"
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-stone-700 dark:text-stone-200 hover:bg-stone-50 dark:hover:bg-zinc-800"
                   >
                     <Settings className="h-3.5 w-3.5" />
                     <span>Account Settings</span>
@@ -1193,7 +1311,7 @@ export function SocialNewsfeedClient({
                   <button
                     type="button"
                     onClick={handleSignOut}
-                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50"
+                    className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30"
                   >
                     <LogOut className="h-3.5 w-3.5" />
                     <span>Sign Out</span>
@@ -1202,19 +1320,25 @@ export function SocialNewsfeedClient({
               )}
             </div>
           ) : (
-            <div className="space-y-1.5">
+            <div className={`space-y-1.5 ${isDesktopSidebarCollapsed ? 'lg:flex lg:flex-col lg:items-center' : ''}`}>
               <Link
                 href="/login"
-                className="flex w-full items-center justify-center rounded-xl bg-black py-2 text-xs font-bold text-white hover:bg-zinc-800 transition-colors shadow-2xs"
+                title="Sign In"
+                className={`flex items-center justify-center rounded-xl bg-black dark:bg-white text-white dark:text-black py-2 text-xs font-bold hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors shadow-2xs ${
+                  isDesktopSidebarCollapsed ? 'lg:w-10 lg:h-10 lg:p-0' : 'w-full'
+                }`}
               >
-                Sign In
+                <User className={`h-4 w-4 ${isDesktopSidebarCollapsed ? 'lg:block' : 'hidden'}`} />
+                <span className={isDesktopSidebarCollapsed ? 'lg:hidden' : 'inline'}>Sign In</span>
               </Link>
-              <Link
-                href="/register"
-                className="flex w-full items-center justify-center rounded-xl border border-stone-200 bg-stone-50 py-2 text-xs font-semibold text-stone-800 hover:bg-stone-100 transition-colors"
-              >
-                Create Account
-              </Link>
+              {!isDesktopSidebarCollapsed && (
+                <Link
+                  href="/register"
+                  className="flex w-full items-center justify-center rounded-xl border border-stone-200 dark:border-zinc-700 bg-stone-50 dark:bg-zinc-900 py-2 text-xs font-semibold text-stone-800 dark:text-stone-200 hover:bg-stone-100 dark:hover:bg-zinc-800 transition-colors"
+                >
+                  Create Account
+                </Link>
+              )}
             </div>
           )}
         </div>
@@ -1225,33 +1349,40 @@ export function SocialNewsfeedClient({
       {/* ------------------------------------------------------------- */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Search & Actions Header */}
-        <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b border-stone-200/80 px-4 sm:px-6 lg:px-8 py-3">
+        <header className="sticky top-0 z-30 bg-white/95 dark:bg-[#121316]/95 backdrop-blur-md border-b border-stone-200/80 dark:border-zinc-800 px-4 sm:px-6 lg:px-8 py-3 transition-colors">
           <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
-            {/* Mobile Hamburger Drawer Trigger */}
+            {/* Sidebar Toggle Button (Mobile Drawer / Desktop Collapse) */}
             <button
               type="button"
-              onClick={() => setIsMobileSidebarOpen(true)}
-              className="lg:hidden rounded-xl p-2 text-stone-600 hover:bg-stone-100"
-              aria-label="Open navigation menu"
+              onClick={() => {
+                if (window.innerWidth < 1024) {
+                  setIsMobileSidebarOpen(true);
+                } else {
+                  toggleDesktopSidebar();
+                }
+              }}
+              className="rounded-xl p-2 text-stone-600 dark:text-zinc-300 hover:bg-stone-100 dark:hover:bg-zinc-800 transition-colors"
+              aria-label="Toggle navigation menu"
+              title={isDesktopSidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
               <PanelLeft className="h-5 w-5" />
             </button>
 
             {/* Global Search Pill Bar (Matching Reference Layout) */}
             <div className="relative flex-1 max-w-2xl">
-              <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400" />
+              <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-stone-400 dark:text-zinc-500" />
               <input
                 type="search"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search for people, communities and more..."
-                className="w-full rounded-full border border-stone-200 bg-stone-50/90 py-2.5 pl-11 pr-4 text-xs sm:text-sm text-stone-900 placeholder:text-stone-400 focus:border-stone-900 focus:bg-white focus:outline-none transition-all shadow-2xs"
+                className="w-full rounded-full border border-stone-200 dark:border-zinc-700 bg-stone-50/90 dark:bg-zinc-900/90 py-2.5 pl-11 pr-4 text-xs sm:text-sm text-stone-900 dark:text-stone-100 placeholder:text-stone-400 dark:placeholder:text-zinc-500 focus:border-stone-900 dark:focus:border-zinc-400 focus:bg-white dark:focus:bg-zinc-900 focus:outline-none transition-all shadow-2xs"
               />
               {searchQuery && (
                 <button
                   type="button"
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-stone-400 hover:text-stone-700"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded-full p-0.5 text-stone-400 hover:text-stone-700 dark:hover:text-zinc-300"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -1263,7 +1394,7 @@ export function SocialNewsfeedClient({
               {currentUser && (
                 <Link
                   href="/notifications"
-                  className="relative flex h-10 w-10 items-center justify-center rounded-full bg-stone-50 border border-stone-200 text-stone-700 hover:bg-stone-100 transition-colors shadow-2xs"
+                  className="relative flex h-10 w-10 items-center justify-center rounded-full bg-stone-50 dark:bg-zinc-800 border border-stone-200 dark:border-zinc-700 text-stone-700 dark:text-zinc-200 hover:bg-stone-100 dark:hover:bg-zinc-700 transition-colors shadow-2xs"
                   title="Notifications"
                 >
                   <Bell className="h-4 w-4" />
@@ -1275,19 +1406,26 @@ export function SocialNewsfeedClient({
                 </Link>
               )}
 
-              {/* Theme Sun Indicator */}
-              <div
-                className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-50 border border-stone-200 text-stone-600 shadow-2xs"
-                title="Theme: Clean Light"
+              {/* Theme Toggle Button (Light / Dark) */}
+              <button
+                type="button"
+                onClick={toggleTheme}
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-50 dark:bg-zinc-800 border border-stone-200 dark:border-zinc-700 text-stone-600 dark:text-zinc-200 hover:bg-stone-100 dark:hover:bg-zinc-700 transition-colors shadow-2xs cursor-pointer"
+                title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+                aria-label={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
               >
-                <Sun className="h-4 w-4" />
-              </div>
+                {theme === 'dark' ? (
+                  <Sun className="h-4 w-4 text-amber-400 fill-amber-400" />
+                ) : (
+                  <Moon className="h-4 w-4 text-stone-700 dark:text-zinc-200" />
+                )}
+              </button>
 
               {/* Profile Avatar Trigger */}
               {currentUser ? (
                 <Link
                   href="/settings"
-                  className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-900 text-xs font-bold text-white border-2 border-white shadow-2xs overflow-hidden"
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-900 text-xs font-bold text-white border-2 border-white dark:border-zinc-700 shadow-2xs overflow-hidden"
                   title={currentUser.display_name}
                 >
                   {currentUser.avatar_url ? (
@@ -1304,7 +1442,7 @@ export function SocialNewsfeedClient({
               ) : (
                 <Link
                   href="/login"
-                  className="rounded-full bg-black px-4 py-2 text-xs font-bold text-white hover:bg-zinc-800 transition-colors shadow-2xs"
+                  className="rounded-full bg-black dark:bg-white text-white dark:text-black px-4 py-2 text-xs font-bold hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors shadow-2xs"
                 >
                   Sign In
                 </Link>
@@ -1317,11 +1455,11 @@ export function SocialNewsfeedClient({
         <main className="flex-1 px-3 sm:px-6 lg:px-8 py-5 sm:py-6 space-y-5 sm:space-y-6 max-w-7xl mx-auto w-full pb-24 lg:pb-8">
           {/* A. HERO WELCOME BANNER ("Bring Your People Together.") */}
           {showHeroBanner && (
-            <section className="relative overflow-hidden rounded-3xl border border-stone-200/90 bg-gradient-to-r from-stone-50 via-white to-stone-50/80 shadow-xs">
+            <section className="relative overflow-hidden rounded-3xl border border-stone-200/90 dark:border-zinc-800 bg-gradient-to-r from-stone-50 via-white to-stone-50/80 dark:from-zinc-900 dark:via-[#141518] dark:to-zinc-900 shadow-xs">
               <button
                 type="button"
                 onClick={dismissHeroBanner}
-                className="absolute top-4 right-4 z-10 rounded-full p-1.5 text-stone-400 hover:bg-stone-200/60 hover:text-stone-700 transition-colors"
+                className="absolute top-4 right-4 z-10 rounded-full p-1.5 text-stone-400 hover:bg-stone-200/60 dark:hover:bg-zinc-800 hover:text-stone-700 dark:hover:text-zinc-200 transition-colors"
                 title="Dismiss banner"
               >
                 <X className="h-4 w-4" />
@@ -1330,24 +1468,24 @@ export function SocialNewsfeedClient({
               <div className="grid grid-cols-1 lg:grid-cols-12 items-center">
                 {/* Banner Left: Typography & CTAs */}
                 <div className="p-5 sm:p-8 lg:p-10 lg:col-span-7 space-y-3 sm:space-y-4">
-                  <h1 className="text-2xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-stone-950 leading-[1.15]">
+                  <h1 className="text-2xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-stone-950 dark:text-white leading-[1.15]">
                     Bring Your People <br className="hidden sm:inline" />
-                    Together<span className="text-stone-400">.</span>
+                    Together<span className="text-stone-400 dark:text-zinc-500">.</span>
                   </h1>
-                  <p className="text-xs sm:text-sm text-stone-600 max-w-lg leading-relaxed">
+                  <p className="text-xs sm:text-sm text-stone-600 dark:text-zinc-400 max-w-lg leading-relaxed">
                     Discover, join and build communities around the things that matter to you.
                   </p>
                   <div className="flex flex-wrap items-center gap-2.5 sm:gap-3 pt-1 sm:pt-2">
                     <Link
                       href="/explore"
-                      className="inline-flex items-center gap-2 rounded-full bg-black px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-bold text-white shadow-xs hover:bg-zinc-800 transition-all"
+                      className="inline-flex items-center gap-2 rounded-full bg-black dark:bg-white px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-bold text-white dark:text-black shadow-xs hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-all"
                     >
                       <span>Explore Communities</span>
                       <ArrowRight className="h-4 w-4" />
                     </Link>
                     <Link
                       href={currentUser ? '/circles/new' : '/register'}
-                      className="inline-flex items-center gap-2 rounded-full border border-stone-300 bg-white px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold text-stone-900 shadow-2xs hover:bg-stone-50 hover:border-black transition-all"
+                      className="inline-flex items-center gap-2 rounded-full border border-stone-300 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm font-semibold text-stone-900 dark:text-white shadow-2xs hover:bg-stone-50 dark:hover:bg-zinc-700 hover:border-black dark:hover:border-zinc-500 transition-all"
                     >
                       <span>Create Your Circle</span>
                     </Link>
@@ -1363,7 +1501,7 @@ export function SocialNewsfeedClient({
                       alt="Community collaboration"
                       className="h-full w-full object-cover object-center"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-r from-stone-50/70 via-transparent to-transparent lg:block hidden" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-stone-50/70 dark:from-[#141518]/80 via-transparent to-transparent lg:block hidden" />
                   </div>
                 </div>
               </div>
@@ -1381,22 +1519,22 @@ export function SocialNewsfeedClient({
                   <Link
                     key={tile.key}
                     href={tile.href}
-                    className="min-w-[155px] sm:min-w-0 shrink-0 sm:shrink flex items-center justify-between rounded-2xl border border-stone-200/90 bg-white p-3 sm:p-3.5 shadow-2xs hover:border-stone-400 hover:shadow-xs transition-all group"
+                    className="min-w-[155px] sm:min-w-0 shrink-0 sm:shrink flex items-center justify-between rounded-2xl border border-stone-200/90 dark:border-zinc-800 bg-white dark:bg-[#141518] p-3 sm:p-3.5 shadow-2xs hover:border-stone-400 dark:hover:border-zinc-600 hover:shadow-xs transition-all group"
                   >
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-stone-100 text-stone-900 border border-stone-200 group-hover:scale-105 transition-transform">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-stone-100 dark:bg-zinc-800 text-stone-900 dark:text-zinc-100 border border-stone-200 dark:border-zinc-700 group-hover:scale-105 transition-transform">
                         <Icon className="h-4 w-4" />
                       </div>
                       <div className="min-w-0 leading-tight">
-                        <h4 className="text-xs font-bold text-stone-900 truncate">
+                        <h4 className="text-xs font-bold text-stone-900 dark:text-zinc-100 truncate">
                           {tile.label}
                         </h4>
-                        <p className="text-[11px] text-stone-400 truncate">
+                        <p className="text-[11px] text-stone-400 dark:text-zinc-500 truncate">
                           {tile.subtitle}
                         </p>
                       </div>
                     </div>
-                    <ArrowRight className="h-3.5 w-3.5 text-stone-400 group-hover:translate-x-0.5 transition-transform shrink-0" />
+                    <ArrowRight className="h-3.5 w-3.5 text-stone-400 dark:text-zinc-500 group-hover:translate-x-0.5 transition-transform shrink-0" />
                   </Link>
                 );
               }
@@ -1412,16 +1550,16 @@ export function SocialNewsfeedClient({
                   }}
                   className={`min-w-[155px] sm:min-w-0 shrink-0 sm:shrink flex items-center justify-between rounded-2xl border p-3 sm:p-3.5 shadow-2xs text-left transition-all group ${
                     isFiltered
-                      ? 'border-black bg-stone-900 text-white shadow-xs'
-                      : 'border-stone-200/90 bg-white hover:border-stone-400 hover:shadow-xs'
+                      ? 'border-black dark:border-white bg-stone-900 dark:bg-zinc-100 text-white dark:text-black shadow-xs'
+                      : 'border-stone-200/90 dark:border-zinc-800 bg-white dark:bg-[#141518] hover:border-stone-400 dark:hover:border-zinc-600 hover:shadow-xs'
                   }`}
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <div
                       className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border group-hover:scale-105 transition-transform ${
                         isFiltered
-                          ? 'bg-stone-800 text-white border-stone-700'
-                          : 'bg-stone-100 text-stone-900 border border-stone-200'
+                          ? 'bg-stone-800 dark:bg-zinc-200 text-white dark:text-black border-stone-700 dark:border-zinc-300'
+                          : 'bg-stone-100 dark:bg-zinc-800 text-stone-900 dark:text-zinc-100 border border-stone-200 dark:border-zinc-700'
                       }`}
                     >
                       <Icon className="h-4 w-4" />
@@ -1429,14 +1567,14 @@ export function SocialNewsfeedClient({
                     <div className="min-w-0 leading-tight">
                       <h4
                         className={`text-xs font-bold truncate ${
-                          isFiltered ? 'text-white' : 'text-stone-900'
+                          isFiltered ? 'text-white dark:text-black' : 'text-stone-900 dark:text-zinc-100'
                         }`}
                       >
                         {tile.label}
                       </h4>
                       <p
                         className={`text-[11px] truncate ${
-                          isFiltered ? 'text-stone-300' : 'text-stone-400'
+                          isFiltered ? 'text-stone-300 dark:text-zinc-600' : 'text-stone-400 dark:text-zinc-500'
                         }`}
                       >
                         {tile.subtitle}
@@ -1445,7 +1583,7 @@ export function SocialNewsfeedClient({
                   </div>
                   <ArrowRight
                     className={`h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform shrink-0 ${
-                      isFiltered ? 'text-stone-300' : 'text-stone-400'
+                      isFiltered ? 'text-stone-300 dark:text-zinc-600' : 'text-stone-400 dark:text-zinc-500'
                     }`}
                   />
                 </button>
@@ -1457,11 +1595,11 @@ export function SocialNewsfeedClient({
           <div className="max-w-2xl mx-auto w-full space-y-4 sm:space-y-5">
               {/* Quick-Post Composer ("What's on your mind?") */}
               {currentUser && composerCircles.length > 0 && (
-                <div className="rounded-2xl border border-stone-200/90 bg-white p-4 shadow-xs">
+                <div className="rounded-2xl border border-stone-200/90 dark:border-zinc-800 bg-white dark:bg-[#141518] p-4 shadow-xs">
                   {!composerExpanded ? (
                     <div className="space-y-3">
                       <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-stone-900 text-xs font-bold text-white overflow-hidden border border-stone-200 shadow-2xs">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-stone-900 text-xs font-bold text-white overflow-hidden border border-stone-200 dark:border-zinc-700 shadow-2xs">
                           {currentUser.avatar_url ? (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
@@ -1476,25 +1614,25 @@ export function SocialNewsfeedClient({
                         <button
                           type="button"
                           onClick={() => setComposerExpanded(true)}
-                          className="flex-1 rounded-full border border-stone-200 bg-stone-50/80 px-4 py-2.5 text-left text-xs sm:text-sm text-stone-500 hover:border-stone-300 hover:bg-stone-100 transition-all"
+                          className="flex-1 rounded-full border border-stone-200 dark:border-zinc-700 bg-stone-50/80 dark:bg-zinc-900/80 px-4 py-2.5 text-left text-xs sm:text-sm text-stone-500 dark:text-zinc-400 hover:border-stone-300 dark:hover:border-zinc-600 hover:bg-stone-100 dark:hover:bg-zinc-800 transition-all"
                         >
                           What&apos;s on your mind?
                         </button>
                       </div>
 
-                      <div className="flex items-center justify-between border-t border-stone-100 pt-3 gap-2">
+                      <div className="flex items-center justify-between border-t border-stone-100 dark:border-zinc-800 pt-3 gap-2">
                         <div className="flex items-center gap-1 sm:gap-2 overflow-x-auto no-scrollbar">
                           <button
                             type="button"
                             onClick={() => setComposerExpanded(true)}
-                            className="inline-flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-2.5 py-1.5 text-[11px] sm:text-xs font-semibold text-stone-600 hover:bg-stone-100 hover:text-stone-900 transition-colors shrink-0"
+                            className="inline-flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-2.5 py-1.5 text-[11px] sm:text-xs font-semibold text-stone-600 dark:text-zinc-400 hover:bg-stone-100 dark:hover:bg-zinc-800 hover:text-stone-900 dark:hover:text-zinc-200 transition-colors shrink-0"
                           >
                             <ImageIcon className="h-4 w-4 text-emerald-500" />
                             <span>Photo</span>
                           </button>
                           <Link
                             href="/explore?tab=events"
-                            className="inline-flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-2.5 py-1.5 text-[11px] sm:text-xs font-semibold text-stone-600 hover:bg-stone-100 hover:text-stone-900 transition-colors shrink-0"
+                            className="inline-flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-2.5 py-1.5 text-[11px] sm:text-xs font-semibold text-stone-600 dark:text-zinc-400 hover:bg-stone-100 dark:hover:bg-zinc-800 hover:text-stone-900 dark:hover:text-zinc-200 transition-colors shrink-0"
                           >
                             <Calendar className="h-4 w-4 text-rose-500" />
                             <span>Event</span>
@@ -1502,7 +1640,7 @@ export function SocialNewsfeedClient({
                           <button
                             type="button"
                             onClick={() => setComposerExpanded(true)}
-                            className="inline-flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-2.5 py-1.5 text-[11px] sm:text-xs font-semibold text-stone-600 hover:bg-stone-100 hover:text-stone-900 transition-colors shrink-0"
+                            className="inline-flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-2.5 py-1.5 text-[11px] sm:text-xs font-semibold text-stone-600 dark:text-zinc-400 hover:bg-stone-100 dark:hover:bg-zinc-800 hover:text-stone-900 dark:hover:text-zinc-200 transition-colors shrink-0"
                           >
                             <Video className="h-4 w-4 text-sky-500" />
                             <span>Video</span>
@@ -1513,7 +1651,7 @@ export function SocialNewsfeedClient({
                               setComposerMode('resource');
                               setComposerExpanded(true);
                             }}
-                            className="inline-flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-2.5 py-1.5 text-[11px] sm:text-xs font-semibold text-stone-600 hover:bg-stone-100 hover:text-stone-900 transition-colors shrink-0"
+                            className="inline-flex items-center gap-1 sm:gap-1.5 rounded-lg px-2 sm:px-2.5 py-1.5 text-[11px] sm:text-xs font-semibold text-stone-600 dark:text-zinc-400 hover:bg-stone-100 dark:hover:bg-zinc-800 hover:text-stone-900 dark:hover:text-zinc-200 transition-colors shrink-0"
                           >
                             <FileText className="h-4 w-4 text-amber-500" />
                             <span>Document</span>
@@ -1531,9 +1669,9 @@ export function SocialNewsfeedClient({
                     </div>
                   ) : (
                   <form onSubmit={handleCreateFeedPost} className="space-y-3.5">
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-100 pb-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-100 dark:border-zinc-800 pb-3">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs font-semibold text-stone-500">Posting in:</span>
+                        <span className="text-xs font-semibold text-stone-500 dark:text-zinc-400">Posting in:</span>
                         <select
                           value={selectedCircleId}
                           onChange={(e) => {
@@ -1542,7 +1680,7 @@ export function SocialNewsfeedClient({
                             const nextCircle = composerCircles.find((c) => c.id === nextId);
                             setSelectedSpaceId(nextCircle?.spaces[0]?.id ?? '');
                           }}
-                          className="rounded-xl border border-stone-200 bg-[#FAF9F6] px-3 py-1.5 text-xs font-semibold text-stone-900 focus:border-black focus:outline-none"
+                          className="rounded-xl border border-stone-200 dark:border-zinc-700 bg-[#FAF9F6] dark:bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-stone-900 dark:text-zinc-100 focus:border-black dark:focus:border-zinc-400 focus:outline-none"
                         >
                           {composerCircles.map((c) => (
                             <option key={c.id} value={c.id}>
@@ -1555,7 +1693,7 @@ export function SocialNewsfeedClient({
                           <select
                             value={selectedSpaceId}
                             onChange={(e) => setSelectedSpaceId(e.target.value)}
-                            className="rounded-xl border border-stone-200 bg-white px-2.5 py-1.5 text-xs text-stone-700 focus:border-black focus:outline-none"
+                            className="rounded-xl border border-stone-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2.5 py-1.5 text-xs text-stone-700 dark:text-zinc-300 focus:border-black dark:focus:border-zinc-400 focus:outline-none"
                           >
                             {selectedComposerCircle.spaces.map((sp) => (
                               <option key={sp.id} value={sp.id}>
@@ -1569,14 +1707,14 @@ export function SocialNewsfeedClient({
                       <button
                         type="button"
                         onClick={() => setComposerExpanded(false)}
-                        className="rounded-lg p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-600"
+                        className="rounded-lg p-1 text-stone-400 hover:bg-stone-100 dark:hover:bg-zinc-800 hover:text-stone-600 dark:hover:text-zinc-300"
                       >
                         <X className="h-4 w-4" />
                       </button>
                     </div>
 
                     {composerError && (
-                      <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                      <div className="rounded-xl border border-rose-200 dark:border-rose-900/60 bg-rose-50 dark:bg-rose-950/40 px-3 py-2 text-xs text-rose-700 dark:text-rose-300">
                         {composerError}
                       </div>
                     )}
@@ -1586,7 +1724,7 @@ export function SocialNewsfeedClient({
                       value={postTitle}
                       onChange={(e) => setPostTitle(e.target.value)}
                       placeholder="Headline or title (optional)"
-                      className="w-full rounded-xl border border-stone-200 bg-white px-3.5 py-2 text-xs sm:text-sm font-semibold text-stone-900 placeholder:font-normal placeholder:text-stone-400 focus:border-black focus:outline-none"
+                      className="w-full rounded-xl border border-stone-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3.5 py-2 text-xs sm:text-sm font-semibold text-stone-900 dark:text-zinc-100 placeholder:font-normal placeholder:text-stone-400 dark:placeholder:text-zinc-500 focus:border-black dark:focus:border-zinc-400 focus:outline-none"
                     />
 
                     <textarea
@@ -1594,21 +1732,21 @@ export function SocialNewsfeedClient({
                       value={postBody}
                       onChange={(e) => setPostBody(e.target.value)}
                       placeholder={`What would you like to share in ${selectedComposerCircle?.name || 'this community'}?`}
-                      className="w-full rounded-xl border border-stone-200 bg-white p-3.5 text-xs sm:text-sm text-stone-900 placeholder:text-stone-400 focus:border-black focus:outline-none"
+                      className="w-full rounded-xl border border-stone-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-3.5 text-xs sm:text-sm text-stone-900 dark:text-zinc-100 placeholder:text-stone-400 dark:placeholder:text-zinc-500 focus:border-black dark:focus:border-zinc-400 focus:outline-none"
                     />
 
                     {/* Optional Poll Builder */}
                     {composerMode === 'poll' && (
-                      <div className="rounded-xl border border-stone-200 bg-[#FAF9F6] p-3.5 space-y-2.5">
+                      <div className="rounded-xl border border-stone-200 dark:border-zinc-700 bg-[#FAF9F6] dark:bg-zinc-900/60 p-3.5 space-y-2.5">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-stone-900 flex items-center gap-1.5">
+                          <span className="text-xs font-bold text-stone-900 dark:text-zinc-100 flex items-center gap-1.5">
                             <BarChart2 className="h-3.5 w-3.5" />
                             Attach Community Poll
                           </span>
                           <button
                             type="button"
                             onClick={() => setComposerMode('post')}
-                            className="text-xs text-stone-400 hover:text-stone-600"
+                            className="text-xs text-stone-400 hover:text-stone-600 dark:hover:text-zinc-300"
                           >
                             Remove
                           </button>
@@ -1618,7 +1756,7 @@ export function SocialNewsfeedClient({
                           value={pollQuestion}
                           onChange={(e) => setPollQuestion(e.target.value)}
                           placeholder="Ask a question..."
-                          className="w-full rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-900"
+                          className="w-full rounded-lg border border-stone-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-1.5 text-xs text-stone-900 dark:text-zinc-100 placeholder:text-stone-400 dark:placeholder:text-zinc-500"
                         />
                         <div className="space-y-1.5">
                           {pollOptions.map((opt, idx) => (
@@ -1632,7 +1770,7 @@ export function SocialNewsfeedClient({
                                   setPollOptions(next);
                                 }}
                                 placeholder={`Option ${idx + 1}`}
-                                className="flex-1 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-900"
+                                className="flex-1 rounded-lg border border-stone-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-1.5 text-xs text-stone-900 dark:text-zinc-100 placeholder:text-stone-400 dark:placeholder:text-zinc-500"
                               />
                               {pollOptions.length > 2 && (
                                 <button
@@ -1640,7 +1778,7 @@ export function SocialNewsfeedClient({
                                   onClick={() =>
                                     setPollOptions(pollOptions.filter((_, i) => i !== idx))
                                   }
-                                  className="text-xs text-stone-400 hover:text-rose-600"
+                                  className="text-xs text-stone-400 hover:text-rose-600 dark:hover:text-rose-400"
                                 >
                                   <X className="h-3.5 w-3.5" />
                                 </button>
@@ -1651,7 +1789,7 @@ export function SocialNewsfeedClient({
                             <button
                               type="button"
                               onClick={() => setPollOptions([...pollOptions, ''])}
-                              className="text-xs font-semibold text-stone-900 hover:underline"
+                              className="text-xs font-semibold text-stone-900 dark:text-zinc-100 hover:underline"
                             >
                               + Add Option
                             </button>
@@ -1662,16 +1800,16 @@ export function SocialNewsfeedClient({
 
                     {/* Optional Resource Builder */}
                     {composerMode === 'resource' && (
-                      <div className="rounded-xl border border-stone-200 bg-[#FAF9F6] p-3.5 space-y-2.5">
+                      <div className="rounded-xl border border-stone-200 dark:border-zinc-700 bg-[#FAF9F6] dark:bg-zinc-900/60 p-3.5 space-y-2.5">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-stone-900 flex items-center gap-1.5">
+                          <span className="text-xs font-bold text-stone-900 dark:text-zinc-100 flex items-center gap-1.5">
                             <BookOpen className="h-3.5 w-3.5" />
                             Attach Shared Resource
                           </span>
                           <button
                             type="button"
                             onClick={() => setComposerMode('post')}
-                            className="text-xs text-stone-400 hover:text-stone-600"
+                            className="text-xs text-stone-400 hover:text-stone-600 dark:hover:text-zinc-300"
                           >
                             Remove
                           </button>
@@ -1682,12 +1820,12 @@ export function SocialNewsfeedClient({
                             value={resourceTitle}
                             onChange={(e) => setResourceTitle(e.target.value)}
                             placeholder="Resource title..."
-                            className="sm:col-span-2 rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-900"
+                            className="sm:col-span-2 rounded-lg border border-stone-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-1.5 text-xs text-stone-900 dark:text-zinc-100 placeholder:text-stone-400 dark:placeholder:text-zinc-500"
                           />
                           <select
                             value={resourceCategory}
                             onChange={(e) => setResourceCategory(e.target.value)}
-                            className="rounded-lg border border-stone-200 bg-white px-2.5 py-1.5 text-xs text-stone-700"
+                            className="rounded-lg border border-stone-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2.5 py-1.5 text-xs text-stone-700 dark:text-zinc-300"
                           >
                             {RESOURCE_CATEGORIES.map((cat) => (
                               <option key={cat} value={cat}>
@@ -1701,7 +1839,7 @@ export function SocialNewsfeedClient({
                           value={resourceUrl}
                           onChange={(e) => setResourceUrl(e.target.value)}
                           placeholder="https://... (optional link)"
-                          className="w-full rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs text-stone-900"
+                          className="w-full rounded-lg border border-stone-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-1.5 text-xs text-stone-900 dark:text-zinc-100 placeholder:text-stone-400 dark:placeholder:text-zinc-500"
                         />
                       </div>
                     )}
@@ -1716,8 +1854,8 @@ export function SocialNewsfeedClient({
                             }
                             className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors ${
                               composerMode === 'poll'
-                                ? 'bg-black text-white'
-                                : 'bg-stone-100 text-stone-700 hover:bg-stone-200/80'
+                                ? 'bg-black dark:bg-white text-white dark:text-black'
+                                : 'bg-stone-100 dark:bg-zinc-800 text-stone-700 dark:text-zinc-300 hover:bg-stone-200/80 dark:hover:bg-zinc-700'
                             }`}
                           >
                             <BarChart2 className="h-3.5 w-3.5" />
@@ -1731,8 +1869,8 @@ export function SocialNewsfeedClient({
                           }
                           className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold transition-colors ${
                             composerMode === 'resource'
-                              ? 'bg-black text-white'
-                              : 'bg-stone-100 text-stone-700 hover:bg-stone-200/80'
+                              ? 'bg-black dark:bg-white text-white dark:text-black'
+                              : 'bg-stone-100 dark:bg-zinc-800 text-stone-700 dark:text-zinc-300 hover:bg-stone-200/80 dark:hover:bg-zinc-700'
                           }`}
                         >
                           <BookOpen className="h-3.5 w-3.5" />
@@ -1743,7 +1881,7 @@ export function SocialNewsfeedClient({
                       <button
                         type="submit"
                         disabled={submittingPost}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-black px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-zinc-800 disabled:opacity-50 transition-all"
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-black dark:bg-white px-4 py-2 text-xs font-bold text-white dark:text-black shadow-xs hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50 transition-all"
                       >
                         <Send className="h-3.5 w-3.5" />
                         <span>{submittingPost ? 'Publishing...' : 'Publish to Circle'}</span>
@@ -1755,18 +1893,18 @@ export function SocialNewsfeedClient({
             )}
 
             {/* Feed Filter Bar: Content Types, Search & Category Pills */}
-            <div className="rounded-2xl border border-stone-200/90 bg-white p-3.5 shadow-xs space-y-3">
+            <div className="rounded-2xl border border-stone-200/90 dark:border-zinc-800 bg-white dark:bg-[#141518] p-3.5 shadow-xs space-y-3">
               <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
                 {/* Content Type Tabs (Mixed Stream Switcher) */}
-                <div className="flex items-center gap-1 rounded-xl bg-stone-100/80 p-1 overflow-x-auto no-scrollbar">
+                <div className="flex items-center gap-1 rounded-xl bg-stone-100/80 dark:bg-zinc-900/90 p-1 overflow-x-auto no-scrollbar">
                   {isDesktopSidebarCollapsed && (
                     <button
                       type="button"
                       onClick={toggleDesktopSidebar}
-                      className="hidden lg:inline-flex items-center gap-1 rounded-lg bg-white px-2 py-1.5 text-xs font-bold text-stone-900 border border-stone-200 shadow-2xs hover:bg-stone-50 transition-all shrink-0"
+                      className="hidden lg:inline-flex items-center gap-1 rounded-lg bg-white dark:bg-zinc-800 px-2 py-1.5 text-xs font-bold text-stone-900 dark:text-zinc-100 border border-stone-200 dark:border-zinc-700 shadow-2xs hover:bg-stone-50 dark:hover:bg-zinc-700 transition-all shrink-0"
                       title="Show Sidemenu"
                     >
-                      <PanelLeft className="h-3.5 w-3.5 text-stone-600" />
+                      <PanelLeft className="h-3.5 w-3.5 text-stone-600 dark:text-zinc-400" />
                       <span>Menu</span>
                     </button>
                   )}
@@ -1785,8 +1923,8 @@ export function SocialNewsfeedClient({
                         onClick={() => setContentType(tab.key as ContentTypeFilter)}
                         className={`whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all ${
                           active
-                            ? 'bg-black text-white shadow-2xs'
-                            : 'text-stone-600 hover:bg-stone-200/70 hover:text-stone-900'
+                            ? 'bg-black dark:bg-white text-white dark:text-black shadow-2xs'
+                            : 'text-stone-600 dark:text-zinc-400 hover:bg-stone-200/70 dark:hover:bg-zinc-800 hover:text-stone-900 dark:hover:text-zinc-200'
                         }`}
                       >
                         {tab.label}
@@ -1797,13 +1935,13 @@ export function SocialNewsfeedClient({
 
                 {/* Inline Search */}
                 <div className="relative min-w-[180px] flex-1 sm:max-w-[220px]">
-                  <Search className="pointer-events-none absolute left-3 top-2.5 h-3.5 w-3.5 text-stone-400" />
+                  <Search className="pointer-events-none absolute left-3 top-2.5 h-3.5 w-3.5 text-stone-400 dark:text-zinc-500" />
                   <input
                     type="search"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Filter feed..."
-                    className="w-full rounded-xl border border-stone-200 bg-stone-50/70 py-1.5 pl-8 pr-3 text-xs text-stone-900 placeholder:text-stone-400 focus:border-black focus:bg-white focus:outline-none"
+                    className="w-full rounded-xl border border-stone-200 dark:border-zinc-700 bg-stone-50/70 dark:bg-zinc-900 py-1.5 pl-8 pr-3 text-xs text-stone-900 dark:text-zinc-100 placeholder:text-stone-400 dark:placeholder:text-zinc-500 focus:border-black dark:focus:border-zinc-400 focus:bg-white dark:focus:bg-zinc-900 focus:outline-none"
                   />
                 </div>
               </div>
@@ -1819,8 +1957,8 @@ export function SocialNewsfeedClient({
                       onClick={() => setSelectedCategory(cat.key)}
                       className={`whitespace-nowrap rounded-full px-3 py-1 text-[11px] font-medium transition-all ${
                         active
-                          ? 'border border-black bg-black text-white font-semibold shadow-2xs'
-                          : 'border border-stone-200 bg-stone-50 text-stone-700 hover:bg-stone-100 hover:border-stone-300 hover:text-stone-900'
+                          ? 'border border-black dark:border-white bg-black dark:bg-white text-white dark:text-black font-semibold shadow-2xs'
+                          : 'border border-stone-200 dark:border-zinc-800 bg-stone-50 dark:bg-zinc-900 text-stone-700 dark:text-zinc-300 hover:bg-stone-100 dark:hover:bg-zinc-800 hover:border-stone-300 dark:hover:border-zinc-700 hover:text-stone-900 dark:hover:text-zinc-100'
                       }`}
                     >
                       {cat.label}
@@ -1834,17 +1972,17 @@ export function SocialNewsfeedClient({
             {/* MAIN SOCIAL FEED STREAM                                         */}
             {/* =============================================================== */}
             {filteredItems.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-stone-300 bg-white p-12 text-center shadow-xs space-y-3">
-                <MessageSquare className="mx-auto h-9 w-9 text-stone-300" />
+              <div className="rounded-2xl border border-dashed border-stone-300 dark:border-zinc-800 bg-white dark:bg-[#141518] p-12 text-center shadow-xs space-y-3">
+                <MessageSquare className="mx-auto h-9 w-9 text-stone-300 dark:text-zinc-600" />
                 <div>
-                  <h3 className="text-base font-bold text-stone-900">
+                  <h3 className="text-base font-bold text-stone-900 dark:text-zinc-100">
                     {scope === 'saved'
                       ? 'No saved posts yet'
                       : scope === 'my_circles'
                         ? 'No activity in your joined Circles yet'
                         : 'No matching community posts found'}
                   </h3>
-                  <p className="mt-1 text-xs text-stone-500 max-w-sm mx-auto">
+                  <p className="mt-1 text-xs text-stone-500 dark:text-zinc-400 max-w-sm mx-auto">
                     {scope === 'saved'
                       ? 'Bookmark public discussions or resources from any Circle to find them easily here.'
                       : 'Explore public communities or start a new discussion to get the conversation going.'}
@@ -1859,14 +1997,14 @@ export function SocialNewsfeedClient({
                         setContentType('all');
                         setSelectedCategory('all');
                       }}
-                      className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-50"
+                      className="rounded-xl border border-stone-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-4 py-2 text-xs font-semibold text-stone-700 dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-700"
                     >
                       View Public Feed
                     </button>
                   )}
                   <Link
                     href="/explore"
-                    className="rounded-xl bg-black px-4 py-2 text-xs font-semibold text-white hover:bg-zinc-800"
+                    className="rounded-xl bg-black dark:bg-white px-4 py-2 text-xs font-semibold text-white dark:text-black hover:bg-zinc-800 dark:hover:bg-zinc-200"
                   >
                     Explore Communities
                   </Link>
@@ -1902,14 +2040,14 @@ export function SocialNewsfeedClient({
                     return (
                       <article
                         key={item.id}
-                        className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-xs transition-all hover:border-stone-300/90"
+                        className="overflow-hidden rounded-2xl border border-stone-200/90 dark:border-zinc-800 bg-white dark:bg-[#141518] shadow-xs transition-all hover:border-stone-300/90 dark:hover:border-zinc-700"
                       >
                         {/* 1. Facebook-style Clean Header matching reference */}
                         <div className="p-4 sm:p-5 pb-3 flex items-start justify-between gap-3">
                           <div className="flex items-center gap-3 min-w-0">
                             {/* Author Avatar */}
                             <div className="relative shrink-0">
-                              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-stone-900 text-white font-bold border border-stone-200 overflow-hidden shadow-2xs">
+                              <div className="flex h-11 w-11 items-center justify-center rounded-full bg-stone-900 text-white font-bold border border-stone-200 dark:border-zinc-700 overflow-hidden shadow-2xs">
                                 {post.author?.avatar_url ? (
                                   // eslint-disable-next-line @next/next/no-img-element
                                   <img
@@ -1925,7 +2063,7 @@ export function SocialNewsfeedClient({
                               <Link
                                 href={`/circles/${item.circle.slug}`}
                                 title={`Posted in ${item.circle.name}`}
-                                className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-black text-[8px] font-bold text-white border-2 border-white overflow-hidden shadow-2xs hover:scale-110 transition-transform"
+                                className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-black text-[8px] font-bold text-white border-2 border-white dark:border-[#141518] overflow-hidden shadow-2xs hover:scale-110 transition-transform"
                               >
                                 {item.circle.avatar_url ? (
                                   // eslint-disable-next-line @next/next/no-img-element
@@ -1943,39 +2081,39 @@ export function SocialNewsfeedClient({
                             {/* Author & Circle Context Lines (Matching Reference Header) */}
                             <div className="min-w-0 leading-tight">
                               <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="text-base font-bold text-stone-900 hover:underline cursor-pointer">
+                                <span className="text-base font-bold text-stone-900 dark:text-zinc-100 hover:underline cursor-pointer">
                                   {post.author?.display_name || 'Member'}
                                 </span>
                                 {item.authorRole && ['owner', 'admin'].includes(item.authorRole) && (
                                   <CheckCircle2 className="h-4 w-4 fill-[#1877F2] text-white shrink-0" />
                                 )}
                                 {item.authorRole && ['owner', 'admin', 'moderator'].includes(item.authorRole) && (
-                                  <span className="rounded bg-stone-100 px-1.5 py-0.5 text-[9px] font-mono font-bold uppercase text-stone-700 border border-stone-200">
+                                  <span className="rounded bg-stone-100 dark:bg-zinc-800 px-1.5 py-0.5 text-[9px] font-mono font-bold uppercase text-stone-700 dark:text-zinc-300 border border-stone-200 dark:border-zinc-700">
                                     {item.authorRole}
                                   </span>
                                 )}
                               </div>
-                              <div className="mt-1 flex items-center gap-1.5 text-xs text-stone-500">
+                              <div className="mt-1 flex items-center gap-1.5 text-xs text-stone-500 dark:text-zinc-400">
                                 <span>{formatRelativeTime(post.created_at)}</span>
                                 <span>·</span>
                                 <span className="inline-flex items-center gap-1">
-                                  <Globe className="h-3 w-3 text-stone-400" />
+                                  <Globe className="h-3 w-3 text-stone-400 dark:text-zinc-500" />
                                   <span>{item.circle.visibility === 'public' ? 'Public' : 'Members'}</span>
                                 </span>
                                 <span>·</span>
                                 <Link
                                   href={`/circles/${item.circle.slug}`}
-                                  className="text-stone-500 hover:text-stone-900 hover:underline truncate"
+                                  className="text-stone-500 dark:text-zinc-400 hover:text-stone-900 dark:hover:text-zinc-200 hover:underline truncate"
                                 >
                                   {item.circle.name}
                                 </Link>
                                 {post.space?.name && (
-                                  <span className="text-stone-400">
+                                  <span className="text-stone-400 dark:text-zinc-500">
                                     › #{post.space.name}
                                   </span>
                                 )}
                                 {post.is_pinned && (
-                                  <span className="inline-flex items-center gap-0.5 text-stone-900 font-semibold ml-0.5">
+                                  <span className="inline-flex items-center gap-0.5 text-stone-900 dark:text-zinc-100 font-semibold ml-0.5">
                                     · <Pin className="h-3 w-3" /> Pinned
                                   </span>
                                 )}
@@ -1987,7 +2125,7 @@ export function SocialNewsfeedClient({
                           <div className="relative shrink-0 flex items-center gap-2">
                             {!isMember && item.circle.name !== 'Circles' && (
                               isPending ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-semibold text-amber-800 border border-amber-200">
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 dark:bg-amber-950/40 px-2.5 py-1 text-[10px] font-semibold text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
                                   <Clock className="h-2.5 w-2.5" />
                                   <span>Pending</span>
                                 </span>
@@ -1996,7 +2134,7 @@ export function SocialNewsfeedClient({
                                   type="button"
                                   disabled={joiningCircleId === item.circle.id}
                                   onClick={() => handleJoinCircle(item.circle)}
-                                  className="inline-flex items-center gap-1 rounded-full bg-stone-100 hover:bg-stone-200 px-3 py-1 text-xs font-semibold text-stone-900 transition-colors"
+                                  className="inline-flex items-center gap-1 rounded-full bg-stone-100 dark:bg-zinc-800 hover:bg-stone-200 dark:hover:bg-zinc-700 px-3 py-1 text-xs font-semibold text-stone-900 dark:text-zinc-100 transition-colors"
                                 >
                                   <UserPlus className="h-3.5 w-3.5" />
                                   <span>Join</span>
@@ -2012,7 +2150,7 @@ export function SocialNewsfeedClient({
                                   e.stopPropagation();
                                   setActiveMenuPostId(activeMenuPostId === item.id ? null : item.id);
                                 }}
-                                className="rounded-full p-2 text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors"
+                                className="rounded-full p-2 text-stone-400 dark:text-zinc-400 hover:bg-stone-100 dark:hover:bg-zinc-800 hover:text-stone-700 dark:hover:text-zinc-200 transition-colors"
                                 aria-label="More post options"
                               >
                                 <MoreHorizontal className="h-5 w-5" />
@@ -2021,7 +2159,7 @@ export function SocialNewsfeedClient({
                               {activeMenuPostId === item.id && (
                                 <div
                                   onClick={(e) => e.stopPropagation()}
-                                  className="absolute right-0 top-full mt-1 w-48 rounded-xl border border-stone-200 bg-white p-1.5 shadow-lg z-20 animate-in fade-in zoom-in-95 duration-100 space-y-0.5"
+                                  className="absolute right-0 top-full mt-1 w-48 rounded-xl border border-stone-200 dark:border-zinc-800 bg-white dark:bg-[#18191D] p-1.5 shadow-lg z-20 animate-in fade-in zoom-in-95 duration-100 space-y-0.5"
                                 >
                                   <button
                                     type="button"
@@ -2029,7 +2167,7 @@ export function SocialNewsfeedClient({
                                       handleToggleSave(item.circle.id, post.id);
                                       setActiveMenuPostId(null);
                                     }}
-                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 hover:bg-stone-50 font-medium transition-colors"
+                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 dark:text-zinc-300 hover:bg-stone-50 dark:hover:bg-zinc-800 font-medium transition-colors"
                                   >
                                     <Bookmark className={`h-3.5 w-3.5 ${post.viewer_has_saved ? 'fill-purple-600 text-purple-600' : ''}`} />
                                     <span>{post.viewer_has_saved ? 'Remove from Saved' : 'Save Post'}</span>
@@ -2040,7 +2178,7 @@ export function SocialNewsfeedClient({
                                       handleShareUrl(item.id, `/circles/${item.circle.slug}/discussions/${post.id}`);
                                       setActiveMenuPostId(null);
                                     }}
-                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 hover:bg-stone-50 font-medium transition-colors"
+                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 dark:text-zinc-300 hover:bg-stone-50 dark:hover:bg-zinc-800 font-medium transition-colors"
                                   >
                                     <Share2 className="h-3.5 w-3.5" />
                                     <span>{copiedItemId === item.id ? 'Copied Link' : 'Copy link to post'}</span>
@@ -2048,7 +2186,7 @@ export function SocialNewsfeedClient({
                                   <Link
                                     href={`/circles/${item.circle.slug}`}
                                     onClick={() => setActiveMenuPostId(null)}
-                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 hover:bg-stone-50 font-medium transition-colors"
+                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 dark:text-zinc-300 hover:bg-stone-50 dark:hover:bg-zinc-800 font-medium transition-colors"
                                   >
                                     <ArrowRight className="h-3.5 w-3.5" />
                                     <span>Visit Circle</span>
@@ -2064,14 +2202,14 @@ export function SocialNewsfeedClient({
                           {showTitle && (
                             <Link
                               href={`/circles/${item.circle.slug}/discussions/${post.id}`}
-                              className="block text-base sm:text-lg font-bold text-stone-900 hover:text-black tracking-tight leading-snug transition-colors"
+                              className="block text-base sm:text-lg font-bold text-stone-900 dark:text-zinc-100 hover:text-black dark:hover:text-white tracking-tight leading-snug transition-colors"
                             >
                               {post.title}
                             </Link>
                           )}
 
                           {cleanBody && (
-                            <p className="whitespace-pre-line text-sm sm:text-base leading-relaxed text-stone-700 break-words">
+                            <p className="whitespace-pre-line text-sm sm:text-base leading-relaxed text-stone-700 dark:text-zinc-300 break-words">
                               {renderTextWithHashtags(cleanBody, (tag) => {
                                 setSearchQuery(tag);
                                 window.scrollTo({ top: 350, behavior: 'smooth' });
@@ -2081,10 +2219,10 @@ export function SocialNewsfeedClient({
 
                           {/* Attached Images Gallery (Full-bleed / Collage like Facebook) */}
                           {mediaUrls.length > 0 && (
-                            <div className="w-full overflow-hidden rounded-xl border border-stone-200 mt-2">
+                            <div className="w-full overflow-hidden rounded-xl border border-stone-200 dark:border-zinc-800 mt-2">
                               {mediaUrls.length === 1 && (
                                 <div
-                                  className="relative w-full bg-stone-100 cursor-pointer overflow-hidden"
+                                  className="relative w-full bg-stone-100 dark:bg-zinc-900 cursor-pointer overflow-hidden"
                                   onClick={() => window.open(mediaUrls[0], '_blank')}
                                 >
                                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -2100,7 +2238,7 @@ export function SocialNewsfeedClient({
                                   {mediaUrls.map((url, idx) => (
                                     <div
                                       key={idx}
-                                      className="relative bg-stone-100 overflow-hidden cursor-pointer h-64"
+                                      className="relative bg-stone-100 dark:bg-zinc-900 overflow-hidden cursor-pointer h-64"
                                       onClick={() => window.open(url, '_blank')}
                                     >
                                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -2112,7 +2250,7 @@ export function SocialNewsfeedClient({
                               {mediaUrls.length >= 3 && (
                                 <div className="grid grid-cols-2 gap-1 max-h-[380px]">
                                   <div
-                                    className="relative bg-stone-100 overflow-hidden cursor-pointer h-72"
+                                    className="relative bg-stone-100 dark:bg-zinc-900 overflow-hidden cursor-pointer h-72"
                                     onClick={() => window.open(mediaUrls[0], '_blank')}
                                   >
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -2120,14 +2258,14 @@ export function SocialNewsfeedClient({
                                   </div>
                                   <div className="flex flex-col gap-1 h-72">
                                     <div
-                                      className="relative bg-stone-100 overflow-hidden cursor-pointer flex-1"
+                                      className="relative bg-stone-100 dark:bg-zinc-900 overflow-hidden cursor-pointer flex-1"
                                       onClick={() => window.open(mediaUrls[1], '_blank')}
                                     >
                                       {/* eslint-disable-next-line @next/next/no-img-element */}
                                       <img src={mediaUrls[1]} alt="Photo 2" className="w-full h-full object-cover hover:brightness-95" />
                                     </div>
                                     <div
-                                      className="relative bg-stone-100 overflow-hidden cursor-pointer flex-1"
+                                      className="relative bg-stone-100 dark:bg-zinc-900 overflow-hidden cursor-pointer flex-1"
                                       onClick={() => window.open(mediaUrls[2], '_blank')}
                                     >
                                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -2146,17 +2284,17 @@ export function SocialNewsfeedClient({
 
                           {/* Attached Resource Card */}
                           {resource && (
-                            <div className="rounded-xl border border-stone-200 bg-stone-50/80 p-3.5">
+                            <div className="rounded-xl border border-stone-200 dark:border-zinc-800 bg-stone-50/80 dark:bg-zinc-900/60 p-3.5">
                               <div className="flex items-start justify-between gap-3">
                                 <div className="flex items-start gap-2.5 min-w-0">
-                                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#F4F3EE] text-stone-900">
+                                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#F4F3EE] dark:bg-zinc-800 text-stone-900 dark:text-zinc-100">
                                     <BookOpen className="h-4 w-4" />
                                   </div>
                                   <div className="min-w-0">
-                                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-stone-900">
+                                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-stone-900 dark:text-zinc-300">
                                       {resource.category}
                                     </span>
-                                    <h4 className="text-sm font-bold text-stone-900 truncate">
+                                    <h4 className="text-sm font-bold text-stone-900 dark:text-zinc-100 truncate">
                                       {resource.title}
                                     </h4>
                                   </div>
@@ -2166,7 +2304,7 @@ export function SocialNewsfeedClient({
                                     href={resource.url}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-black px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800"
+                                    className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-black dark:bg-white px-3 py-1.5 text-xs font-semibold text-white dark:text-black hover:bg-zinc-800 dark:hover:bg-zinc-200"
                                   >
                                     <span>Open</span>
                                     <ExternalLink className="h-3 w-3" />
@@ -2178,13 +2316,13 @@ export function SocialNewsfeedClient({
 
                           {/* Attached Interactive Poll */}
                           {attachedPoll && (
-                            <div className="mt-2 rounded-xl border border-stone-200 bg-stone-50/80 p-4 space-y-2.5">
+                            <div className="mt-2 rounded-xl border border-stone-200 dark:border-zinc-800 bg-stone-50/80 dark:bg-zinc-900/60 p-4 space-y-2.5">
                               <div className="flex items-center justify-between gap-2">
-                                <span className="text-xs sm:text-sm font-bold text-stone-900 flex items-center gap-1.5">
-                                  <BarChart2 className="h-4 w-4 text-stone-900" />
+                                <span className="text-xs sm:text-sm font-bold text-stone-900 dark:text-zinc-100 flex items-center gap-1.5">
+                                  <BarChart2 className="h-4 w-4 text-stone-900 dark:text-zinc-100" />
                                   {attachedPoll.question}
                                 </span>
-                                <span className="text-[11px] font-mono text-stone-500">
+                                <span className="text-[11px] font-mono text-stone-500 dark:text-zinc-400">
                                   {attachedPoll.status === 'closed'
                                     ? 'Closed'
                                     : `${attachedPoll.total_votes || 0} votes`}
@@ -2217,22 +2355,22 @@ export function SocialNewsfeedClient({
                                       }
                                       className={`relative w-full overflow-hidden rounded-xl border px-3.5 py-2 text-left text-xs transition-all ${
                                         opt.viewer_voted
-                                          ? 'border-stone-900 bg-white font-semibold text-stone-900'
-                                          : 'border-stone-200 bg-white text-stone-700 hover:border-stone-300'
+                                          ? 'border-stone-900 dark:border-zinc-400 bg-white dark:bg-zinc-800 font-semibold text-stone-900 dark:text-zinc-100'
+                                          : 'border-stone-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-stone-700 dark:text-zinc-300 hover:border-stone-300 dark:hover:border-zinc-600'
                                       }`}
                                     >
                                       <div
-                                        className="pointer-events-none absolute inset-y-0 left-0 bg-stone-100/60"
+                                        className="pointer-events-none absolute inset-y-0 left-0 bg-stone-100/60 dark:bg-zinc-700/50"
                                         style={{ width: `${pct}%` }}
                                       />
                                       <div className="relative flex items-center justify-between gap-2">
                                         <span className="flex items-center gap-1.5">
                                           {opt.viewer_voted && (
-                                            <Check className="h-3.5 w-3.5 text-stone-900" />
+                                            <Check className="h-3.5 w-3.5 text-stone-900 dark:text-zinc-100" />
                                           )}
                                           <span>{opt.label}</span>
                                         </span>
-                                        <span className="text-[11px] font-mono text-stone-500">
+                                        <span className="text-[11px] font-mono text-stone-500 dark:text-zinc-400">
                                           {pct}%
                                         </span>
                                       </div>
@@ -2241,7 +2379,7 @@ export function SocialNewsfeedClient({
                                 })}
                               </div>
                               {!isMember && (
-                                <p className="text-[11px] text-stone-400">
+                                <p className="text-[11px] text-stone-400 dark:text-zinc-500">
                                   Join {item.circle.name} to vote in this poll.
                                 </p>
                               )}
@@ -2251,7 +2389,7 @@ export function SocialNewsfeedClient({
 
                         {/* 3. Social Engagement Stats Row (Only shown when there are real reactions or comments) */}
                         {(post.reaction_count > 0 || post.comment_count > 0) && (
-                          <div className="flex items-center justify-between px-4 sm:px-5 py-2 text-xs text-stone-500 border-t border-stone-100">
+                          <div className="flex items-center justify-between px-4 sm:px-5 py-2 text-xs text-stone-500 dark:text-zinc-400 border-t border-stone-100 dark:border-zinc-800">
                             {/* Real Reactions: 👍 ❤️ */}
                             <div className="flex items-center gap-1.5">
                               {post.reaction_count > 0 && (
@@ -2264,7 +2402,7 @@ export function SocialNewsfeedClient({
                                       <Heart className="h-2.5 w-2.5 fill-white text-white" />
                                     </span>
                                   </div>
-                                  <span className="font-semibold text-stone-700 text-xs">
+                                  <span className="font-semibold text-stone-700 dark:text-zinc-300 text-xs">
                                     {post.reaction_count >= 1000
                                       ? `${(post.reaction_count / 1000).toFixed(1)}K`
                                       : post.reaction_count}
@@ -2278,7 +2416,7 @@ export function SocialNewsfeedClient({
                               <button
                                 type="button"
                                 onClick={() => handleToggleComments(item.circle.id, post.id)}
-                                className="hover:underline text-xs text-stone-500 font-medium"
+                                className="hover:underline text-xs text-stone-500 dark:text-zinc-400 font-medium"
                               >
                                 {post.comment_count} {post.comment_count === 1 ? 'comment' : 'comments'}
                               </button>
@@ -2287,16 +2425,16 @@ export function SocialNewsfeedClient({
                         )}
 
                         {/* 4. Facebook-style 4-Button Action Bar matching reference image */}
-                        <div className="grid grid-cols-4 border-t border-stone-100 px-1 sm:px-2 py-1 text-[11px] sm:text-xs md:text-sm font-semibold text-stone-600">
+                        <div className="grid grid-cols-4 border-t border-stone-100 dark:border-zinc-800 px-1 sm:px-2 py-1 text-[11px] sm:text-xs md:text-sm font-semibold text-stone-600 dark:text-zinc-400">
                           {/* Like Button */}
                           <button
                             type="button"
                             onClick={() => handleToggleLike(item.circle.id, post.id)}
-                            className={`inline-flex items-center justify-center gap-1 sm:gap-1.5 rounded-xl py-2 sm:py-2.5 hover:bg-stone-50 transition-colors ${
-                              post.viewer_has_liked ? 'text-[#1877F2] font-bold' : 'text-stone-600 hover:text-stone-900'
+                            className={`inline-flex items-center justify-center gap-1 sm:gap-1.5 rounded-xl py-2 sm:py-2.5 hover:bg-stone-50 dark:hover:bg-zinc-800/60 transition-colors ${
+                              post.viewer_has_liked ? 'text-[#1877F2] font-bold' : 'text-stone-600 dark:text-zinc-400 hover:text-stone-900 dark:hover:text-zinc-200'
                             }`}
                           >
-                            <ThumbsUp className={`h-4 w-4 shrink-0 ${post.viewer_has_liked ? 'fill-[#1877F2] text-[#1877F2]' : 'text-stone-500'}`} />
+                            <ThumbsUp className={`h-4 w-4 shrink-0 ${post.viewer_has_liked ? 'fill-[#1877F2] text-[#1877F2]' : 'text-stone-500 dark:text-zinc-400'}`} />
                             <span>Like</span>
                           </button>
 
@@ -2304,11 +2442,11 @@ export function SocialNewsfeedClient({
                           <button
                             type="button"
                             onClick={() => handleToggleComments(item.circle.id, post.id)}
-                            className={`inline-flex items-center justify-center gap-1 sm:gap-1.5 rounded-xl py-2 sm:py-2.5 hover:bg-stone-50 transition-colors ${
-                              isCommentsOpen ? 'text-stone-900 bg-stone-100 font-bold' : 'text-stone-600 hover:text-stone-900'
+                            className={`inline-flex items-center justify-center gap-1 sm:gap-1.5 rounded-xl py-2 sm:py-2.5 hover:bg-stone-50 dark:hover:bg-zinc-800/60 transition-colors ${
+                              isCommentsOpen ? 'text-stone-900 dark:text-white bg-stone-100 dark:bg-zinc-800 font-bold' : 'text-stone-600 dark:text-zinc-400 hover:text-stone-900 dark:hover:text-zinc-200'
                             }`}
                           >
-                            <MessageSquare className="h-4 w-4 shrink-0 text-stone-500" />
+                            <MessageSquare className="h-4 w-4 shrink-0 text-stone-500 dark:text-zinc-400" />
                             <span>Comment</span>
                           </button>
 
@@ -2316,16 +2454,16 @@ export function SocialNewsfeedClient({
                           <button
                             type="button"
                             onClick={() => handleShareUrl(item.id, `/circles/${item.circle.slug}/discussions/${post.id}`)}
-                            className="inline-flex items-center justify-center gap-1 sm:gap-1.5 rounded-xl py-2 sm:py-2.5 hover:bg-stone-50 text-stone-600 hover:text-stone-900 transition-colors"
+                            className="inline-flex items-center justify-center gap-1 sm:gap-1.5 rounded-xl py-2 sm:py-2.5 hover:bg-stone-50 dark:hover:bg-zinc-800/60 text-stone-600 dark:text-zinc-400 hover:text-stone-900 dark:hover:text-zinc-200 transition-colors"
                           >
                             {copiedItemId === item.id ? (
                               <>
-                                <Check className="h-4 w-4 shrink-0 text-emerald-600" />
-                                <span className="text-emerald-700">Copied</span>
+                                <Check className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                                <span className="text-emerald-700 dark:text-emerald-300">Copied</span>
                               </>
                             ) : (
                               <>
-                                <Share2 className="h-4 w-4 shrink-0 text-stone-500" />
+                                <Share2 className="h-4 w-4 shrink-0 text-stone-500 dark:text-zinc-400" />
                                 <span>Share</span>
                               </>
                             )}
@@ -2335,24 +2473,24 @@ export function SocialNewsfeedClient({
                           <button
                             type="button"
                             onClick={() => handleToggleSave(item.circle.id, post.id)}
-                            className={`inline-flex items-center justify-center gap-1 sm:gap-1.5 rounded-xl py-2 sm:py-2.5 hover:bg-stone-50 transition-colors ${
-                              post.viewer_has_saved ? 'text-purple-600 font-bold' : 'text-stone-600 hover:text-stone-900'
+                            className={`inline-flex items-center justify-center gap-1 sm:gap-1.5 rounded-xl py-2 sm:py-2.5 hover:bg-stone-50 dark:hover:bg-zinc-800/60 transition-colors ${
+                              post.viewer_has_saved ? 'text-purple-600 dark:text-purple-400 font-bold' : 'text-stone-600 dark:text-zinc-400 hover:text-stone-900 dark:hover:text-zinc-200'
                             }`}
                           >
-                            <Bookmark className={`h-4 w-4 shrink-0 ${post.viewer_has_saved ? 'fill-purple-600 text-purple-600' : 'text-stone-500'}`} />
+                            <Bookmark className={`h-4 w-4 shrink-0 ${post.viewer_has_saved ? 'fill-purple-600 text-purple-600 dark:fill-purple-400 dark:text-purple-400' : 'text-stone-500 dark:text-zinc-400'}`} />
                             <span>{post.viewer_has_saved ? 'Saved' : 'Save'}</span>
                           </button>
                         </div>
 
                         {/* 5. Facebook-style Inline Comments Section */}
                         {isCommentsOpen && (
-                          <div className="border-t border-stone-100 bg-stone-50/50 px-4 py-3.5 space-y-3">
+                          <div className="border-t border-stone-100 dark:border-zinc-800 bg-stone-50/50 dark:bg-zinc-900/40 px-4 py-3.5 space-y-3">
                             {isLoadingComments ? (
-                              <p className="py-3 text-center text-xs text-stone-400">
+                              <p className="py-3 text-center text-xs text-stone-400 dark:text-zinc-500">
                                 Loading comments...
                               </p>
                             ) : postComments.length === 0 ? (
-                              <p className="py-2 text-center text-xs text-stone-500">
+                              <p className="py-2 text-center text-xs text-stone-500 dark:text-zinc-400">
                                 No comments yet. Be the first to start the conversation!
                               </p>
                             ) : (
@@ -2362,7 +2500,7 @@ export function SocialNewsfeedClient({
                                     key={comment.id}
                                     className="flex items-start gap-2.5"
                                   >
-                                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-stone-200 text-xs font-bold text-stone-800 overflow-hidden border border-stone-200">
+                                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-stone-200 dark:bg-zinc-800 text-xs font-bold text-stone-800 dark:text-zinc-200 overflow-hidden border border-stone-200 dark:border-zinc-700">
                                       {comment.author?.avatar_url ? (
                                         // eslint-disable-next-line @next/next/no-img-element
                                         <img
@@ -2377,15 +2515,15 @@ export function SocialNewsfeedClient({
                                       )}
                                     </div>
                                     <div className="min-w-0 max-w-[85%]">
-                                      <div className="rounded-2xl bg-white px-3.5 py-2 border border-stone-200/80 shadow-2xs">
-                                        <span className="text-xs font-bold text-stone-900 block leading-tight">
+                                      <div className="rounded-2xl bg-white dark:bg-zinc-800/90 px-3.5 py-2 border border-stone-200/80 dark:border-zinc-700 shadow-2xs">
+                                        <span className="text-xs font-bold text-stone-900 dark:text-zinc-100 block leading-tight">
                                           {comment.author?.display_name || 'Member'}
                                         </span>
-                                        <p className="mt-0.5 whitespace-pre-line text-xs text-stone-800 leading-relaxed">
+                                        <p className="mt-0.5 whitespace-pre-line text-xs text-stone-800 dark:text-zinc-200 leading-relaxed">
                                           {comment.body}
                                         </p>
                                       </div>
-                                      <span className="text-[10px] text-stone-400 pl-2 mt-0.5 block">
+                                      <span className="text-[10px] text-stone-400 dark:text-zinc-500 pl-2 mt-0.5 block">
                                         {formatRelativeTime(comment.created_at)}
                                       </span>
                                     </div>
@@ -2396,13 +2534,13 @@ export function SocialNewsfeedClient({
 
                             {/* Inline Comment Input Box */}
                             {!currentUser ? (
-                              <div className="flex items-center justify-between rounded-xl border border-stone-200 bg-white px-3.5 py-2.5 text-xs">
-                                <span className="text-stone-600">
+                              <div className="flex items-center justify-between rounded-xl border border-stone-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3.5 py-2.5 text-xs">
+                                <span className="text-stone-600 dark:text-zinc-300">
                                   Sign in to join {item.circle.name} and reply to this post.
                                 </span>
                                 <Link
                                   href="/login"
-                                  className="rounded-lg bg-black px-3 py-1.5 font-semibold text-white hover:bg-zinc-800"
+                                  className="rounded-lg bg-black dark:bg-white px-3 py-1.5 font-semibold text-white dark:text-black hover:bg-zinc-800 dark:hover:bg-zinc-200"
                                 >
                                   Sign In
                                 </Link>
@@ -2414,7 +2552,7 @@ export function SocialNewsfeedClient({
                                 }
                                 className="flex items-center gap-2 pt-1"
                               >
-                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black text-xs font-bold text-white overflow-hidden border border-stone-200">
+                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black text-xs font-bold text-white overflow-hidden border border-stone-200 dark:border-zinc-700">
                                   {currentUser.avatar_url ? (
                                     // eslint-disable-next-line @next/next/no-img-element
                                     <img
@@ -2436,24 +2574,24 @@ export function SocialNewsfeedClient({
                                     }))
                                   }
                                   placeholder={`Write a comment in ${item.circle.name}...`}
-                                  className="flex-1 rounded-full border border-stone-200 bg-white px-4 py-2 text-xs text-stone-900 placeholder:text-stone-400 focus:border-black focus:outline-none shadow-2xs"
+                                  className="flex-1 rounded-full border border-stone-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-4 py-2 text-xs text-stone-900 dark:text-zinc-100 placeholder:text-stone-400 dark:placeholder:text-zinc-500 focus:border-black dark:focus:border-zinc-400 focus:outline-none shadow-2xs"
                                 />
                                 <button
                                   type="submit"
                                   disabled={isSubmittingComment || !commentDraft.trim()}
-                                  className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-black text-white hover:bg-stone-800 disabled:opacity-40 transition-colors shrink-0 shadow-2xs"
+                                  className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-black dark:bg-white text-white dark:text-black hover:bg-stone-800 dark:hover:bg-zinc-200 disabled:opacity-40 transition-colors shrink-0 shadow-2xs"
                                   title="Send comment"
                                 >
                                   <Send className="h-3.5 w-3.5" />
                                 </button>
                               </form>
                             ) : (
-                              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-stone-200 bg-stone-100 px-3.5 py-2.5 text-xs">
-                                <span className="text-stone-700">
+                              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-stone-200 dark:border-zinc-700 bg-stone-100 dark:bg-zinc-800 px-3.5 py-2.5 text-xs">
+                                <span className="text-stone-700 dark:text-zinc-300">
                                   Join <strong>{item.circle.name}</strong> to comment on community discussions.
                                 </span>
                                 {isPending ? (
-                                  <span className="font-semibold text-amber-800">
+                                  <span className="font-semibold text-amber-800 dark:text-amber-300">
                                     Join Request Pending
                                   </span>
                                 ) : (
@@ -2461,7 +2599,7 @@ export function SocialNewsfeedClient({
                                     type="button"
                                     disabled={joiningCircleId === item.circle.id}
                                     onClick={() => handleJoinCircle(item.circle)}
-                                    className="inline-flex items-center gap-1 rounded-lg bg-black px-3 py-1.5 font-semibold text-white hover:bg-zinc-800 disabled:opacity-50"
+                                    className="inline-flex items-center gap-1 rounded-lg bg-black dark:bg-white px-3 py-1.5 font-semibold text-white dark:text-black hover:bg-zinc-800 dark:hover:bg-zinc-200 disabled:opacity-50"
                                   >
                                     <UserPlus className="h-3.5 w-3.5" />
                                     <span>
@@ -2492,13 +2630,13 @@ export function SocialNewsfeedClient({
                     return (
                       <article
                         key={item.id}
-                        className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white p-5 shadow-xs transition-all hover:border-stone-300/90 space-y-3.5"
+                        className="overflow-hidden rounded-2xl border border-stone-200/90 dark:border-zinc-800 bg-white dark:bg-[#141518] p-5 shadow-xs transition-all hover:border-stone-300/90 dark:hover:border-zinc-700 space-y-3.5"
                       >
                         {/* Facebook-style Clean Header */}
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-center gap-3 min-w-0">
                             <div className="relative shrink-0">
-                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-sm font-bold text-stone-800 border border-stone-200 overflow-hidden shadow-2xs">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 dark:bg-zinc-800 text-sm font-bold text-stone-800 dark:text-zinc-200 border border-stone-200 dark:border-zinc-700 overflow-hidden shadow-2xs">
                                 {(ev.host?.avatar_url || ev.organizer?.avatar_url) ? (
                                   // eslint-disable-next-line @next/next/no-img-element
                                   <img
@@ -2513,7 +2651,7 @@ export function SocialNewsfeedClient({
                               <Link
                                 href={`/circles/${item.circle.slug}`}
                                 title={item.circle.name}
-                                className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-black text-[8px] font-bold text-white border-2 border-white overflow-hidden shadow-2xs"
+                                className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-black text-[8px] font-bold text-white border-2 border-white dark:border-[#141518] overflow-hidden shadow-2xs"
                               >
                                 {item.circle.avatar_url ? (
                                   // eslint-disable-next-line @next/next/no-img-element
@@ -2526,25 +2664,25 @@ export function SocialNewsfeedClient({
 
                             <div className="min-w-0 leading-tight">
                               <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-                                <span className="text-sm font-bold text-stone-900 hover:underline">
+                                <span className="text-sm font-bold text-stone-900 dark:text-zinc-100 hover:underline">
                                   {ev.host?.display_name || ev.organizer?.display_name || 'Host'}
                                 </span>
-                                <span className="text-xs text-stone-400 font-normal">created an event in</span>
+                                <span className="text-xs text-stone-400 dark:text-zinc-500 font-normal">created an event in</span>
                                 <Link
                                   href={`/circles/${item.circle.slug}`}
-                                  className="text-sm font-semibold text-stone-900 hover:underline truncate"
+                                  className="text-sm font-semibold text-stone-900 dark:text-zinc-100 hover:underline truncate"
                                 >
                                   {item.circle.name}
                                 </Link>
                               </div>
-                              <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-stone-400">
+                              <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-stone-400 dark:text-zinc-500">
                                 <span>{formatRelativeTime(ev.created_at)}</span>
                                 <span>·</span>
                                 <span className="inline-flex items-center gap-1">
                                   {ev.location_type === 'in_person' ? (
-                                    <MapPin className="h-2.5 w-2.5 text-amber-600" />
+                                    <MapPin className="h-2.5 w-2.5 text-amber-600 dark:text-amber-400" />
                                   ) : (
-                                    <Video className="h-2.5 w-2.5 text-sky-600" />
+                                    <Video className="h-2.5 w-2.5 text-sky-600 dark:text-sky-400" />
                                   )}
                                   <span>{channelLabel}</span>
                                 </span>
@@ -2553,7 +2691,7 @@ export function SocialNewsfeedClient({
                           </div>
 
                           <div className="flex items-center gap-1.5 shrink-0">
-                            <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-[10px] font-mono font-semibold text-sky-800 border border-sky-200">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 dark:bg-sky-950/40 px-2.5 py-0.5 text-[10px] font-mono font-semibold text-sky-800 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
                               EVENT
                             </span>
                             <div className="relative">
@@ -2563,7 +2701,7 @@ export function SocialNewsfeedClient({
                                   e.stopPropagation();
                                   setActiveMenuPostId(activeMenuPostId === item.id ? null : item.id);
                                 }}
-                                className="rounded-full p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors"
+                                className="rounded-full p-1 text-stone-400 dark:text-zinc-400 hover:bg-stone-100 dark:hover:bg-zinc-800 hover:text-stone-700 dark:hover:text-zinc-200 transition-colors"
                                 aria-label="More options"
                               >
                                 <MoreHorizontal className="h-4 w-4" />
@@ -2571,7 +2709,7 @@ export function SocialNewsfeedClient({
                               {activeMenuPostId === item.id && (
                                 <div
                                   onClick={(e) => e.stopPropagation()}
-                                  className="absolute right-0 top-full mt-1 w-44 rounded-xl border border-stone-200 bg-white p-1.5 shadow-lg z-20 animate-in fade-in zoom-in-95 duration-100 space-y-0.5"
+                                  className="absolute right-0 top-full mt-1 w-44 rounded-xl border border-stone-200 dark:border-zinc-800 bg-white dark:bg-[#18191D] p-1.5 shadow-lg z-20 animate-in fade-in zoom-in-95 duration-100 space-y-0.5"
                                 >
                                   <button
                                     type="button"
@@ -2579,7 +2717,7 @@ export function SocialNewsfeedClient({
                                       handleShareUrl(item.id, `/circles/${item.circle.slug}/events`);
                                       setActiveMenuPostId(null);
                                     }}
-                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 hover:bg-stone-50 font-medium transition-colors"
+                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 dark:text-zinc-300 hover:bg-stone-50 dark:hover:bg-zinc-800 font-medium transition-colors"
                                   >
                                     <Share2 className="h-3.5 w-3.5" />
                                     <span>{copiedItemId === item.id ? 'Copied Link' : 'Copy event link'}</span>
@@ -2587,7 +2725,7 @@ export function SocialNewsfeedClient({
                                   <Link
                                     href={`/circles/${item.circle.slug}`}
                                     onClick={() => setActiveMenuPostId(null)}
-                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 hover:bg-stone-50 font-medium transition-colors"
+                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 dark:text-zinc-300 hover:bg-stone-50 dark:hover:bg-zinc-800 font-medium transition-colors"
                                   >
                                     <ArrowRight className="h-3.5 w-3.5" />
                                     <span>Visit Circle</span>
@@ -2600,7 +2738,7 @@ export function SocialNewsfeedClient({
 
                         {/* Event Cover Image if provided */}
                         {ev.cover_image_url && (
-                          <div className="relative overflow-hidden rounded-xl border border-stone-200 bg-stone-100 aspect-[21/9] max-h-56 w-full">
+                          <div className="relative overflow-hidden rounded-xl border border-stone-200 dark:border-zinc-800 bg-stone-100 dark:bg-zinc-900 aspect-[21/9] max-h-56 w-full">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img
                               src={ev.cover_image_url}
@@ -2611,12 +2749,12 @@ export function SocialNewsfeedClient({
                         )}
 
                         {/* Event Card Body */}
-                        <div className="flex items-start gap-4 rounded-xl border border-stone-200/80 bg-[#FAF9F6] p-4">
-                          <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center overflow-hidden rounded-xl border border-stone-200 bg-white shadow-2xs">
-                            <span className="w-full bg-black py-0.5 text-center text-[9px] font-mono font-bold uppercase text-white">
+                        <div className="flex items-start gap-4 rounded-xl border border-stone-200/80 dark:border-zinc-800 bg-[#FAF9F6] dark:bg-zinc-900/60 p-4">
+                          <div className="flex h-14 w-14 shrink-0 flex-col items-center justify-center overflow-hidden rounded-xl border border-stone-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 shadow-2xs">
+                            <span className="w-full bg-black dark:bg-white py-0.5 text-center text-[9px] font-mono font-bold uppercase text-white dark:text-black">
                               {startDate.toLocaleDateString([], { month: 'short' })}
                             </span>
-                            <span className="py-1 text-lg font-extrabold text-stone-900 leading-none">
+                            <span className="py-1 text-lg font-extrabold text-stone-900 dark:text-zinc-100 leading-none">
                               {startDate.getDate()}
                             </span>
                           </div>
@@ -2624,11 +2762,11 @@ export function SocialNewsfeedClient({
                           <div className="min-w-0 flex-1 space-y-1">
                             <Link
                               href={`/circles/${item.circle.slug}/events`}
-                              className="block text-sm sm:text-base font-bold text-stone-900 hover:text-black"
+                              className="block text-sm sm:text-base font-bold text-stone-900 dark:text-zinc-100 hover:text-black dark:hover:text-white"
                             >
                               {ev.title}
                             </Link>
-                            <p className="text-xs text-stone-500">
+                            <p className="text-xs text-stone-500 dark:text-zinc-400">
                               {startDate.toLocaleDateString([], {
                                 weekday: 'short',
                                 month: 'short',
@@ -2642,7 +2780,7 @@ export function SocialNewsfeedClient({
                               ({ev.timezone || 'UTC'})
                             </p>
                             {ev.description && (
-                              <p className="line-clamp-2 text-xs text-stone-600 pt-0.5">
+                              <p className="line-clamp-2 text-xs text-stone-600 dark:text-zinc-400 pt-0.5">
                                 {ev.description}
                               </p>
                             )}
@@ -2651,8 +2789,8 @@ export function SocialNewsfeedClient({
 
                         {/* Event Footer */}
                         <div className="flex items-center justify-between pt-1">
-                          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-stone-600">
-                            <Users className="h-3.5 w-3.5 text-stone-400" />
+                          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-stone-600 dark:text-zinc-400">
+                            <Users className="h-3.5 w-3.5 text-stone-400 dark:text-zinc-500" />
                             {ev.going_count || 0} attending
                           </span>
 
@@ -2670,8 +2808,8 @@ export function SocialNewsfeedClient({
                                 }
                                 className={`inline-flex items-center gap-1 rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all ${
                                   isGoing
-                                    ? 'bg-stone-100 text-stone-900 border border-stone-300'
-                                    : 'bg-black text-white hover:bg-zinc-800'
+                                    ? 'bg-stone-100 dark:bg-zinc-800 text-stone-900 dark:text-zinc-100 border border-stone-300 dark:border-zinc-700'
+                                    : 'bg-black dark:bg-white text-white dark:text-black hover:bg-zinc-800 dark:hover:bg-zinc-200'
                                 }`}
                               >
                                 {isGoing && <CheckCircle2 className="h-3.5 w-3.5" />}
@@ -2680,7 +2818,7 @@ export function SocialNewsfeedClient({
                             ) : (
                               <Link
                                 href={`/circles/${item.circle.slug}/events`}
-                                className="inline-flex items-center gap-1 rounded-xl border border-stone-200 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50"
+                                className="inline-flex items-center gap-1 rounded-xl border border-stone-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 px-3 py-1.5 text-xs font-semibold text-stone-700 dark:text-zinc-200 hover:bg-stone-50 dark:hover:bg-zinc-700"
                               >
                                 <span>View Event</span>
                                 <ArrowRight className="h-3 w-3" />
@@ -2702,13 +2840,13 @@ export function SocialNewsfeedClient({
                     return (
                       <article
                         key={item.id}
-                        className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white p-4 sm:p-5 shadow-xs transition-all hover:border-stone-300/90 space-y-3"
+                        className="overflow-hidden rounded-2xl border border-stone-200/90 dark:border-zinc-800 bg-white dark:bg-[#141518] p-4 sm:p-5 shadow-xs transition-all hover:border-stone-300/90 dark:hover:border-zinc-700 space-y-3"
                       >
                         {/* Facebook-style Clean Header */}
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-center gap-3 min-w-0">
                             <div className="relative shrink-0">
-                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-sm font-bold text-stone-800 border border-stone-200 overflow-hidden shadow-2xs">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 dark:bg-zinc-800 text-sm font-bold text-stone-800 dark:text-zinc-200 border border-stone-200 dark:border-zinc-700 overflow-hidden shadow-2xs">
                                 {listing.seller?.avatar_url ? (
                                   // eslint-disable-next-line @next/next/no-img-element
                                   <img
@@ -2723,7 +2861,7 @@ export function SocialNewsfeedClient({
                               <Link
                                 href={`/circles/${item.circle.slug}`}
                                 title={item.circle.name}
-                                className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-black text-[8px] font-bold text-white border-2 border-white overflow-hidden shadow-2xs hover:scale-110 transition-transform"
+                                className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-black text-[8px] font-bold text-white border-2 border-white dark:border-[#141518] overflow-hidden shadow-2xs hover:scale-110 transition-transform"
                               >
                                 {item.circle.avatar_url ? (
                                   // eslint-disable-next-line @next/next/no-img-element
@@ -2736,18 +2874,18 @@ export function SocialNewsfeedClient({
 
                             <div className="min-w-0 leading-tight">
                               <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-                                <span className="text-sm font-bold text-stone-900 hover:underline">
+                                <span className="text-sm font-bold text-stone-900 dark:text-zinc-100 hover:underline">
                                   {listing.seller?.display_name || 'Member'}
                                 </span>
-                                <span className="text-xs text-stone-400 font-normal">listed an item in</span>
+                                <span className="text-xs text-stone-400 dark:text-zinc-500 font-normal">listed an item in</span>
                                 <Link
                                   href={`/circles/${item.circle.slug}`}
-                                  className="text-sm font-semibold text-stone-900 hover:underline truncate"
+                                  className="text-sm font-semibold text-stone-900 dark:text-zinc-100 hover:underline truncate"
                                 >
                                   {item.circle.name}
                                 </Link>
                               </div>
-                              <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-stone-400">
+                              <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-stone-400 dark:text-zinc-500">
                                 <span>{formatRelativeTime(listing.created_at)}</span>
                                 <span>·</span>
                                 <span className="capitalize">{listing.category || 'Marketplace'}</span>
@@ -2755,7 +2893,7 @@ export function SocialNewsfeedClient({
                                   <>
                                     <span>·</span>
                                     <span className="inline-flex items-center gap-0.5">
-                                      <MapPin className="h-2.5 w-2.5 text-stone-400" />
+                                      <MapPin className="h-2.5 w-2.5 text-stone-400 dark:text-zinc-500" />
                                       {listing.location}
                                     </span>
                                   </>
@@ -2765,7 +2903,7 @@ export function SocialNewsfeedClient({
                           </div>
 
                           <div className="flex items-center gap-1.5 shrink-0">
-                            <span className="rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-mono font-bold text-stone-900 border border-stone-200">
+                            <span className="rounded-full bg-stone-100 dark:bg-zinc-800 px-2.5 py-0.5 text-xs font-mono font-bold text-stone-900 dark:text-zinc-100 border border-stone-200 dark:border-zinc-700">
                               {priceText}
                             </span>
                             <div className="relative">
@@ -2775,7 +2913,7 @@ export function SocialNewsfeedClient({
                                   e.stopPropagation();
                                   setActiveMenuPostId(activeMenuPostId === item.id ? null : item.id);
                                 }}
-                                className="rounded-full p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors"
+                                className="rounded-full p-1 text-stone-400 dark:text-zinc-400 hover:bg-stone-100 dark:hover:bg-zinc-800 hover:text-stone-700 dark:hover:text-zinc-200 transition-colors"
                                 aria-label="More options"
                               >
                                 <MoreHorizontal className="h-4 w-4" />
@@ -2783,7 +2921,7 @@ export function SocialNewsfeedClient({
                               {activeMenuPostId === item.id && (
                                 <div
                                   onClick={(e) => e.stopPropagation()}
-                                  className="absolute right-0 top-full mt-1 w-44 rounded-xl border border-stone-200 bg-white p-1.5 shadow-lg z-20 animate-in fade-in zoom-in-95 duration-100 space-y-0.5"
+                                  className="absolute right-0 top-full mt-1 w-44 rounded-xl border border-stone-200 dark:border-zinc-800 bg-white dark:bg-[#18191D] p-1.5 shadow-lg z-20 animate-in fade-in zoom-in-95 duration-100 space-y-0.5"
                                 >
                                   <button
                                     type="button"
@@ -2791,7 +2929,7 @@ export function SocialNewsfeedClient({
                                       handleShareUrl(item.id, `/circles/${item.circle.slug}/marketplace/${listing.id}`);
                                       setActiveMenuPostId(null);
                                     }}
-                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 hover:bg-stone-50 font-medium transition-colors"
+                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 dark:text-zinc-300 hover:bg-stone-50 dark:hover:bg-zinc-800 font-medium transition-colors"
                                   >
                                     <Share2 className="h-3.5 w-3.5" />
                                     <span>{copiedItemId === item.id ? 'Copied Link' : 'Copy listing link'}</span>
@@ -2799,7 +2937,7 @@ export function SocialNewsfeedClient({
                                   <Link
                                     href={`/circles/${item.circle.slug}`}
                                     onClick={() => setActiveMenuPostId(null)}
-                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 hover:bg-stone-50 font-medium transition-colors"
+                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 dark:text-zinc-300 hover:bg-stone-50 dark:hover:bg-zinc-800 font-medium transition-colors"
                                   >
                                     <ArrowRight className="h-3.5 w-3.5" />
                                     <span>Visit Circle</span>
@@ -2811,24 +2949,24 @@ export function SocialNewsfeedClient({
                         </div>
 
                         {/* Listing Content Body */}
-                        <div className="flex flex-col sm:flex-row gap-3.5 rounded-xl border border-stone-200/80 bg-stone-50/50 p-3">
+                        <div className="flex flex-col sm:flex-row gap-3.5 rounded-xl border border-stone-200/80 dark:border-zinc-800 bg-stone-50/50 dark:bg-zinc-900/60 p-3">
                           {listing.image_urls && listing.image_urls[0] && (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
                               src={listing.image_urls[0]}
                               alt={listing.title}
-                              className="h-36 sm:h-24 sm:w-32 rounded-lg object-cover shrink-0 border border-stone-200"
+                              className="h-36 sm:h-24 sm:w-32 rounded-lg object-cover shrink-0 border border-stone-200 dark:border-zinc-700"
                             />
                           )}
                           <div className="min-w-0 flex-1 space-y-1">
                             <Link
                               href={`/circles/${item.circle.slug}/marketplace/${listing.id}`}
-                              className="block text-sm sm:text-base font-bold text-stone-900 hover:underline"
+                              className="block text-sm sm:text-base font-bold text-stone-900 dark:text-zinc-100 hover:underline"
                             >
                               {listing.title}
                             </Link>
                             {listing.description && (
-                              <p className="line-clamp-2 text-xs text-stone-600 leading-relaxed">
+                              <p className="line-clamp-2 text-xs text-stone-600 dark:text-zinc-400 leading-relaxed">
                                 {listing.description}
                               </p>
                             )}
@@ -2837,13 +2975,13 @@ export function SocialNewsfeedClient({
 
                         {/* Footer Action */}
                         <div className="flex items-center justify-between pt-0.5">
-                          <span className="inline-flex items-center gap-1 text-xs text-stone-500 capitalize">
-                            <Tag className="h-3.5 w-3.5 text-stone-400" />
+                          <span className="inline-flex items-center gap-1 text-xs text-stone-500 dark:text-zinc-400 capitalize">
+                            <Tag className="h-3.5 w-3.5 text-stone-400 dark:text-zinc-500" />
                             {listing.listing_type || 'Listing'}
                           </span>
                           <Link
                             href={`/circles/${item.circle.slug}/marketplace/${listing.id}`}
-                            className="inline-flex items-center gap-1.5 rounded-xl bg-black px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800 transition-colors"
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-black dark:bg-white px-3.5 py-1.5 text-xs font-semibold text-white dark:text-black hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-colors"
                           >
                             <ShoppingBag className="h-3.5 w-3.5" />
                             <span>View Listing</span>
@@ -2866,13 +3004,13 @@ export function SocialNewsfeedClient({
                     return (
                       <article
                         key={item.id}
-                        className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white p-4 sm:p-5 shadow-xs transition-all hover:border-stone-300/90 space-y-3"
+                        className="overflow-hidden rounded-2xl border border-stone-200/90 dark:border-zinc-800 bg-white dark:bg-[#141518] p-4 sm:p-5 shadow-xs transition-all hover:border-stone-300/90 dark:hover:border-zinc-700 space-y-3"
                       >
                         {/* Facebook-style Clean Header */}
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-center gap-3 min-w-0">
                             <div className="relative shrink-0">
-                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-sm font-bold text-stone-800 border border-stone-200 overflow-hidden shadow-2xs">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 dark:bg-zinc-800 text-sm font-bold text-stone-800 dark:text-zinc-200 border border-stone-200 dark:border-zinc-700 overflow-hidden shadow-2xs">
                                 {course.instructor?.avatar_url ? (
                                   // eslint-disable-next-line @next/next/no-img-element
                                   <img
@@ -2887,7 +3025,7 @@ export function SocialNewsfeedClient({
                               <Link
                                 href={`/circles/${item.circle.slug}`}
                                 title={item.circle.name}
-                                className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-black text-[8px] font-bold text-white border-2 border-white overflow-hidden shadow-2xs hover:scale-110 transition-transform"
+                                className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-black text-[8px] font-bold text-white border-2 border-white dark:border-[#141518] overflow-hidden shadow-2xs hover:scale-110 transition-transform"
                               >
                                 {item.circle.avatar_url ? (
                                   // eslint-disable-next-line @next/next/no-img-element
@@ -2900,18 +3038,18 @@ export function SocialNewsfeedClient({
 
                             <div className="min-w-0 leading-tight">
                               <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-                                <span className="text-sm font-bold text-stone-900 hover:underline">
+                                <span className="text-sm font-bold text-stone-900 dark:text-zinc-100 hover:underline">
                                   {course.instructor?.display_name || 'Instructor'}
                                 </span>
-                                <span className="text-xs text-stone-400 font-normal">published a course in</span>
+                                <span className="text-xs text-stone-400 dark:text-zinc-500 font-normal">published a course in</span>
                                 <Link
                                   href={`/circles/${item.circle.slug}`}
-                                  className="text-sm font-semibold text-stone-900 hover:underline truncate"
+                                  className="text-sm font-semibold text-stone-900 dark:text-zinc-100 hover:underline truncate"
                                 >
                                   {item.circle.name}
                                 </Link>
                               </div>
-                              <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-stone-400">
+                              <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-stone-400 dark:text-zinc-500">
                                 <span>{formatRelativeTime(item.timestamp)}</span>
                                 <span>·</span>
                                 <span className="capitalize">{difficulty}</span>
@@ -2924,8 +3062,8 @@ export function SocialNewsfeedClient({
                           <div className="flex items-center gap-1.5 shrink-0">
                             <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-mono font-semibold border ${
                               isPaid
-                                ? 'bg-amber-50 text-amber-800 border-amber-200'
-                                : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border-amber-200 dark:border-amber-800'
+                                : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
                             }`}>
                               {isPaid ? 'PAID' : 'FREE'}
                             </span>
@@ -2936,7 +3074,7 @@ export function SocialNewsfeedClient({
                                   e.stopPropagation();
                                   setActiveMenuPostId(activeMenuPostId === item.id ? null : item.id);
                                 }}
-                                className="rounded-full p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors"
+                                className="rounded-full p-1 text-stone-400 dark:text-zinc-400 hover:bg-stone-100 dark:hover:bg-zinc-800 hover:text-stone-700 dark:hover:text-zinc-200 transition-colors"
                                 aria-label="More options"
                               >
                                 <MoreHorizontal className="h-4 w-4" />
@@ -2944,7 +3082,7 @@ export function SocialNewsfeedClient({
                               {activeMenuPostId === item.id && (
                                 <div
                                   onClick={(e) => e.stopPropagation()}
-                                  className="absolute right-0 top-full mt-1 w-44 rounded-xl border border-stone-200 bg-white p-1.5 shadow-lg z-20 animate-in fade-in zoom-in-95 duration-100 space-y-0.5"
+                                  className="absolute right-0 top-full mt-1 w-44 rounded-xl border border-stone-200 dark:border-zinc-800 bg-white dark:bg-[#18191D] p-1.5 shadow-lg z-20 animate-in fade-in zoom-in-95 duration-100 space-y-0.5"
                                 >
                                   <button
                                     type="button"
@@ -2952,7 +3090,7 @@ export function SocialNewsfeedClient({
                                       handleShareUrl(item.id, `/circles/${item.circle.slug}/courses/${course.id}`);
                                       setActiveMenuPostId(null);
                                     }}
-                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 hover:bg-stone-50 font-medium transition-colors"
+                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 dark:text-zinc-300 hover:bg-stone-50 dark:hover:bg-zinc-800 font-medium transition-colors"
                                   >
                                     <Share2 className="h-3.5 w-3.5" />
                                     <span>{copiedItemId === item.id ? 'Copied Link' : 'Copy course link'}</span>
@@ -2960,7 +3098,7 @@ export function SocialNewsfeedClient({
                                   <Link
                                     href={`/circles/${item.circle.slug}`}
                                     onClick={() => setActiveMenuPostId(null)}
-                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 hover:bg-stone-50 font-medium transition-colors"
+                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 dark:text-zinc-300 hover:bg-stone-50 dark:hover:bg-zinc-800 font-medium transition-colors"
                                   >
                                     <ArrowRight className="h-3.5 w-3.5" />
                                     <span>Visit Circle</span>
@@ -2972,35 +3110,35 @@ export function SocialNewsfeedClient({
                         </div>
 
                         {/* Course Body */}
-                        <div className="flex flex-col sm:flex-row gap-3.5 rounded-xl border border-stone-200/80 bg-stone-50/50 p-3">
+                        <div className="flex flex-col sm:flex-row gap-3.5 rounded-xl border border-stone-200/80 dark:border-zinc-800 bg-stone-50/50 dark:bg-zinc-900/60 p-3">
                           {course.thumbnail_url && (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
                               src={course.thumbnail_url}
                               alt={course.title}
-                              className="h-36 sm:h-24 sm:w-36 rounded-lg object-cover shrink-0 border border-stone-200"
+                              className="h-36 sm:h-24 sm:w-36 rounded-lg object-cover shrink-0 border border-stone-200 dark:border-zinc-700"
                             />
                           )}
                           <div className="min-w-0 flex-1 space-y-1.5">
                             <Link
                               href={`/circles/${item.circle.slug}/courses/${course.id}`}
-                              className="block text-sm sm:text-base font-bold text-stone-900 hover:underline"
+                              className="block text-sm sm:text-base font-bold text-stone-900 dark:text-zinc-100 hover:underline"
                             >
                               {course.title}
                             </Link>
                             {course.description && (
-                              <p className="line-clamp-2 text-xs text-stone-600 leading-relaxed">
+                              <p className="line-clamp-2 text-xs text-stone-600 dark:text-zinc-400 leading-relaxed">
                                 {course.description}
                               </p>
                             )}
-                            <div className="flex flex-wrap items-center gap-2 pt-0.5 text-[11px] text-stone-500 font-medium">
-                              <span className="inline-flex items-center gap-1 rounded bg-white px-2 py-0.5 border border-stone-200">
-                                <BookOpen className="h-3 w-3 text-stone-600" />
+                            <div className="flex flex-wrap items-center gap-2 pt-0.5 text-[11px] text-stone-500 dark:text-zinc-400 font-medium">
+                              <span className="inline-flex items-center gap-1 rounded bg-white dark:bg-zinc-800 px-2 py-0.5 border border-stone-200 dark:border-zinc-700 text-stone-700 dark:text-zinc-300">
+                                <BookOpen className="h-3 w-3 text-stone-600 dark:text-zinc-400" />
                                 {totalLessons} {totalLessons === 1 ? 'lesson' : 'lessons'}
                               </span>
                               {duration && (
-                                <span className="inline-flex items-center gap-1 rounded bg-white px-2 py-0.5 border border-stone-200">
-                                  <Clock className="h-3 w-3 text-stone-600" />
+                                <span className="inline-flex items-center gap-1 rounded bg-white dark:bg-zinc-800 px-2 py-0.5 border border-stone-200 dark:border-zinc-700 text-stone-700 dark:text-zinc-300">
+                                  <Clock className="h-3 w-3 text-stone-600 dark:text-zinc-400" />
                                   {duration}
                                 </span>
                               )}
@@ -3012,14 +3150,14 @@ export function SocialNewsfeedClient({
                         <div className="flex items-center justify-between gap-3 pt-0.5">
                           <Link
                             href={`/circles/${item.circle.slug}/courses`}
-                            className="text-xs text-stone-500 hover:text-stone-900 font-medium flex items-center gap-1"
+                            className="text-xs text-stone-500 dark:text-zinc-400 hover:text-stone-900 dark:hover:text-zinc-200 font-medium flex items-center gap-1"
                           >
                             <span>More in {item.circle.name}</span>
                             <ChevronRight className="h-3.5 w-3.5" />
                           </Link>
                           <Link
                             href={`/circles/${item.circle.slug}/courses/${course.id}`}
-                            className="inline-flex items-center gap-1.5 rounded-xl bg-black px-3.5 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-stone-800 transition-colors"
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-black dark:bg-white px-3.5 py-1.5 text-xs font-semibold text-white dark:text-black shadow-2xs hover:bg-stone-800 dark:hover:bg-zinc-200 transition-colors"
                           >
                             <Play className="h-3.5 w-3.5 fill-current" />
                             <span>View Curriculum</span>
@@ -3037,13 +3175,13 @@ export function SocialNewsfeedClient({
                     return (
                       <article
                         key={item.id}
-                        className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white p-4 sm:p-5 shadow-xs transition-all hover:border-stone-300/90 space-y-3"
+                        className="overflow-hidden rounded-2xl border border-stone-200/90 dark:border-zinc-800 bg-white dark:bg-[#141518] p-4 sm:p-5 shadow-xs transition-all hover:border-stone-300/90 dark:hover:border-zinc-700 space-y-3"
                       >
                         {/* Facebook-style Clean Header */}
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-center gap-3 min-w-0">
                             <div className="relative shrink-0">
-                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-sm font-bold text-stone-800 border border-stone-200 overflow-hidden shadow-2xs">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 dark:bg-zinc-800 text-sm font-bold text-stone-800 dark:text-zinc-200 border border-stone-200 dark:border-zinc-700 overflow-hidden shadow-2xs">
                                 {res.author?.avatar_url ? (
                                   // eslint-disable-next-line @next/next/no-img-element
                                   <img
@@ -3058,7 +3196,7 @@ export function SocialNewsfeedClient({
                               <Link
                                 href={`/circles/${item.circle.slug}`}
                                 title={item.circle.name}
-                                className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-black text-[8px] font-bold text-white border-2 border-white overflow-hidden shadow-2xs hover:scale-110 transition-transform"
+                                className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-black text-[8px] font-bold text-white border-2 border-white dark:border-[#141518] overflow-hidden shadow-2xs hover:scale-110 transition-transform"
                               >
                                 {item.circle.avatar_url ? (
                                   // eslint-disable-next-line @next/next/no-img-element
@@ -3071,18 +3209,18 @@ export function SocialNewsfeedClient({
 
                             <div className="min-w-0 leading-tight">
                               <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-                                <span className="text-sm font-bold text-stone-900 hover:underline">
+                                <span className="text-sm font-bold text-stone-900 dark:text-zinc-100 hover:underline">
                                   {res.author?.display_name || 'Member'}
                                 </span>
-                                <span className="text-xs text-stone-400 font-normal">shared a guide in</span>
+                                <span className="text-xs text-stone-400 dark:text-zinc-500 font-normal">shared a guide in</span>
                                 <Link
                                   href={`/circles/${item.circle.slug}`}
-                                  className="text-sm font-semibold text-stone-900 hover:underline truncate"
+                                  className="text-sm font-semibold text-stone-900 dark:text-zinc-100 hover:underline truncate"
                                 >
                                   {item.circle.name}
                                 </Link>
                               </div>
-                              <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-stone-400">
+                              <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-stone-400 dark:text-zinc-500">
                                 <span>{formatRelativeTime(item.timestamp)}</span>
                                 <span>·</span>
                                 <span className="capitalize">{res.category || 'Guide'}</span>
@@ -3092,7 +3230,7 @@ export function SocialNewsfeedClient({
 
                           <div className="flex items-center gap-1.5 shrink-0">
                             {res.difficulty_level && (
-                              <span className="rounded-full bg-stone-50 px-2 py-0.5 text-[10px] font-mono font-bold capitalize text-stone-700 border border-stone-200">
+                              <span className="rounded-full bg-stone-50 dark:bg-zinc-800 px-2 py-0.5 text-[10px] font-mono font-bold capitalize text-stone-700 dark:text-zinc-300 border border-stone-200 dark:border-zinc-700">
                                 {res.difficulty_level}
                               </span>
                             )}
@@ -3103,7 +3241,7 @@ export function SocialNewsfeedClient({
                                   e.stopPropagation();
                                   setActiveMenuPostId(activeMenuPostId === item.id ? null : item.id);
                                 }}
-                                className="rounded-full p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors"
+                                className="rounded-full p-1 text-stone-400 dark:text-zinc-400 hover:bg-stone-100 dark:hover:bg-zinc-800 hover:text-stone-700 dark:hover:text-zinc-200 transition-colors"
                                 aria-label="More options"
                               >
                                 <MoreHorizontal className="h-4 w-4" />
@@ -3111,7 +3249,7 @@ export function SocialNewsfeedClient({
                               {activeMenuPostId === item.id && (
                                 <div
                                   onClick={(e) => e.stopPropagation()}
-                                  className="absolute right-0 top-full mt-1 w-44 rounded-xl border border-stone-200 bg-white p-1.5 shadow-lg z-20 animate-in fade-in zoom-in-95 duration-100 space-y-0.5"
+                                  className="absolute right-0 top-full mt-1 w-44 rounded-xl border border-stone-200 dark:border-zinc-800 bg-white dark:bg-[#18191D] p-1.5 shadow-lg z-20 animate-in fade-in zoom-in-95 duration-100 space-y-0.5"
                                 >
                                   <button
                                     type="button"
@@ -3119,7 +3257,7 @@ export function SocialNewsfeedClient({
                                       handleShareUrl(item.id, `/circles/${item.circle.slug}/resources`);
                                       setActiveMenuPostId(null);
                                     }}
-                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 hover:bg-stone-50 font-medium transition-colors"
+                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 dark:text-zinc-300 hover:bg-stone-50 dark:hover:bg-zinc-800 font-medium transition-colors"
                                   >
                                     <Share2 className="h-3.5 w-3.5" />
                                     <span>{copiedItemId === item.id ? 'Copied Link' : 'Copy resource link'}</span>
@@ -3127,7 +3265,7 @@ export function SocialNewsfeedClient({
                                   <Link
                                     href={`/circles/${item.circle.slug}`}
                                     onClick={() => setActiveMenuPostId(null)}
-                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 hover:bg-stone-50 font-medium transition-colors"
+                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 dark:text-zinc-300 hover:bg-stone-50 dark:hover:bg-zinc-800 font-medium transition-colors"
                                   >
                                     <ArrowRight className="h-3.5 w-3.5" />
                                     <span>Visit Circle</span>
@@ -3138,15 +3276,15 @@ export function SocialNewsfeedClient({
                           </div>
                         </div>
 
-                        <div className="rounded-xl border border-stone-200/80 bg-stone-50/50 p-3.5 space-y-1.5">
+                        <div className="rounded-xl border border-stone-200/80 dark:border-zinc-800 bg-stone-50/50 dark:bg-zinc-900/60 p-3.5 space-y-1.5">
                           <Link
                             href={`/circles/${item.circle.slug}/resources`}
-                            className="block text-sm sm:text-base font-bold text-stone-900 hover:underline"
+                            className="block text-sm sm:text-base font-bold text-stone-900 dark:text-zinc-100 hover:underline"
                           >
                             {res.title}
                           </Link>
                           {res.summary && (
-                            <p className="line-clamp-2 text-xs text-stone-600 leading-relaxed">
+                            <p className="line-clamp-2 text-xs text-stone-600 dark:text-zinc-400 leading-relaxed">
                               {res.summary}
                             </p>
                           )}
@@ -3155,14 +3293,14 @@ export function SocialNewsfeedClient({
                         <div className="flex items-center justify-between pt-0.5">
                           <Link
                             href={`/circles/${item.circle.slug}/resources`}
-                            className="text-xs text-stone-500 hover:text-stone-900 font-medium flex items-center gap-1"
+                            className="text-xs text-stone-500 dark:text-zinc-400 hover:text-stone-900 dark:hover:text-zinc-200 font-medium flex items-center gap-1"
                           >
                             <span>Browse resources</span>
                             <ChevronRight className="h-3.5 w-3.5" />
                           </Link>
                           <Link
                             href={`/circles/${item.circle.slug}/resources`}
-                            className="inline-flex items-center gap-1.5 rounded-xl bg-black px-3.5 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-stone-800 transition-colors"
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-black dark:bg-white px-3.5 py-1.5 text-xs font-semibold text-white dark:text-black shadow-2xs hover:bg-stone-800 dark:hover:bg-zinc-200 transition-colors"
                           >
                             <BookOpen className="h-3.5 w-3.5" />
                             <span>Read Guide</span>
@@ -3187,7 +3325,7 @@ export function SocialNewsfeedClient({
                     return (
                       <article
                         key={item.id}
-                        className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white p-4 sm:p-5 shadow-xs transition-all hover:border-stone-300/90 space-y-3"
+                        className="overflow-hidden rounded-2xl border border-stone-200/90 dark:border-zinc-800 bg-white dark:bg-[#141518] p-4 sm:p-5 shadow-xs transition-all hover:border-stone-300/90 dark:hover:border-zinc-700 space-y-3"
                       >
                         {/* Facebook-style Clean Header */}
                         <div className="flex items-start justify-between gap-3">
@@ -3195,7 +3333,7 @@ export function SocialNewsfeedClient({
                             <div className="relative shrink-0">
                               <Link
                                 href={`/circles/${item.circle.slug}`}
-                                className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-sm font-bold text-stone-800 border border-stone-200 overflow-hidden shadow-2xs"
+                                className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 dark:bg-zinc-800 text-sm font-bold text-stone-800 dark:text-zinc-200 border border-stone-200 dark:border-zinc-700 overflow-hidden shadow-2xs"
                               >
                                 {item.circle.avatar_url ? (
                                   // eslint-disable-next-line @next/next/no-img-element
@@ -3214,13 +3352,13 @@ export function SocialNewsfeedClient({
                               <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
                                 <Link
                                   href={`/circles/${item.circle.slug}`}
-                                  className="text-sm font-bold text-stone-900 hover:underline truncate"
+                                  className="text-sm font-bold text-stone-900 dark:text-zinc-100 hover:underline truncate"
                                 >
                                   {item.circle.name}
                                 </Link>
-                                <span className="text-xs text-stone-400 font-normal">started a fundraiser</span>
+                                <span className="text-xs text-stone-400 dark:text-zinc-500 font-normal">started a fundraiser</span>
                               </div>
-                              <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-stone-400">
+                              <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-stone-400 dark:text-zinc-500">
                                 <span>{formatRelativeTime(item.timestamp)}</span>
                                 <span>·</span>
                                 <span>Community Campaign</span>
@@ -3229,7 +3367,7 @@ export function SocialNewsfeedClient({
                           </div>
 
                           <div className="flex items-center gap-1.5 shrink-0">
-                            <span className="rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-mono font-bold text-stone-900 border border-stone-200">
+                            <span className="rounded-full bg-stone-100 dark:bg-zinc-800 px-2.5 py-0.5 text-xs font-mono font-bold text-stone-900 dark:text-zinc-100 border border-stone-200 dark:border-zinc-700">
                               {cause.currency} {pledgedTotal.toLocaleString()}
                             </span>
                             <div className="relative">
@@ -3239,7 +3377,7 @@ export function SocialNewsfeedClient({
                                   e.stopPropagation();
                                   setActiveMenuPostId(activeMenuPostId === item.id ? null : item.id);
                                 }}
-                                className="rounded-full p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors"
+                                className="rounded-full p-1 text-stone-400 dark:text-zinc-400 hover:bg-stone-100 dark:hover:bg-zinc-800 hover:text-stone-700 dark:hover:text-zinc-200 transition-colors"
                                 aria-label="More options"
                               >
                                 <MoreHorizontal className="h-4 w-4" />
@@ -3247,7 +3385,7 @@ export function SocialNewsfeedClient({
                               {activeMenuPostId === item.id && (
                                 <div
                                   onClick={(e) => e.stopPropagation()}
-                                  className="absolute right-0 top-full mt-1 w-44 rounded-xl border border-stone-200 bg-white p-1.5 shadow-lg z-20 animate-in fade-in zoom-in-95 duration-100 space-y-0.5"
+                                  className="absolute right-0 top-full mt-1 w-44 rounded-xl border border-stone-200 dark:border-zinc-800 bg-white dark:bg-[#18191D] p-1.5 shadow-lg z-20 animate-in fade-in zoom-in-95 duration-100 space-y-0.5"
                                 >
                                   <button
                                     type="button"
@@ -3255,7 +3393,7 @@ export function SocialNewsfeedClient({
                                       handleShareUrl(item.id, `/circles/${item.circle.slug}/community`);
                                       setActiveMenuPostId(null);
                                     }}
-                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 hover:bg-stone-50 font-medium transition-colors"
+                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 dark:text-zinc-300 hover:bg-stone-50 dark:hover:bg-zinc-800 font-medium transition-colors"
                                   >
                                     <Share2 className="h-3.5 w-3.5" />
                                     <span>{copiedItemId === item.id ? 'Copied Link' : 'Copy cause link'}</span>
@@ -3263,7 +3401,7 @@ export function SocialNewsfeedClient({
                                   <Link
                                     href={`/circles/${item.circle.slug}`}
                                     onClick={() => setActiveMenuPostId(null)}
-                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 hover:bg-stone-50 font-medium transition-colors"
+                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 dark:text-zinc-300 hover:bg-stone-50 dark:hover:bg-zinc-800 font-medium transition-colors"
                                   >
                                     <ArrowRight className="h-3.5 w-3.5" />
                                     <span>Visit Circle</span>
@@ -3274,36 +3412,36 @@ export function SocialNewsfeedClient({
                           </div>
                         </div>
 
-                        <div className="rounded-xl border border-stone-200/80 bg-stone-50/50 p-3.5 space-y-2">
+                        <div className="rounded-xl border border-stone-200/80 dark:border-zinc-800 bg-stone-50/50 dark:bg-zinc-900/60 p-3.5 space-y-2">
                           <Link
                             href={`/circles/${item.circle.slug}/community`}
-                            className="block text-sm sm:text-base font-bold text-stone-900 hover:underline"
+                            className="block text-sm sm:text-base font-bold text-stone-900 dark:text-zinc-100 hover:underline"
                           >
                             {cause.title}
                           </Link>
                           {cause.description && (
-                            <p className="line-clamp-2 text-xs text-stone-600 leading-relaxed">
+                            <p className="line-clamp-2 text-xs text-stone-600 dark:text-zinc-400 leading-relaxed">
                               {cause.description}
                             </p>
                           )}
                           <div className="space-y-1 pt-1">
-                            <div className="flex justify-between text-[11px] text-stone-500 font-mono">
+                            <div className="flex justify-between text-[11px] text-stone-500 dark:text-zinc-400 font-mono">
                               <span>Goal: {cause.currency} {cause.goal_amount.toLocaleString()}</span>
                               <span>{pct}% funded</span>
                             </div>
-                            <div className="h-1.5 w-full rounded-full bg-stone-200 overflow-hidden">
-                              <div className="h-full bg-black rounded-full transition-all" style={{ width: `${pct}%` }} />
+                            <div className="h-1.5 w-full rounded-full bg-stone-200 dark:bg-zinc-700 overflow-hidden">
+                              <div className="h-full bg-black dark:bg-white rounded-full transition-all" style={{ width: `${pct}%` }} />
                             </div>
                           </div>
                         </div>
 
                         <div className="flex items-center justify-between pt-0.5">
-                          <span className="text-xs text-stone-500 font-medium">
+                          <span className="text-xs text-stone-500 dark:text-zinc-400 font-medium">
                             {pledgeCount} {pledgeCount === 1 ? 'supporter' : 'supporters'}
                           </span>
                           <Link
                             href={`/circles/${item.circle.slug}/community`}
-                            className="inline-flex items-center gap-1.5 rounded-xl bg-black px-3.5 py-1.5 text-xs font-semibold text-white shadow-2xs hover:bg-stone-800 transition-colors"
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-black dark:bg-white px-3.5 py-1.5 text-xs font-semibold text-white dark:text-black shadow-2xs hover:bg-stone-800 dark:hover:bg-zinc-200 transition-colors"
                           >
                             <HeartHandshake className="h-3.5 w-3.5" />
                             <span>Support Cause</span>
@@ -3323,7 +3461,7 @@ export function SocialNewsfeedClient({
         {/* Mobile Fixed Bottom Navigation Bar */}
         <nav
           aria-label="Mobile Navigation"
-          className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur-md border-t border-stone-200/90 py-1.5 px-4 flex items-center justify-around shadow-lg"
+          className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 dark:bg-[#121316]/95 backdrop-blur-md border-t border-stone-200/90 dark:border-zinc-800 py-1.5 px-4 flex items-center justify-around shadow-lg"
         >
           <button
             type="button"
@@ -3334,7 +3472,7 @@ export function SocialNewsfeedClient({
               setSearchQuery('');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            className="flex flex-col items-center gap-0.5 text-stone-900"
+            className="flex flex-col items-center gap-0.5 text-stone-900 dark:text-zinc-100"
           >
             <Home className="h-5 w-5" />
             <span className="text-[10px] font-bold">Home</span>
@@ -3342,7 +3480,7 @@ export function SocialNewsfeedClient({
 
           <Link
             href="/explore"
-            className="flex flex-col items-center gap-0.5 text-stone-500 hover:text-stone-900"
+            className="flex flex-col items-center gap-0.5 text-stone-500 dark:text-zinc-400 hover:text-stone-900 dark:hover:text-zinc-200"
           >
             <Compass className="h-5 w-5" />
             <span className="text-[10px] font-semibold">Explore</span>
@@ -3350,7 +3488,7 @@ export function SocialNewsfeedClient({
 
           <Link
             href={currentUser ? '/circles/new' : '/register'}
-            className="flex flex-col items-center justify-center -mt-5 h-11 w-11 rounded-full bg-black text-white shadow-md hover:bg-zinc-800 transition-transform active:scale-95"
+            className="flex flex-col items-center justify-center -mt-5 h-11 w-11 rounded-full bg-black dark:bg-white text-white dark:text-black shadow-md hover:bg-zinc-800 dark:hover:bg-zinc-200 transition-transform active:scale-95"
             title="Create Circle"
           >
             <Plus className="h-5 w-5" />
@@ -3359,7 +3497,7 @@ export function SocialNewsfeedClient({
           {currentUser ? (
             <Link
               href="/notifications"
-              className="relative flex flex-col items-center gap-0.5 text-stone-500 hover:text-stone-900"
+              className="relative flex flex-col items-center gap-0.5 text-stone-500 dark:text-zinc-400 hover:text-stone-900 dark:hover:text-zinc-200"
             >
               <Bell className="h-5 w-5" />
               {unreadNotificationsCount > 0 && (
@@ -3372,7 +3510,7 @@ export function SocialNewsfeedClient({
           ) : (
             <Link
               href="/login"
-              className="flex flex-col items-center gap-0.5 text-stone-500 hover:text-stone-900"
+              className="flex flex-col items-center gap-0.5 text-stone-500 dark:text-zinc-400 hover:text-stone-900 dark:hover:text-zinc-200"
             >
               <User className="h-5 w-5" />
               <span className="text-[10px] font-semibold">Sign In</span>
@@ -3382,7 +3520,7 @@ export function SocialNewsfeedClient({
           {currentUser && (
             <Link
               href="/settings"
-              className="flex flex-col items-center gap-0.5 text-stone-500 hover:text-stone-900"
+              className="flex flex-col items-center gap-0.5 text-stone-500 dark:text-zinc-400 hover:text-stone-900 dark:hover:text-zinc-200"
             >
               <Settings className="h-5 w-5" />
               <span className="text-[10px] font-semibold">Settings</span>
