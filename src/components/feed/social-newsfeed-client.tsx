@@ -18,14 +18,13 @@ import {
   Compass,
   ExternalLink,
   Globe,
-  GraduationCap,
-  Hash,
   Heart,
   HeartHandshake,
   Layers,
   Lock,
   MapPin,
   MessageSquare,
+  MoreHorizontal,
   PanelLeft,
   PanelLeftClose,
   Pin,
@@ -114,6 +113,23 @@ function parsePostContent(body: string): {
     }
   }
   return { resource: null, cleanBody: body };
+}
+
+function extractMediaUrls(body: string): string[] {
+  if (!body) return [];
+  const urls: string[] = [];
+  const mdRegex = /!\[.*?\]\(((\/api\/uploads\/[^\s)]+)|(https?:\/\/[^\s)]+))\)/g;
+  let match: RegExpExecArray | null;
+  while ((match = mdRegex.exec(body)) !== null) {
+    const url = match[1];
+    if (url && !urls.includes(url)) urls.push(url);
+  }
+  return urls;
+}
+
+function stripImageMarkdown(text: string): string {
+  if (!text) return '';
+  return text.replace(/!\[.*?\]\(((\/api\/uploads\/[^\s)]+)|(https?:\/\/[^\s)]+))\)/g, '').trim();
 }
 
 function formatRelativeTime(isoStr: string): string {
@@ -264,6 +280,15 @@ export function SocialNewsfeedClient({
   const [votingOptionId, setVotingOptionId] = useState<string | null>(null);
   const [rsvpLoadingByEvent, setRsvpLoadingByEvent] = useState<Record<string, boolean>>({});
   const [copiedItemId, setCopiedItemId] = useState<string | null>(null);
+  const [activeMenuPostId, setActiveMenuPostId] = useState<string | null>(null);
+
+  useEffect(() => {
+    function handleGlobalClick() {
+      if (activeMenuPostId) setActiveMenuPostId(null);
+    }
+    window.addEventListener('click', handleGlobalClick);
+    return () => window.removeEventListener('click', handleGlobalClick);
+  }, [activeMenuPostId]);
 
   const selectedComposerCircle = useMemo(
     () => composerCircles.find((c) => c.id === selectedCircleId) ?? composerCircles[0] ?? null,
@@ -1450,7 +1475,9 @@ export function SocialNewsfeedClient({
                   /* --------------------------------------------------------- */
                   if (item.itemType === 'post') {
                     const post = item.data;
-                    const { resource, cleanBody } = parsePostContent(post.body);
+                    const { resource, cleanBody: rawCleanBody } = parsePostContent(post.body);
+                    const mediaUrls = extractMediaUrls(rawCleanBody);
+                    const cleanBody = stripImageMarkdown(rawCleanBody);
                     const attachedPoll = post.poll ?? null;
                     const showTitle =
                       !resource &&
@@ -1469,360 +1496,430 @@ export function SocialNewsfeedClient({
                         key={item.id}
                         className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white shadow-xs transition-all hover:border-stone-300/90"
                       >
-                        <div className="p-5 space-y-3.5">
-                          {/* Dual-Identity Header: Circle Context + Join Action */}
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex items-center gap-3 min-w-0">
-                              <div className="relative shrink-0">
-                                <Link
-                                  href={`/circles/${item.circle.slug}`}
-                                  className="flex h-10 w-10 items-center justify-center rounded-xl bg-black text-sm font-bold text-white shadow-2xs hover:bg-zinc-800 transition-colors overflow-hidden"
-                                >
-                                  {item.circle.avatar_url ? (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img
-                                      src={item.circle.avatar_url}
-                                      alt={item.circle.name}
-                                      className="h-full w-full object-cover"
-                                    />
-                                  ) : (
-                                    item.circle.name.slice(0, 1).toUpperCase()
-                                  )}
-                                </Link>
-                                {/* Author Avatar Badge */}
-                                <div
-                                  className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full overflow-hidden border-2 border-white bg-stone-200 flex items-center justify-center shadow-2xs"
-                                  title={post.author?.display_name || 'Member'}
-                                >
-                                  {post.author?.avatar_url ? (
-                                    // eslint-disable-next-line @next/next/no-img-element
-                                    <img
-                                      src={post.author.avatar_url}
-                                      alt={post.author.display_name}
-                                      className="h-full w-full object-cover"
-                                    />
-                                  ) : (
-                                    <span className="text-[9px] font-bold text-stone-700">
-                                      {(post.author?.display_name || 'M').slice(0, 1).toUpperCase()}
-                                    </span>
-                                  )}
-                                </div>
+                        {/* 1. Facebook-style Clean Header */}
+                        <div className="p-4 pb-2.5 flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            {/* Author Avatar with subtle Circle Badge */}
+                            <div className="relative shrink-0">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-sm font-bold text-stone-800 border border-stone-200 overflow-hidden shadow-2xs">
+                                {post.author?.avatar_url ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={post.author.avatar_url}
+                                    alt={post.author.display_name}
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  <span>{(post.author?.display_name || 'M').slice(0, 1).toUpperCase()}</span>
+                                )}
                               </div>
-
-                              <div className="min-w-0">
-                                <div className="flex flex-wrap items-center gap-1.5">
-                                  <Link
-                                    href={`/circles/${item.circle.slug}`}
-                                    className="text-sm font-bold text-stone-900 hover:text-black transition-colors truncate"
-                                  >
-                                    {item.circle.name}
-                                  </Link>
-                                  <span className="rounded-full bg-[#F4F3EE] px-2 py-0.5 text-[10px] font-medium capitalize text-stone-900">
-                                    {item.circle.category.replace('_', ' ')}
-                                  </span>
-                                  {post.space?.name && (
-                                    <span className="inline-flex items-center gap-0.5 text-[11px] font-medium text-stone-400">
-                                      <span>·</span>
-                                      <Hash className="h-3 w-3" />
-                                      <span>{post.space.name}</span>
-                                    </span>
-                                  )}
-                                </div>
-
-                                {/* Author Sub-line */}
-                                <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-stone-500">
-                                  <span className="inline-flex items-center gap-1.5">
-                                    {post.author?.avatar_url ? (
-                                      // eslint-disable-next-line @next/next/no-img-element
-                                      <img
-                                        src={post.author.avatar_url}
-                                        alt={post.author.display_name}
-                                        className="h-3.5 w-3.5 rounded-full object-cover border border-stone-200"
-                                      />
-                                    ) : null}
-                                    <span>
-                                      Posted by{' '}
-                                      <strong className="font-semibold text-stone-700">
-                                        {post.author?.display_name || 'Member'}
-                                      </strong>
-                                    </span>
-                                  </span>
-                                  {item.authorRole &&
-                                    ['owner', 'admin', 'moderator'].includes(item.authorRole) && (
-                                      <span className="rounded bg-stone-100 px-1.5 py-0.2 text-[9px] font-mono font-bold uppercase text-stone-700 border border-stone-200">
-                                        {item.authorRole}
-                                      </span>
-                                    )}
-                                  <span>·</span>
-                                  <span>{formatRelativeTime(post.created_at)}</span>
-                                  {post.is_pinned && (
-                                    <span className="inline-flex items-center gap-0.5 text-[11px] font-semibold text-stone-900">
-                                      · <Pin className="h-3 w-3" /> Pinned
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
+                              {/* Circle Mini Badge */}
+                              <Link
+                                href={`/circles/${item.circle.slug}`}
+                                title={`Posted in ${item.circle.name}`}
+                                className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-black text-[8px] font-bold text-white border-2 border-white overflow-hidden shadow-2xs hover:scale-110 transition-transform"
+                              >
+                                {item.circle.avatar_url ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={item.circle.avatar_url}
+                                    alt={item.circle.name}
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  item.circle.name.slice(0, 1).toUpperCase()
+                                )}
+                              </Link>
                             </div>
 
-                            {/* Circle Membership Status / 1-Click Join Pill */}
-                            <div className="shrink-0">
-                              {isMember ? (
+                            {/* Author & Circle Context Lines */}
+                            <div className="min-w-0 leading-tight">
+                              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                                <span className="text-sm font-bold text-stone-900 hover:underline cursor-pointer">
+                                  {post.author?.display_name || 'Member'}
+                                </span>
+                                {item.authorRole && ['owner', 'admin', 'moderator'].includes(item.authorRole) && (
+                                  <span className="rounded bg-stone-100 px-1.5 py-0.2 text-[9px] font-mono font-bold uppercase text-stone-700 border border-stone-200">
+                                    {item.authorRole}
+                                  </span>
+                                )}
+                                <span className="text-xs text-stone-400 font-normal">in</span>
                                 <Link
                                   href={`/circles/${item.circle.slug}`}
-                                  className="inline-flex items-center gap-1 rounded-full bg-stone-100 px-2.5 py-1 text-[11px] font-semibold text-stone-900 border border-stone-200/70 hover:bg-stone-200 transition-colors"
+                                  className="text-sm font-semibold text-stone-900 hover:text-black hover:underline truncate"
                                 >
-                                  <Check className="h-3 w-3" />
-                                  <span>Joined</span>
+                                  {item.circle.name}
                                 </Link>
-                              ) : isPending ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800 border border-amber-200">
-                                  <Clock className="h-3 w-3" />
-                                  <span>Requested</span>
+                                {post.space?.name && (
+                                  <span className="text-xs text-stone-400 font-medium">
+                                    › #{post.space.name}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Timestamp + Privacy icon line */}
+                              <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-stone-400">
+                                <span>{formatRelativeTime(post.created_at)}</span>
+                                <span>·</span>
+                                <Globe className="h-2.5 w-2.5 text-stone-400" />
+                                {post.is_pinned && (
+                                  <span className="inline-flex items-center gap-0.5 text-stone-900 font-semibold ml-1">
+                                    · <Pin className="h-3 w-3" /> Pinned
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Header Right: Join Button (if not member) + 3-Dots Menu */}
+                          <div className="relative shrink-0 flex items-center gap-1.5">
+                            {!isMember && (
+                              isPending ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-800 border border-amber-200">
+                                  <Clock className="h-2.5 w-2.5" />
+                                  <span>Pending</span>
                                 </span>
                               ) : (
                                 <button
                                   type="button"
                                   disabled={joiningCircleId === item.circle.id}
                                   onClick={() => handleJoinCircle(item.circle)}
-                                  className="inline-flex items-center gap-1 rounded-full bg-black px-3 py-1 text-[11px] font-semibold text-white shadow-2xs hover:bg-zinc-800 disabled:opacity-50 transition-all"
+                                  className="inline-flex items-center gap-1 rounded-full bg-stone-100 hover:bg-stone-200 px-2.5 py-1 text-[11px] font-semibold text-stone-900 transition-colors"
                                 >
                                   <UserPlus className="h-3 w-3" />
-                                  <span>
-                                    {joiningCircleId === item.circle.id
-                                      ? 'Joining...'
-                                      : item.circle.membership_policy === 'approval'
-                                        ? 'Request'
-                                        : 'Join'}
+                                  <span>Join</span>
+                                </button>
+                              )
+                            )}
+
+                            {/* 3-Dots Dropdown Trigger */}
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveMenuPostId(activeMenuPostId === item.id ? null : item.id);
+                                }}
+                                className="rounded-full p-1.5 text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors"
+                                aria-label="More post options"
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </button>
+
+                              {activeMenuPostId === item.id && (
+                                <div
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="absolute right-0 top-full mt-1 w-48 rounded-xl border border-stone-200 bg-white p-1.5 shadow-lg z-20 animate-in fade-in zoom-in-95 duration-100 space-y-0.5"
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleToggleSave(item.circle.id, post.id);
+                                      setActiveMenuPostId(null);
+                                    }}
+                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 hover:bg-stone-50 font-medium transition-colors"
+                                  >
+                                    <Bookmark className={`h-3.5 w-3.5 ${post.viewer_has_saved ? 'fill-stone-900 text-stone-900' : ''}`} />
+                                    <span>{post.viewer_has_saved ? 'Remove from Saved' : 'Save Post'}</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleShareUrl(item.id, `/circles/${item.circle.slug}/discussions/${post.id}`);
+                                      setActiveMenuPostId(null);
+                                    }}
+                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 hover:bg-stone-50 font-medium transition-colors"
+                                  >
+                                    <Share2 className="h-3.5 w-3.5" />
+                                    <span>{copiedItemId === item.id ? 'Copied Link' : 'Copy link to post'}</span>
+                                  </button>
+                                  <Link
+                                    href={`/circles/${item.circle.slug}`}
+                                    onClick={() => setActiveMenuPostId(null)}
+                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 hover:bg-stone-50 font-medium transition-colors"
+                                  >
+                                    <ArrowRight className="h-3.5 w-3.5" />
+                                    <span>Visit Circle</span>
+                                  </Link>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* 2. Post Content Body */}
+                        <div className="px-4 pb-3 space-y-2.5">
+                          {showTitle && (
+                            <Link
+                              href={`/circles/${item.circle.slug}/discussions/${post.id}`}
+                              className="block text-base font-bold text-stone-900 hover:text-black transition-colors"
+                            >
+                              {post.title}
+                            </Link>
+                          )}
+
+                          {cleanBody && (
+                            <p className="whitespace-pre-line text-sm leading-relaxed text-stone-800 break-words">
+                              {cleanBody}
+                            </p>
+                          )}
+
+                          {/* Attached Images Gallery (Full-bleed / Collage like Facebook) */}
+                          {mediaUrls.length > 0 && (
+                            <div className="w-full overflow-hidden rounded-xl border border-stone-200 mt-2">
+                              {mediaUrls.length === 1 && (
+                                <div
+                                  className="relative w-full bg-stone-100 cursor-pointer overflow-hidden"
+                                  onClick={() => window.open(mediaUrls[0], '_blank')}
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img
+                                    src={mediaUrls[0]}
+                                    alt="Post photo"
+                                    className="w-full object-cover hover:brightness-95 transition-all max-h-[500px]"
+                                  />
+                                </div>
+                              )}
+                              {mediaUrls.length === 2 && (
+                                <div className="grid grid-cols-2 gap-1 max-h-[380px]">
+                                  {mediaUrls.map((url, idx) => (
+                                    <div
+                                      key={idx}
+                                      className="relative bg-stone-100 overflow-hidden cursor-pointer h-64"
+                                      onClick={() => window.open(url, '_blank')}
+                                    >
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img src={url} alt={`Photo ${idx + 1}`} className="w-full h-full object-cover hover:brightness-95" />
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {mediaUrls.length >= 3 && (
+                                <div className="grid grid-cols-2 gap-1 max-h-[380px]">
+                                  <div
+                                    className="relative bg-stone-100 overflow-hidden cursor-pointer h-72"
+                                    onClick={() => window.open(mediaUrls[0], '_blank')}
+                                  >
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src={mediaUrls[0]} alt="Photo 1" className="w-full h-full object-cover hover:brightness-95" />
+                                  </div>
+                                  <div className="flex flex-col gap-1 h-72">
+                                    <div
+                                      className="relative bg-stone-100 overflow-hidden cursor-pointer flex-1"
+                                      onClick={() => window.open(mediaUrls[1], '_blank')}
+                                    >
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img src={mediaUrls[1]} alt="Photo 2" className="w-full h-full object-cover hover:brightness-95" />
+                                    </div>
+                                    <div
+                                      className="relative bg-stone-100 overflow-hidden cursor-pointer flex-1"
+                                      onClick={() => window.open(mediaUrls[2], '_blank')}
+                                    >
+                                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                                      <img src={mediaUrls[2]} alt="Photo 3" className="w-full h-full object-cover hover:brightness-95" />
+                                      {mediaUrls.length > 3 && (
+                                        <div className="absolute inset-0 bg-black/55 flex items-center justify-center pointer-events-none">
+                                          <span className="text-white font-bold text-lg">+{mediaUrls.length - 3}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          {/* Attached Resource Card */}
+                          {resource && (
+                            <div className="rounded-xl border border-stone-200 bg-stone-50/80 p-3.5">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="flex items-start gap-2.5 min-w-0">
+                                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#F4F3EE] text-stone-900">
+                                    <BookOpen className="h-4 w-4" />
+                                  </div>
+                                  <div className="min-w-0">
+                                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-stone-900">
+                                      {resource.category}
+                                    </span>
+                                    <h4 className="text-sm font-bold text-stone-900 truncate">
+                                      {resource.title}
+                                    </h4>
+                                  </div>
+                                </div>
+                                {resource.url && (
+                                  <a
+                                    href={resource.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-black px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800"
+                                  >
+                                    <span>Open</span>
+                                    <ExternalLink className="h-3 w-3" />
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Attached Interactive Poll */}
+                          {attachedPoll && (
+                            <div className="mt-2 rounded-xl border border-stone-200 bg-stone-50/80 p-4 space-y-2.5">
+                              <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs sm:text-sm font-bold text-stone-900 flex items-center gap-1.5">
+                                  <BarChart2 className="h-4 w-4 text-stone-900" />
+                                  {attachedPoll.question}
+                                </span>
+                                <span className="text-[11px] font-mono text-stone-500">
+                                  {attachedPoll.status === 'closed'
+                                    ? 'Closed'
+                                    : `${attachedPoll.total_votes || 0} votes`}
+                                </span>
+                              </div>
+
+                              <div className="space-y-1.5">
+                                {(attachedPoll.options || []).map((opt: PollOptionItem) => {
+                                  const totalVotes = attachedPoll.total_votes || 0;
+                                  const pct =
+                                    totalVotes > 0
+                                      ? Math.round(((opt.vote_count || 0) / totalVotes) * 100)
+                                      : 0;
+                                  return (
+                                    <button
+                                      key={opt.id}
+                                      type="button"
+                                      disabled={
+                                        attachedPoll.status === 'closed' ||
+                                        !isMember ||
+                                        votingOptionId === opt.id
+                                      }
+                                      onClick={() =>
+                                        handleVotePoll(
+                                          item.circle.id,
+                                          post.id,
+                                          attachedPoll.id,
+                                          opt.id
+                                        )
+                                      }
+                                      className={`relative w-full overflow-hidden rounded-xl border px-3.5 py-2 text-left text-xs transition-all ${
+                                        opt.viewer_voted
+                                          ? 'border-stone-900 bg-white font-semibold text-stone-900'
+                                          : 'border-stone-200 bg-white text-stone-700 hover:border-stone-300'
+                                      }`}
+                                    >
+                                      <div
+                                        className="pointer-events-none absolute inset-y-0 left-0 bg-stone-100/60"
+                                        style={{ width: `${pct}%` }}
+                                      />
+                                      <div className="relative flex items-center justify-between gap-2">
+                                        <span className="flex items-center gap-1.5">
+                                          {opt.viewer_voted && (
+                                            <Check className="h-3.5 w-3.5 text-stone-900" />
+                                          )}
+                                          <span>{opt.label}</span>
+                                        </span>
+                                        <span className="text-[11px] font-mono text-stone-500">
+                                          {pct}%
+                                        </span>
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                              {!isMember && (
+                                <p className="text-[11px] text-stone-400">
+                                  Join {item.circle.name} to vote in this poll.
+                                </p>
+                              )}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* 3. Facebook-style Social Engagement Stats Row */}
+                        {(post.reaction_count > 0 || post.comment_count > 0) && (
+                          <div className="flex items-center justify-between px-4 py-2 text-xs text-stone-500 border-t border-stone-100">
+                            <div className="flex items-center gap-1.5">
+                              {post.reaction_count > 0 && (
+                                <span className="inline-flex items-center gap-1.5 font-medium text-stone-700">
+                                  <span className="flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-white shadow-2xs">
+                                    <Heart className="h-2.5 w-2.5 fill-white text-white" />
                                   </span>
+                                  <span>{post.reaction_count}</span>
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3">
+                              {post.comment_count > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleComments(item.circle.id, post.id)}
+                                  className="hover:underline text-stone-500"
+                                >
+                                  {post.comment_count} {post.comment_count === 1 ? 'comment' : 'comments'}
                                 </button>
                               )}
                             </div>
                           </div>
+                        )}
 
-                          {/* Post Content Body */}
-                          <div className="space-y-2">
-                            {showTitle && (
-                              <Link
-                                href={`/circles/${item.circle.slug}/discussions/${post.id}`}
-                                className="block text-base font-bold text-stone-900 hover:text-black transition-colors"
-                              >
-                                {post.title}
-                              </Link>
+                        {/* 4. Facebook 3-Button Action Bar (Equal Width, Clean Hover) */}
+                        <div className="grid grid-cols-3 border-t border-stone-100 px-2 py-1 text-xs">
+                          {/* Like */}
+                          <button
+                            type="button"
+                            onClick={() => handleToggleLike(item.circle.id, post.id)}
+                            className={`inline-flex items-center justify-center gap-1.5 rounded-lg py-2 font-semibold transition-colors ${
+                              post.viewer_has_liked
+                                ? 'text-rose-600 bg-rose-50/50'
+                                : 'text-stone-600 hover:bg-stone-50 hover:text-stone-900'
+                            }`}
+                          >
+                            <Heart className={`h-4 w-4 ${post.viewer_has_liked ? 'fill-rose-500 text-rose-500' : ''}`} />
+                            <span>Like</span>
+                          </button>
+
+                          {/* Comment */}
+                          <button
+                            type="button"
+                            onClick={() => handleToggleComments(item.circle.id, post.id)}
+                            className={`inline-flex items-center justify-center gap-1.5 rounded-lg py-2 font-semibold transition-colors ${
+                              isCommentsOpen
+                                ? 'text-stone-900 bg-stone-100'
+                                : 'text-stone-600 hover:bg-stone-50 hover:text-stone-900'
+                            }`}
+                          >
+                            <MessageSquare className="h-4 w-4" />
+                            <span>Comment</span>
+                          </button>
+
+                          {/* Share */}
+                          <button
+                            type="button"
+                            onClick={() => handleShareUrl(item.id, `/circles/${item.circle.slug}/discussions/${post.id}`)}
+                            className="inline-flex items-center justify-center gap-1.5 rounded-lg py-2 font-semibold text-stone-600 hover:bg-stone-50 hover:text-stone-900 transition-colors"
+                          >
+                            {copiedItemId === item.id ? (
+                              <>
+                                <Check className="h-4 w-4 text-emerald-600" />
+                                <span className="text-emerald-700">Copied</span>
+                              </>
+                            ) : (
+                              <>
+                                <Share2 className="h-4 w-4" />
+                                <span>Share</span>
+                              </>
                             )}
-
-                            {/* Attached Resource Card */}
-                            {resource && (
-                              <div className="rounded-xl border border-stone-200 bg-[#FAF9F6] p-3.5">
-                                <div className="flex items-start justify-between gap-3">
-                                  <div className="flex items-start gap-2.5 min-w-0">
-                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#F4F3EE] text-stone-900">
-                                      <BookOpen className="h-4 w-4" />
-                                    </div>
-                                    <div className="min-w-0">
-                                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-stone-900">
-                                        {resource.category}
-                                      </span>
-                                      <h4 className="text-sm font-bold text-stone-900 truncate">
-                                        {resource.title}
-                                      </h4>
-                                    </div>
-                                  </div>
-                                  {resource.url && (
-                                    <a
-                                      href={resource.url}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-black px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800"
-                                    >
-                                      <span>Open</span>
-                                      <ExternalLink className="h-3 w-3" />
-                                    </a>
-                                  )}
-                                </div>
-                                {cleanBody && (
-                                  <p className="mt-2 whitespace-pre-line text-xs sm:text-sm leading-relaxed text-stone-600">
-                                    {cleanBody}
-                                  </p>
-                                )}
-                              </div>
-                            )}
-
-                            {!resource && cleanBody && (
-                              <p className="whitespace-pre-line text-sm leading-relaxed text-stone-700 break-words">
-                                {cleanBody}
-                              </p>
-                            )}
-
-                            {/* Attached Interactive Poll */}
-                            {attachedPoll && (
-                              <div className="mt-2 rounded-xl border border-stone-200 bg-[#FAF9F6] p-4 space-y-2.5">
-                                <div className="flex items-center justify-between gap-2">
-                                  <span className="text-xs sm:text-sm font-bold text-stone-900 flex items-center gap-1.5">
-                                    <BarChart2 className="h-4 w-4 text-stone-900" />
-                                    {attachedPoll.question}
-                                  </span>
-                                  <span className="text-[11px] font-mono text-stone-500">
-                                    {attachedPoll.status === 'closed'
-                                      ? 'Closed'
-                                      : `${attachedPoll.total_votes || 0} votes`}
-                                  </span>
-                                </div>
-
-                                <div className="space-y-1.5">
-                                  {(attachedPoll.options || []).map((opt: PollOptionItem) => {
-                                    const totalVotes = attachedPoll.total_votes || 0;
-                                    const pct =
-                                      totalVotes > 0
-                                        ? Math.round(((opt.vote_count || 0) / totalVotes) * 100)
-                                        : 0;
-                                    return (
-                                      <button
-                                        key={opt.id}
-                                        type="button"
-                                        disabled={
-                                          attachedPoll.status === 'closed' ||
-                                          !isMember ||
-                                          votingOptionId === opt.id
-                                        }
-                                        onClick={() =>
-                                          handleVotePoll(
-                                            item.circle.id,
-                                            post.id,
-                                            attachedPoll.id,
-                                            opt.id
-                                          )
-                                        }
-                                        className={`relative w-full overflow-hidden rounded-xl border px-3.5 py-2 text-left text-xs transition-all ${
-                                          opt.viewer_voted
-                                            ? 'border-stone-900 bg-white font-semibold text-stone-900'
-                                            : 'border-stone-200 bg-white text-stone-700 hover:border-stone-300'
-                                        }`}
-                                      >
-                                        <div
-                                          className="pointer-events-none absolute inset-y-0 left-0 bg-stone-100/60"
-                                          style={{ width: `${pct}%` }}
-                                        />
-                                        <div className="relative flex items-center justify-between gap-2">
-                                          <span className="flex items-center gap-1.5">
-                                            {opt.viewer_voted && (
-                                              <Check className="h-3.5 w-3.5 text-stone-900" />
-                                            )}
-                                            <span>{opt.label}</span>
-                                          </span>
-                                          <span className="text-[11px] font-mono text-stone-500">
-                                            {pct}%
-                                          </span>
-                                        </div>
-                                      </button>
-                                    );
-                                  })}
-                                </div>
-                                {!isMember && (
-                                  <p className="text-[11px] text-stone-400">
-                                    Join {item.circle.name} to vote in this poll.
-                                  </p>
-                                )}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Social Engagement Footer Bar */}
-                          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-stone-100 pt-3">
-                            <div className="flex items-center gap-1.5">
-                              {/* Like Button (Any logged-in user can Like public posts!) */}
-                              <button
-                                type="button"
-                                onClick={() => handleToggleLike(item.circle.id, post.id)}
-                                className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all ${
-                                  post.viewer_has_liked
-                                    ? 'bg-rose-50 text-rose-600 border-rose-200 shadow-2xs'
-                                    : 'border-stone-200 bg-stone-50/80 text-stone-700 shadow-2xs hover:bg-stone-100 hover:border-stone-300 hover:text-stone-900'
-                                }`}
-                              >
-                                <Heart
-                                  className={`h-4 w-4 ${
-                                    post.viewer_has_liked ? 'fill-rose-500 text-rose-500' : ''
-                                  }`}
-                                />
-                                <span>{post.reaction_count || 0}</span>
-                                <span className="hidden sm:inline">Like</span>
-                              </button>
-
-                              {/* Inline Expandable Comments Toggle Button */}
-                              <button
-                                type="button"
-                                onClick={() => handleToggleComments(item.circle.id, post.id)}
-                                className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all ${
-                                  isCommentsOpen
-                                    ? 'border-stone-900 bg-stone-100 text-stone-900 shadow-2xs'
-                                    : 'border-stone-200 bg-stone-50/80 text-stone-700 shadow-2xs hover:bg-stone-100 hover:border-stone-300 hover:text-stone-900'
-                                }`}
-                              >
-                                <MessageSquare className="h-4 w-4" />
-                                <span>{post.comment_count || 0}</span>
-                                <span>
-                                  {post.comment_count === 1 ? 'Comment' : 'Comments'}
-                                </span>
-                              </button>
-
-                              {/* Save / Bookmark Button (Any logged-in user can Save public posts!) */}
-                              <button
-                                type="button"
-                                onClick={() => handleToggleSave(item.circle.id, post.id)}
-                                className={`inline-flex items-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-semibold transition-all ${
-                                  post.viewer_has_saved
-                                    ? 'border-stone-900 bg-stone-100 text-stone-900 shadow-2xs'
-                                    : 'border-stone-200 bg-stone-50/80 text-stone-700 shadow-2xs hover:bg-stone-100 hover:border-stone-300 hover:text-stone-900'
-                                }`}
-                              >
-                                <Bookmark
-                                  className={`h-4 w-4 ${
-                                    post.viewer_has_saved ? 'fill-stone-900 text-stone-900' : ''
-                                  }`}
-                                />
-                                <span className="hidden sm:inline">
-                                  {post.viewer_has_saved ? 'Saved' : 'Save'}
-                                </span>
-                              </button>
-                            </div>
-
-                            {/* Share Button */}
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleShareUrl(
-                                  item.id,
-                                  `/circles/${item.circle.slug}/discussions/${post.id}`
-                                )
-                              }
-                              className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-stone-50/80 px-2.5 py-1.5 text-xs font-medium text-stone-700 shadow-2xs hover:bg-stone-100 hover:border-stone-300 hover:text-stone-900 transition-colors"
-                            >
-                              {copiedItemId === item.id ? (
-                                <>
-                                  <Check className="h-3.5 w-3.5 text-stone-700" />
-                                  <span className="text-stone-900 font-semibold">Copied</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Share2 className="h-3.5 w-3.5" />
-                                  <span className="hidden sm:inline">Share</span>
-                                </>
-                              )}
-                            </button>
-                          </div>
+                          </button>
                         </div>
 
-                        {/* =================================================== */}
-                        {/* INLINE EXPANDABLE COMMENTS SECTION                  */}
-                        {/* =================================================== */}
+                        {/* 5. Facebook-style Inline Comments Section */}
                         {isCommentsOpen && (
-                          <div className="border-t border-stone-200/80 bg-[#FAF9F6] px-5 py-4 space-y-3.5">
+                          <div className="border-t border-stone-100 bg-stone-50/50 px-4 py-3.5 space-y-3">
                             {isLoadingComments ? (
                               <p className="py-3 text-center text-xs text-stone-400">
                                 Loading comments...
                               </p>
                             ) : postComments.length === 0 ? (
-                              <p className="py-2 text-xs text-stone-500">
+                              <p className="py-2 text-center text-xs text-stone-500">
                                 No comments yet. Be the first to start the conversation!
                               </p>
                             ) : (
@@ -1830,9 +1927,9 @@ export function SocialNewsfeedClient({
                                 {postComments.map((comment) => (
                                   <div
                                     key={comment.id}
-                                    className="flex items-start gap-2.5 rounded-xl bg-white p-3 border border-stone-200/70"
+                                    className="flex items-start gap-2.5"
                                   >
-                                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#F4F3EE] text-[11px] font-bold text-stone-900 overflow-hidden border border-stone-200">
+                                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-stone-200 text-xs font-bold text-stone-800 overflow-hidden border border-stone-200">
                                       {comment.author?.avatar_url ? (
                                         // eslint-disable-next-line @next/next/no-img-element
                                         <img
@@ -1846,25 +1943,25 @@ export function SocialNewsfeedClient({
                                           .toUpperCase()
                                       )}
                                     </div>
-                                    <div className="min-w-0 flex-1">
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-xs font-bold text-stone-900">
+                                    <div className="min-w-0 max-w-[85%]">
+                                      <div className="rounded-2xl bg-white px-3.5 py-2 border border-stone-200/80 shadow-2xs">
+                                        <span className="text-xs font-bold text-stone-900 block leading-tight">
                                           {comment.author?.display_name || 'Member'}
                                         </span>
-                                        <span className="text-[10px] text-stone-400">
-                                          {formatRelativeTime(comment.created_at)}
-                                        </span>
+                                        <p className="mt-0.5 whitespace-pre-line text-xs text-stone-800 leading-relaxed">
+                                          {comment.body}
+                                        </p>
                                       </div>
-                                      <p className="mt-1 whitespace-pre-line text-xs text-stone-700 leading-relaxed">
-                                        {comment.body}
-                                      </p>
+                                      <span className="text-[10px] text-stone-400 pl-2 mt-0.5 block">
+                                        {formatRelativeTime(comment.created_at)}
+                                      </span>
                                     </div>
                                   </div>
                                 ))}
                               </div>
                             )}
 
-                            {/* Inline Reply Input OR Membership Gate Prompt */}
+                            {/* Inline Comment Input Box */}
                             {!currentUser ? (
                               <div className="flex items-center justify-between rounded-xl border border-stone-200 bg-white px-3.5 py-2.5 text-xs">
                                 <span className="text-stone-600">
@@ -1882,9 +1979,9 @@ export function SocialNewsfeedClient({
                                 onSubmit={(e) =>
                                   handleSubmitComment(e, item.circle.id, post.id)
                                 }
-                                className="flex items-center gap-2"
+                                className="flex items-center gap-2 pt-1"
                               >
-                                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-black text-[11px] font-bold text-white overflow-hidden border border-stone-200">
+                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black text-xs font-bold text-white overflow-hidden border border-stone-200">
                                   {currentUser.avatar_url ? (
                                     // eslint-disable-next-line @next/next/no-img-element
                                     <img
@@ -1906,22 +2003,21 @@ export function SocialNewsfeedClient({
                                     }))
                                   }
                                   placeholder={`Write a comment in ${item.circle.name}...`}
-                                  className="flex-1 rounded-xl border border-stone-200 bg-white px-3.5 py-2 text-xs text-stone-900 placeholder:text-stone-400 focus:border-black focus:outline-none"
+                                  className="flex-1 rounded-full border border-stone-200 bg-white px-4 py-2 text-xs text-stone-900 placeholder:text-stone-400 focus:border-black focus:outline-none shadow-2xs"
                                 />
                                 <button
                                   type="submit"
                                   disabled={isSubmittingComment || !commentDraft.trim()}
-                                  className="inline-flex items-center gap-1 rounded-xl bg-black px-3.5 py-2 text-xs font-semibold text-white hover:bg-zinc-800 disabled:opacity-50 transition-colors"
+                                  className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-black text-white hover:bg-stone-800 disabled:opacity-40 transition-colors shrink-0 shadow-2xs"
+                                  title="Send comment"
                                 >
                                   <Send className="h-3.5 w-3.5" />
-                                  <span>Reply</span>
                                 </button>
                               </form>
                             ) : (
                               <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-stone-200 bg-stone-100 px-3.5 py-2.5 text-xs">
                                 <span className="text-stone-700">
-                                  Join <strong>{item.circle.name}</strong> to comment on community
-                                  discussions.
+                                  Join <strong>{item.circle.name}</strong> to comment on community discussions.
                                 </span>
                                 {isPending ? (
                                   <span className="font-semibold text-amber-800">
@@ -1965,63 +2061,108 @@ export function SocialNewsfeedClient({
                         key={item.id}
                         className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white p-5 shadow-xs transition-all hover:border-stone-300/90 space-y-3.5"
                       >
-                        {/* Circle Header */}
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <Link
-                              href={`/circles/${item.circle.slug}`}
-                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black text-xs font-bold text-white shadow-2xs overflow-hidden"
-                            >
-                              {item.circle.avatar_url ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  src={item.circle.avatar_url}
-                                  alt={item.circle.name}
-                                  className="h-full w-full object-cover"
-                                />
-                              ) : (
-                                item.circle.name.slice(0, 1).toUpperCase()
-                              )}
-                            </Link>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <Link
-                                  href={`/circles/${item.circle.slug}`}
-                                  className="text-xs sm:text-sm font-bold text-stone-900 hover:text-black truncate"
-                                >
-                                  {item.circle.name}
-                                </Link>
-                                <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-mono font-bold text-stone-900 border border-stone-200">
-                                  EVENT
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1.5 text-[11px] text-stone-500">
-                                <span>Hosted by</span>
+                        {/* Facebook-style Clean Header */}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="relative shrink-0">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-sm font-bold text-stone-800 border border-stone-200 overflow-hidden shadow-2xs">
                                 {(ev.host?.avatar_url || ev.organizer?.avatar_url) ? (
                                   // eslint-disable-next-line @next/next/no-img-element
                                   <img
                                     src={ev.host?.avatar_url || ev.organizer?.avatar_url || ''}
                                     alt={ev.host?.display_name || ev.organizer?.display_name || 'Host'}
-                                    className="h-3.5 w-3.5 rounded-full object-cover border border-stone-200"
+                                    className="h-full w-full object-cover"
                                   />
-                                ) : null}
-                                <span className="font-semibold text-stone-700">
+                                ) : (
+                                  <span>{((ev.host?.display_name || ev.organizer?.display_name || item.circle.name).slice(0, 1)).toUpperCase()}</span>
+                                )}
+                              </div>
+                              <Link
+                                href={`/circles/${item.circle.slug}`}
+                                title={item.circle.name}
+                                className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-black text-[8px] font-bold text-white border-2 border-white overflow-hidden shadow-2xs"
+                              >
+                                {item.circle.avatar_url ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={item.circle.avatar_url} alt={item.circle.name} className="h-full w-full object-cover" />
+                                ) : (
+                                  item.circle.name.slice(0, 1).toUpperCase()
+                                )}
+                              </Link>
+                            </div>
+
+                            <div className="min-w-0 leading-tight">
+                              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                                <span className="text-sm font-bold text-stone-900 hover:underline">
                                   {ev.host?.display_name || ev.organizer?.display_name || 'Host'}
                                 </span>
-                                <span>·</span>
+                                <span className="text-xs text-stone-400 font-normal">created an event in</span>
+                                <Link
+                                  href={`/circles/${item.circle.slug}`}
+                                  className="text-sm font-semibold text-stone-900 hover:underline truncate"
+                                >
+                                  {item.circle.name}
+                                </Link>
+                              </div>
+                              <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-stone-400">
                                 <span>{formatRelativeTime(ev.created_at)}</span>
+                                <span>·</span>
+                                <span className="inline-flex items-center gap-1">
+                                  {ev.location_type === 'in_person' ? (
+                                    <MapPin className="h-2.5 w-2.5 text-amber-600" />
+                                  ) : (
+                                    <Video className="h-2.5 w-2.5 text-sky-600" />
+                                  )}
+                                  <span>{channelLabel}</span>
+                                </span>
                               </div>
                             </div>
                           </div>
 
-                          <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-[11px] font-mono font-semibold text-sky-800 border border-sky-200">
-                            {ev.location_type === 'in_person' ? (
-                              <MapPin className="h-3 w-3 text-amber-600" />
-                            ) : (
-                              <Video className="h-3 w-3 text-sky-600" />
-                            )}
-                            {channelLabel}
-                          </span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-0.5 text-[10px] font-mono font-semibold text-sky-800 border border-sky-200">
+                              EVENT
+                            </span>
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveMenuPostId(activeMenuPostId === item.id ? null : item.id);
+                                }}
+                                className="rounded-full p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors"
+                                aria-label="More options"
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </button>
+                              {activeMenuPostId === item.id && (
+                                <div
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="absolute right-0 top-full mt-1 w-44 rounded-xl border border-stone-200 bg-white p-1.5 shadow-lg z-20 animate-in fade-in zoom-in-95 duration-100 space-y-0.5"
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleShareUrl(item.id, `/circles/${item.circle.slug}/events`);
+                                      setActiveMenuPostId(null);
+                                    }}
+                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 hover:bg-stone-50 font-medium transition-colors"
+                                  >
+                                    <Share2 className="h-3.5 w-3.5" />
+                                    <span>{copiedItemId === item.id ? 'Copied Link' : 'Copy event link'}</span>
+                                  </button>
+                                  <Link
+                                    href={`/circles/${item.circle.slug}`}
+                                    onClick={() => setActiveMenuPostId(null)}
+                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 hover:bg-stone-50 font-medium transition-colors"
+                                  >
+                                    <ArrowRight className="h-3.5 w-3.5" />
+                                    <span>Visit Circle</span>
+                                  </Link>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
 
                         {/* Event Cover Image if provided */}
@@ -2128,74 +2269,128 @@ export function SocialNewsfeedClient({
                     return (
                       <article
                         key={item.id}
-                        className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white p-5 shadow-xs transition-all hover:border-stone-300/90 space-y-3.5"
+                        className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white p-4 sm:p-5 shadow-xs transition-all hover:border-stone-300/90 space-y-3"
                       >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <Link
-                              href={`/circles/${item.circle.slug}`}
-                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black text-xs font-bold text-white shadow-2xs overflow-hidden"
-                            >
-                              {item.circle.avatar_url ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  src={item.circle.avatar_url}
-                                  alt={item.circle.name}
-                                  className="h-full w-full object-cover"
-                                />
-                              ) : (
-                                item.circle.name.slice(0, 1).toUpperCase()
-                              )}
-                            </Link>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <Link
-                                  href={`/circles/${item.circle.slug}`}
-                                  className="text-xs sm:text-sm font-bold text-stone-900 hover:text-black truncate"
-                                >
-                                  {item.circle.name}
-                                </Link>
-                                <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-mono font-bold uppercase text-amber-800 border border-amber-200">
-                                  {listing.listing_type || 'Listing'}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1.5 text-[11px] text-stone-500">
-                                <span>Listed by</span>
+                        {/* Facebook-style Clean Header */}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="relative shrink-0">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-sm font-bold text-stone-800 border border-stone-200 overflow-hidden shadow-2xs">
                                 {listing.seller?.avatar_url ? (
                                   // eslint-disable-next-line @next/next/no-img-element
                                   <img
                                     src={listing.seller.avatar_url}
                                     alt={listing.seller.display_name}
-                                    className="h-3.5 w-3.5 rounded-full object-cover border border-stone-200"
+                                    className="h-full w-full object-cover"
                                   />
-                                ) : null}
-                                <span className="font-semibold text-stone-700">
+                                ) : (
+                                  <span>{((listing.seller?.display_name || item.circle.name).slice(0, 1)).toUpperCase()}</span>
+                                )}
+                              </div>
+                              <Link
+                                href={`/circles/${item.circle.slug}`}
+                                title={item.circle.name}
+                                className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-black text-[8px] font-bold text-white border-2 border-white overflow-hidden shadow-2xs hover:scale-110 transition-transform"
+                              >
+                                {item.circle.avatar_url ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={item.circle.avatar_url} alt={item.circle.name} className="h-full w-full object-cover" />
+                                ) : (
+                                  item.circle.name.slice(0, 1).toUpperCase()
+                                )}
+                              </Link>
+                            </div>
+
+                            <div className="min-w-0 leading-tight">
+                              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                                <span className="text-sm font-bold text-stone-900 hover:underline">
                                   {listing.seller?.display_name || 'Member'}
                                 </span>
-                                <span>·</span>
+                                <span className="text-xs text-stone-400 font-normal">listed an item in</span>
+                                <Link
+                                  href={`/circles/${item.circle.slug}`}
+                                  className="text-sm font-semibold text-stone-900 hover:underline truncate"
+                                >
+                                  {item.circle.name}
+                                </Link>
+                              </div>
+                              <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-stone-400">
                                 <span>{formatRelativeTime(listing.created_at)}</span>
+                                <span>·</span>
+                                <span className="capitalize">{listing.category || 'Marketplace'}</span>
+                                {listing.location && (
+                                  <>
+                                    <span>·</span>
+                                    <span className="inline-flex items-center gap-0.5">
+                                      <MapPin className="h-2.5 w-2.5 text-stone-400" />
+                                      {listing.location}
+                                    </span>
+                                  </>
+                                )}
                               </div>
                             </div>
                           </div>
 
-                          <span className="rounded-xl bg-[#F4F3EE] px-3 py-1 text-xs sm:text-sm font-extrabold text-stone-900">
-                            {priceText}
-                          </span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-mono font-bold text-stone-900 border border-stone-200">
+                              {priceText}
+                            </span>
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveMenuPostId(activeMenuPostId === item.id ? null : item.id);
+                                }}
+                                className="rounded-full p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors"
+                                aria-label="More options"
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </button>
+                              {activeMenuPostId === item.id && (
+                                <div
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="absolute right-0 top-full mt-1 w-44 rounded-xl border border-stone-200 bg-white p-1.5 shadow-lg z-20 animate-in fade-in zoom-in-95 duration-100 space-y-0.5"
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleShareUrl(item.id, `/circles/${item.circle.slug}/marketplace/${listing.id}`);
+                                      setActiveMenuPostId(null);
+                                    }}
+                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 hover:bg-stone-50 font-medium transition-colors"
+                                  >
+                                    <Share2 className="h-3.5 w-3.5" />
+                                    <span>{copiedItemId === item.id ? 'Copied Link' : 'Copy listing link'}</span>
+                                  </button>
+                                  <Link
+                                    href={`/circles/${item.circle.slug}`}
+                                    onClick={() => setActiveMenuPostId(null)}
+                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 hover:bg-stone-50 font-medium transition-colors"
+                                  >
+                                    <ArrowRight className="h-3.5 w-3.5" />
+                                    <span>Visit Circle</span>
+                                  </Link>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
 
-                        <div className="flex flex-col sm:flex-row gap-4 rounded-xl border border-stone-200/80 bg-[#FAF9F6] p-3.5">
+                        {/* Listing Content Body */}
+                        <div className="flex flex-col sm:flex-row gap-3.5 rounded-xl border border-stone-200/80 bg-stone-50/50 p-3">
                           {listing.image_urls && listing.image_urls[0] && (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
                               src={listing.image_urls[0]}
                               alt={listing.title}
-                              className="h-32 sm:h-24 sm:w-32 rounded-lg object-cover shrink-0"
+                              className="h-36 sm:h-24 sm:w-32 rounded-lg object-cover shrink-0 border border-stone-200"
                             />
                           )}
                           <div className="min-w-0 flex-1 space-y-1">
                             <Link
                               href={`/circles/${item.circle.slug}/marketplace/${listing.id}`}
-                              className="block text-sm sm:text-base font-bold text-stone-900 hover:text-black"
+                              className="block text-sm sm:text-base font-bold text-stone-900 hover:underline"
                             >
                               {listing.title}
                             </Link>
@@ -2204,23 +2399,18 @@ export function SocialNewsfeedClient({
                                 {listing.description}
                               </p>
                             )}
-                            {listing.location && (
-                              <p className="inline-flex items-center gap-1 text-[11px] text-stone-500 pt-1">
-                                <MapPin className="h-3 w-3" />
-                                {listing.location}
-                              </p>
-                            )}
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between pt-1">
+                        {/* Footer Action */}
+                        <div className="flex items-center justify-between pt-0.5">
                           <span className="inline-flex items-center gap-1 text-xs text-stone-500 capitalize">
                             <Tag className="h-3.5 w-3.5 text-stone-400" />
-                            {listing.category}
+                            {listing.listing_type || 'Listing'}
                           </span>
                           <Link
                             href={`/circles/${item.circle.slug}/marketplace/${listing.id}`}
-                            className="inline-flex items-center gap-1 rounded-xl bg-black px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800"
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-black px-3.5 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800 transition-colors"
                           >
                             <ShoppingBag className="h-3.5 w-3.5" />
                             <span>View Listing</span>
@@ -2243,80 +2433,125 @@ export function SocialNewsfeedClient({
                     return (
                       <article
                         key={item.id}
-                        className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white p-5 shadow-xs transition-all hover:border-stone-300/90 space-y-3.5"
+                        className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white p-4 sm:p-5 shadow-xs transition-all hover:border-stone-300/90 space-y-3"
                       >
-                        {/* Circle Header */}
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <Link
-                              href={`/circles/${item.circle.slug}`}
-                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black text-xs font-bold text-white shadow-2xs overflow-hidden"
-                            >
-                              {item.circle.avatar_url ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  src={item.circle.avatar_url}
-                                  alt={item.circle.name}
-                                  className="h-full w-full object-cover"
-                                />
-                              ) : (
-                                item.circle.name.slice(0, 1).toUpperCase()
-                              )}
-                            </Link>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <Link
-                                  href={`/circles/${item.circle.slug}`}
-                                  className="text-xs sm:text-sm font-bold text-stone-900 hover:text-black truncate"
-                                >
-                                  {item.circle.name}
-                                </Link>
-                                <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-mono font-bold uppercase text-stone-900 border border-stone-200">
-                                  Course
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1.5 text-[11px] text-stone-500">
-                                <span>By</span>
+                        {/* Facebook-style Clean Header */}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="relative shrink-0">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-sm font-bold text-stone-800 border border-stone-200 overflow-hidden shadow-2xs">
                                 {course.instructor?.avatar_url ? (
                                   // eslint-disable-next-line @next/next/no-img-element
                                   <img
                                     src={course.instructor.avatar_url}
                                     alt={course.instructor.display_name}
-                                    className="h-3.5 w-3.5 rounded-full object-cover border border-stone-200"
+                                    className="h-full w-full object-cover"
                                   />
-                                ) : null}
-                                <span className="font-semibold text-stone-700">
+                                ) : (
+                                  <span>{((course.instructor?.display_name || item.circle.name).slice(0, 1)).toUpperCase()}</span>
+                                )}
+                              </div>
+                              <Link
+                                href={`/circles/${item.circle.slug}`}
+                                title={item.circle.name}
+                                className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-black text-[8px] font-bold text-white border-2 border-white overflow-hidden shadow-2xs hover:scale-110 transition-transform"
+                              >
+                                {item.circle.avatar_url ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={item.circle.avatar_url} alt={item.circle.name} className="h-full w-full object-cover" />
+                                ) : (
+                                  item.circle.name.slice(0, 1).toUpperCase()
+                                )}
+                              </Link>
+                            </div>
+
+                            <div className="min-w-0 leading-tight">
+                              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                                <span className="text-sm font-bold text-stone-900 hover:underline">
                                   {course.instructor?.display_name || 'Instructor'}
                                 </span>
-                                <span>·</span>
+                                <span className="text-xs text-stone-400 font-normal">published a course in</span>
+                                <Link
+                                  href={`/circles/${item.circle.slug}`}
+                                  className="text-sm font-semibold text-stone-900 hover:underline truncate"
+                                >
+                                  {item.circle.name}
+                                </Link>
+                              </div>
+                              <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-stone-400">
                                 <span>{formatRelativeTime(item.timestamp)}</span>
+                                <span>·</span>
+                                <span className="capitalize">{difficulty}</span>
+                                <span>·</span>
+                                <span>{totalLessons} {totalLessons === 1 ? 'lesson' : 'lessons'}</span>
                               </div>
                             </div>
                           </div>
 
-                          <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-mono font-semibold border ${
-                            isPaid
-                              ? 'bg-amber-50 text-amber-800 border-amber-200'
-                              : 'bg-stone-50 text-stone-700 border-stone-200'
-                          }`}>
-                            {isPaid ? 'PAID ACCESS' : 'OPEN ENROLLMENT'}
-                          </span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-mono font-semibold border ${
+                              isPaid
+                                ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                            }`}>
+                              {isPaid ? 'PAID' : 'FREE'}
+                            </span>
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveMenuPostId(activeMenuPostId === item.id ? null : item.id);
+                                }}
+                                className="rounded-full p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors"
+                                aria-label="More options"
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </button>
+                              {activeMenuPostId === item.id && (
+                                <div
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="absolute right-0 top-full mt-1 w-44 rounded-xl border border-stone-200 bg-white p-1.5 shadow-lg z-20 animate-in fade-in zoom-in-95 duration-100 space-y-0.5"
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleShareUrl(item.id, `/circles/${item.circle.slug}/courses/${course.id}`);
+                                      setActiveMenuPostId(null);
+                                    }}
+                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 hover:bg-stone-50 font-medium transition-colors"
+                                  >
+                                    <Share2 className="h-3.5 w-3.5" />
+                                    <span>{copiedItemId === item.id ? 'Copied Link' : 'Copy course link'}</span>
+                                  </button>
+                                  <Link
+                                    href={`/circles/${item.circle.slug}`}
+                                    onClick={() => setActiveMenuPostId(null)}
+                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 hover:bg-stone-50 font-medium transition-colors"
+                                  >
+                                    <ArrowRight className="h-3.5 w-3.5" />
+                                    <span>Visit Circle</span>
+                                  </Link>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
 
                         {/* Course Body */}
-                        <div className="flex flex-col sm:flex-row gap-4 rounded-xl border border-stone-200/80 bg-[#FAF9F6] p-3.5">
+                        <div className="flex flex-col sm:flex-row gap-3.5 rounded-xl border border-stone-200/80 bg-stone-50/50 p-3">
                           {course.thumbnail_url && (
                             // eslint-disable-next-line @next/next/no-img-element
                             <img
                               src={course.thumbnail_url}
                               alt={course.title}
-                              className="h-32 sm:h-24 sm:w-36 rounded-lg object-cover shrink-0 border border-stone-200"
+                              className="h-36 sm:h-24 sm:w-36 rounded-lg object-cover shrink-0 border border-stone-200"
                             />
                           )}
                           <div className="min-w-0 flex-1 space-y-1.5">
                             <Link
                               href={`/circles/${item.circle.slug}/courses/${course.id}`}
-                              className="block text-sm sm:text-base font-bold text-stone-900 hover:text-black"
+                              className="block text-sm sm:text-base font-bold text-stone-900 hover:underline"
                             >
                               {course.title}
                             </Link>
@@ -2325,7 +2560,7 @@ export function SocialNewsfeedClient({
                                 {course.description}
                               </p>
                             )}
-                            <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] text-stone-500 font-medium">
+                            <div className="flex flex-wrap items-center gap-2 pt-0.5 text-[11px] text-stone-500 font-medium">
                               <span className="inline-flex items-center gap-1 rounded bg-white px-2 py-0.5 border border-stone-200">
                                 <BookOpen className="h-3 w-3 text-stone-600" />
                                 {totalLessons} {totalLessons === 1 ? 'lesson' : 'lessons'}
@@ -2336,21 +2571,17 @@ export function SocialNewsfeedClient({
                                   {duration}
                                 </span>
                               )}
-                              <span className="inline-flex items-center gap-1 rounded bg-white px-2 py-0.5 border border-stone-200 capitalize">
-                                <GraduationCap className="h-3 w-3 text-stone-600" />
-                                {difficulty}
-                              </span>
                             </div>
                           </div>
                         </div>
 
                         {/* Card Actions */}
-                        <div className="flex items-center justify-between gap-3 border-t border-stone-100 pt-3">
+                        <div className="flex items-center justify-between gap-3 pt-0.5">
                           <Link
                             href={`/circles/${item.circle.slug}/courses`}
                             className="text-xs text-stone-500 hover:text-stone-900 font-medium flex items-center gap-1"
                           >
-                            <span>More courses in {item.circle.name}</span>
+                            <span>More in {item.circle.name}</span>
                             <ChevronRight className="h-3.5 w-3.5" />
                           </Link>
                           <Link
@@ -2373,67 +2604,111 @@ export function SocialNewsfeedClient({
                     return (
                       <article
                         key={item.id}
-                        className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white p-5 shadow-xs transition-all hover:border-stone-300/90 space-y-3.5"
+                        className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white p-4 sm:p-5 shadow-xs transition-all hover:border-stone-300/90 space-y-3"
                       >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <Link
-                              href={`/circles/${item.circle.slug}`}
-                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black text-xs font-bold text-white shadow-2xs overflow-hidden"
-                            >
-                              {item.circle.avatar_url ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  src={item.circle.avatar_url}
-                                  alt={item.circle.name}
-                                  className="h-full w-full object-cover"
-                                />
-                              ) : (
-                                item.circle.name.slice(0, 1).toUpperCase()
-                              )}
-                            </Link>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <Link
-                                  href={`/circles/${item.circle.slug}`}
-                                  className="text-xs sm:text-sm font-bold text-stone-900 hover:text-black truncate"
-                                >
-                                  {item.circle.name}
-                                </Link>
-                                <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-mono font-bold uppercase text-stone-900 border border-stone-200">
-                                  {res.category || 'Guide'}
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-1.5 text-[11px] text-stone-500">
-                                <span>Published by</span>
+                        {/* Facebook-style Clean Header */}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="relative shrink-0">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-sm font-bold text-stone-800 border border-stone-200 overflow-hidden shadow-2xs">
                                 {res.author?.avatar_url ? (
                                   // eslint-disable-next-line @next/next/no-img-element
                                   <img
                                     src={res.author.avatar_url}
                                     alt={res.author.display_name}
-                                    className="h-3.5 w-3.5 rounded-full object-cover border border-stone-200"
+                                    className="h-full w-full object-cover"
                                   />
-                                ) : null}
-                                <span className="font-semibold text-stone-700">
+                                ) : (
+                                  <span>{((res.author?.display_name || item.circle.name).slice(0, 1)).toUpperCase()}</span>
+                                )}
+                              </div>
+                              <Link
+                                href={`/circles/${item.circle.slug}`}
+                                title={item.circle.name}
+                                className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-black text-[8px] font-bold text-white border-2 border-white overflow-hidden shadow-2xs hover:scale-110 transition-transform"
+                              >
+                                {item.circle.avatar_url ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={item.circle.avatar_url} alt={item.circle.name} className="h-full w-full object-cover" />
+                                ) : (
+                                  item.circle.name.slice(0, 1).toUpperCase()
+                                )}
+                              </Link>
+                            </div>
+
+                            <div className="min-w-0 leading-tight">
+                              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                                <span className="text-sm font-bold text-stone-900 hover:underline">
                                   {res.author?.display_name || 'Member'}
                                 </span>
-                                <span>·</span>
+                                <span className="text-xs text-stone-400 font-normal">shared a guide in</span>
+                                <Link
+                                  href={`/circles/${item.circle.slug}`}
+                                  className="text-sm font-semibold text-stone-900 hover:underline truncate"
+                                >
+                                  {item.circle.name}
+                                </Link>
+                              </div>
+                              <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-stone-400">
                                 <span>{formatRelativeTime(item.timestamp)}</span>
+                                <span>·</span>
+                                <span className="capitalize">{res.category || 'Guide'}</span>
                               </div>
                             </div>
                           </div>
 
-                          {res.difficulty_level && (
-                            <span className="rounded-full bg-stone-50 px-2 py-0.5 text-[10px] font-mono font-bold capitalize text-stone-700 border border-stone-200">
-                              {res.difficulty_level}
-                            </span>
-                          )}
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {res.difficulty_level && (
+                              <span className="rounded-full bg-stone-50 px-2 py-0.5 text-[10px] font-mono font-bold capitalize text-stone-700 border border-stone-200">
+                                {res.difficulty_level}
+                              </span>
+                            )}
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveMenuPostId(activeMenuPostId === item.id ? null : item.id);
+                                }}
+                                className="rounded-full p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors"
+                                aria-label="More options"
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </button>
+                              {activeMenuPostId === item.id && (
+                                <div
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="absolute right-0 top-full mt-1 w-44 rounded-xl border border-stone-200 bg-white p-1.5 shadow-lg z-20 animate-in fade-in zoom-in-95 duration-100 space-y-0.5"
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleShareUrl(item.id, `/circles/${item.circle.slug}/resources`);
+                                      setActiveMenuPostId(null);
+                                    }}
+                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 hover:bg-stone-50 font-medium transition-colors"
+                                  >
+                                    <Share2 className="h-3.5 w-3.5" />
+                                    <span>{copiedItemId === item.id ? 'Copied Link' : 'Copy resource link'}</span>
+                                  </button>
+                                  <Link
+                                    href={`/circles/${item.circle.slug}`}
+                                    onClick={() => setActiveMenuPostId(null)}
+                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 hover:bg-stone-50 font-medium transition-colors"
+                                  >
+                                    <ArrowRight className="h-3.5 w-3.5" />
+                                    <span>Visit Circle</span>
+                                  </Link>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
 
-                        <div className="rounded-xl border border-stone-200/80 bg-[#FAF9F6] p-3.5 space-y-1.5">
+                        <div className="rounded-xl border border-stone-200/80 bg-stone-50/50 p-3.5 space-y-1.5">
                           <Link
                             href={`/circles/${item.circle.slug}/resources`}
-                            className="block text-sm sm:text-base font-bold text-stone-900 hover:text-black"
+                            className="block text-sm sm:text-base font-bold text-stone-900 hover:underline"
                           >
                             {res.title}
                           </Link>
@@ -2444,7 +2719,7 @@ export function SocialNewsfeedClient({
                           )}
                         </div>
 
-                        <div className="flex items-center justify-between pt-1">
+                        <div className="flex items-center justify-between pt-0.5">
                           <Link
                             href={`/circles/${item.circle.slug}/resources`}
                             className="text-xs text-stone-500 hover:text-stone-900 font-medium flex items-center gap-1"
@@ -2479,52 +2754,97 @@ export function SocialNewsfeedClient({
                     return (
                       <article
                         key={item.id}
-                        className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white p-5 shadow-xs transition-all hover:border-stone-300/90 space-y-3.5"
+                        className="overflow-hidden rounded-2xl border border-stone-200/90 bg-white p-4 sm:p-5 shadow-xs transition-all hover:border-stone-300/90 space-y-3"
                       >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <Link
-                              href={`/circles/${item.circle.slug}`}
-                              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-black text-xs font-bold text-white shadow-2xs overflow-hidden"
-                            >
-                              {item.circle.avatar_url ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img
-                                  src={item.circle.avatar_url}
-                                  alt={item.circle.name}
-                                  className="h-full w-full object-cover"
-                                />
-                              ) : (
-                                item.circle.name.slice(0, 1).toUpperCase()
-                              )}
-                            </Link>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5">
+                        {/* Facebook-style Clean Header */}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="relative shrink-0">
+                              <Link
+                                href={`/circles/${item.circle.slug}`}
+                                className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-sm font-bold text-stone-800 border border-stone-200 overflow-hidden shadow-2xs"
+                              >
+                                {item.circle.avatar_url ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img
+                                    src={item.circle.avatar_url}
+                                    alt={item.circle.name}
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  item.circle.name.slice(0, 1).toUpperCase()
+                                )}
+                              </Link>
+                            </div>
+
+                            <div className="min-w-0 leading-tight">
+                              <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
                                 <Link
                                   href={`/circles/${item.circle.slug}`}
-                                  className="text-xs sm:text-sm font-bold text-stone-900 hover:text-black truncate"
+                                  className="text-sm font-bold text-stone-900 hover:underline truncate"
                                 >
                                   {item.circle.name}
                                 </Link>
-                                <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[10px] font-mono font-bold uppercase text-stone-900 border border-stone-200">
-                                  Cause
-                                </span>
+                                <span className="text-xs text-stone-400 font-normal">started a fundraiser</span>
                               </div>
-                              <p className="text-[11px] text-stone-500">
-                                Community Campaign · {formatRelativeTime(item.timestamp)}
-                              </p>
+                              <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-stone-400">
+                                <span>{formatRelativeTime(item.timestamp)}</span>
+                                <span>·</span>
+                                <span>Community Campaign</span>
+                              </div>
                             </div>
                           </div>
 
-                          <span className="rounded-xl bg-[#F4F3EE] px-3 py-1 text-xs sm:text-sm font-extrabold text-stone-900">
-                            {cause.currency} {pledgedTotal.toLocaleString()}
-                          </span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <span className="rounded-full bg-stone-100 px-2.5 py-0.5 text-xs font-mono font-bold text-stone-900 border border-stone-200">
+                              {cause.currency} {pledgedTotal.toLocaleString()}
+                            </span>
+                            <div className="relative">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveMenuPostId(activeMenuPostId === item.id ? null : item.id);
+                                }}
+                                className="rounded-full p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700 transition-colors"
+                                aria-label="More options"
+                              >
+                                <MoreHorizontal className="h-4 w-4" />
+                              </button>
+                              {activeMenuPostId === item.id && (
+                                <div
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="absolute right-0 top-full mt-1 w-44 rounded-xl border border-stone-200 bg-white p-1.5 shadow-lg z-20 animate-in fade-in zoom-in-95 duration-100 space-y-0.5"
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      handleShareUrl(item.id, `/circles/${item.circle.slug}/community`);
+                                      setActiveMenuPostId(null);
+                                    }}
+                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 hover:bg-stone-50 font-medium transition-colors"
+                                  >
+                                    <Share2 className="h-3.5 w-3.5" />
+                                    <span>{copiedItemId === item.id ? 'Copied Link' : 'Copy cause link'}</span>
+                                  </button>
+                                  <Link
+                                    href={`/circles/${item.circle.slug}`}
+                                    onClick={() => setActiveMenuPostId(null)}
+                                    className="w-full flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-xs text-stone-700 hover:bg-stone-50 font-medium transition-colors"
+                                  >
+                                    <ArrowRight className="h-3.5 w-3.5" />
+                                    <span>Visit Circle</span>
+                                  </Link>
+                                </div>
+                              )}
+                            </div>
+                          </div>
                         </div>
 
-                        <div className="rounded-xl border border-stone-200/80 bg-[#FAF9F6] p-3.5 space-y-2">
+                        <div className="rounded-xl border border-stone-200/80 bg-stone-50/50 p-3.5 space-y-2">
                           <Link
                             href={`/circles/${item.circle.slug}/community`}
-                            className="block text-sm sm:text-base font-bold text-stone-900 hover:text-black"
+                            className="block text-sm sm:text-base font-bold text-stone-900 hover:underline"
                           >
                             {cause.title}
                           </Link>
@@ -2544,7 +2864,7 @@ export function SocialNewsfeedClient({
                           </div>
                         </div>
 
-                        <div className="flex items-center justify-between pt-1">
+                        <div className="flex items-center justify-between pt-0.5">
                           <span className="text-xs text-stone-500 font-medium">
                             {pledgeCount} {pledgeCount === 1 ? 'supporter' : 'supporters'}
                           </span>

@@ -345,7 +345,7 @@ export async function createFundraisingPledge(
 ): Promise<FundraisingPledgeItem> {
   const parsed = createFundraisingPledgeSchema.parse(input);
 
-  return withRlsTransaction(actorUserId, async (tx) => {
+  const result = await withRlsTransaction(actorUserId, async (tx) => {
     const capRes = await tx.query<{ enabled: boolean; settings: Record<string, unknown> }>(
       `SELECT enabled, settings FROM public.circle_capabilities
        WHERE circle_id = $1 AND capability_key = 'fundraising_causes' AND enabled = true LIMIT 1;`,
@@ -469,25 +469,44 @@ export async function createFundraisingPledge(
       ]
     );
 
+    let notifyTarget: {
+      creatorId: string;
+      title: string;
+      currency: string;
+    } | null = null;
+
     if (actorUserId !== campaign.creator_id) {
-      await createNotification({
-        recipientId: campaign.creator_id,
-        actorId: actorUserId,
-        circleId,
-        eventType: 'challenge_reward',
-        title: `New donation to "${campaign.title}"`,
-        body: `${parsed.isAnonymous ? 'An anonymous supporter' : parsed.donorName || 'A supporter'} donated ${campaign.currency} ${parsed.pledgeAmount.toLocaleString()}.`,
-        linkUrl: `/circles/${circleId}/community`,
-      }).catch(() => {});
+      notifyTarget = {
+        creatorId: campaign.creator_id,
+        title: campaign.title,
+        currency: campaign.currency,
+      };
     }
 
     return {
-      ...res.rows[0],
-      pledge_amount: Number(res.rows[0].pledge_amount),
-      platform_fee_amount: Number(res.rows[0].platform_fee_amount ?? 0),
-      net_amount: Number(res.rows[0].net_amount ?? res.rows[0].pledge_amount),
+      pledge: {
+        ...res.rows[0],
+        pledge_amount: Number(res.rows[0].pledge_amount),
+        platform_fee_amount: Number(res.rows[0].platform_fee_amount ?? 0),
+        net_amount: Number(res.rows[0].net_amount ?? res.rows[0].pledge_amount),
+      },
+      notifyTarget,
     };
   });
+
+  if (result.notifyTarget) {
+    await createNotification({
+      recipientId: result.notifyTarget.creatorId,
+      actorId: actorUserId,
+      circleId,
+      eventType: 'challenge_reward',
+      title: `New donation to "${result.notifyTarget.title}"`,
+      body: `${parsed.isAnonymous ? 'An anonymous supporter' : parsed.donorName || 'A supporter'} donated ${result.notifyTarget.currency} ${parsed.pledgeAmount.toLocaleString()}.`,
+      linkUrl: `/circles/${circleId}/community`,
+    }).catch(() => {});
+  }
+
+  return result.pledge;
 }
 
 export async function updateFundraisingCampaign(
